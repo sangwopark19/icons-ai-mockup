@@ -1,0 +1,25 @@
+# 의존성
+node_modules
+.pnpm-store
+
+# 빌드 결과물
+dist
+.next
+out
+
+# 캐시
+.turbo
+.cache
+
+# 환경 변수
+.env
+.env.*
+
+# 생성된 파일
+*.generated.*
+prisma/migrations
+
+# 기타
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
