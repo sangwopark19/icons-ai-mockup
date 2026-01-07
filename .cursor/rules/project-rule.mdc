@@ -1,0 +1,7 @@
+---
+alwaysApply: true
+---
+This project uses the latest stable versions of all technology stacks.
+1. Consult Documentation First: Before writing any code, you must retrieve the latest official documentation via Context7 (or refer to indexed @Docs).
+2. No Hallucinations: Do not generate speculative code that is not based on the retrieved documentation.
+3. Avoid Deprecated Code: Never suggest legacy code or deprecated features.
