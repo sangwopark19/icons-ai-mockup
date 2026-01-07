@@ -1,0 +1,205 @@
+// Prisma 스키마 정의
+// AI 목업 이미지 프로그램 데이터베이스 설계
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===================
+// 사용자 관련
+// ===================
+
+/// 사용자 테이블
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  name         String
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  lastLoginAt  DateTime? @map("last_login_at")
+
+  sessions Session[]
+  projects Project[]
+
+  @@map("users")
+}
+
+/// 세션 테이블 (JWT 토큰 저장)
+model Session {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+// ===================
+// 프로젝트 관련
+// ===================
+
+/// 프로젝트 테이블
+model Project {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  name        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  characters  IPCharacter[]
+  generations Generation[]
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("projects")
+}
+
+/// IP 캐릭터 테이블
+model IPCharacter {
+  id            String   @id @default(uuid())
+  projectId     String   @map("project_id")
+  name          String
+  filePath      String   @map("file_path")
+  thumbnailPath String?  @map("thumbnail_path")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  generations Generation[]
+
+  @@index([projectId])
+  @@map("ip_characters")
+}
+
+// ===================
+// 생성 관련
+// ===================
+
+/// 생성 모드 열거형
+enum GenerationMode {
+  ip_change
+  sketch_to_real
+
+  @@map("generation_mode")
+}
+
+/// 생성 상태 열거형
+enum GenerationStatus {
+  pending
+  processing
+  completed
+  failed
+
+  @@map("generation_status")
+}
+
+/// 생성 기록 테이블
+model Generation {
+  id            String           @id @default(uuid())
+  projectId     String           @map("project_id")
+  ipCharacterId String?          @map("ip_character_id")
+  sourceImageId String?          @map("source_image_id")
+  mode          GenerationMode
+  status        GenerationStatus @default(pending)
+  promptData    Json             @map("prompt_data")
+  options       Json             @default("{}")
+  retryCount    Int              @default(0) @map("retry_count")
+  errorMessage  String?          @map("error_message")
+  createdAt     DateTime         @default(now()) @map("created_at")
+  completedAt   DateTime?        @map("completed_at")
+
+  project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  ipCharacter IPCharacter?     @relation(fields: [ipCharacterId], references: [id], onDelete: SetNull)
+  sourceImage GeneratedImage?  @relation("SourceImage", fields: [sourceImageId], references: [id], onDelete: SetNull)
+  images      GeneratedImage[] @relation("GenerationImages")
+
+  @@index([projectId, createdAt(sort: Desc)])
+  @@index([status])
+  @@index([ipCharacterId])
+  @@map("generations")
+}
+
+// ===================
+// 이미지 관련
+// ===================
+
+/// 이미지 타입 열거형
+enum ImageType {
+  source
+  character
+  texture
+  output
+  edited
+
+  @@map("image_type")
+}
+
+/// 생성된 이미지 테이블
+model GeneratedImage {
+  id              String    @id @default(uuid())
+  generationId    String    @map("generation_id")
+  filePath        String    @map("file_path")
+  thumbnailPath   String?   @map("thumbnail_path")
+  type            ImageType
+  isSelected      Boolean   @default(false) @map("is_selected")
+  hasTransparency Boolean   @default(false) @map("has_transparency")
+  width           Int
+  height          Int
+  fileSize        Int       @map("file_size")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  generation     Generation      @relation("GenerationImages", fields: [generationId], references: [id], onDelete: Cascade)
+  usedAsSourceIn Generation[]    @relation("SourceImage")
+  history        ImageHistory[]
+  upscaledImage  UpscaledImage?
+
+  @@index([generationId])
+  @@index([generationId, isSelected])
+  @@map("generated_images")
+}
+
+/// 이미지 히스토리 테이블 (수정 이력)
+model ImageHistory {
+  id              String   @id @default(uuid())
+  imageId         String   @map("image_id")
+  parentHistoryId String?  @map("parent_history_id")
+  action          String
+  changes         Json?
+  filePath        String   @map("file_path")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  image         GeneratedImage @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  parentHistory ImageHistory?  @relation("HistoryChain", fields: [parentHistoryId], references: [id])
+  childHistory  ImageHistory[] @relation("HistoryChain")
+
+  @@index([imageId, createdAt(sort: Desc)])
+  @@index([parentHistoryId])
+  @@map("image_history")
+}
+
+/// 업스케일 이미지 테이블
+model UpscaledImage {
+  id              String   @id @default(uuid())
+  originalImageId String   @unique @map("original_image_id")
+  filePath        String   @map("file_path")
+  scale           Int
+  width           Int
+  height          Int
+  fileSize        Int      @map("file_size")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  originalImage GeneratedImage @relation(fields: [originalImageId], references: [id], onDelete: Cascade)
+
+  @@map("upscaled_images")
+}
