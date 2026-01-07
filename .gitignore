@@ -1,0 +1,47 @@
+# 의존성
+node_modules
+.pnpm-store
+
+# 빌드 결과물
+dist
+.next
+out
+build
+
+# 캐시
+.turbo
+.cache
+*.tsbuildinfo
+
+# 환경 변수
+.env
+.env.local
+.env.*.local
+
+# 로그
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# 에디터
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 테스트
+coverage
+
+# 데이터
+data/uploads
+data/generations
+data/upscaled
+data/characters
+
+# Docker 볼륨
+postgres_data
+redis_data
