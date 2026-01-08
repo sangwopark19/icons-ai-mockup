@@ -1,12 +1,13 @@
 import type { NextConfig } from 'next';
+import path from 'path';
 
 const nextConfig: NextConfig = {
   // Docker standalone 빌드를 위한 설정
   output: 'standalone',
 
-  // Turbopack 모노레포 루트 설정 (Docker 빌드용)
+  // Turbopack 모노레포 루트 설정
   turbopack: {
-    root: process.env.DOCKER_BUILD === '1' ? '/app' : '..',
+    root: process.env.DOCKER_BUILD === '1' ? '/app' : path.resolve(process.cwd(), '../..'),
   },
 
   // 실험적 기능

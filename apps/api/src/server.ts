@@ -1,12 +1,3 @@
-// Production에서는 docker-compose.yml에서 환경 변수 주입
-if (process.env.NODE_ENV !== 'production') {
-  try {
-    await import('dotenv/config');
-  } catch {
-    // dotenv 없이 실행
-  }
-}
-
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';

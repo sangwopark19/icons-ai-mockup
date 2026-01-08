@@ -1,4 +1,13 @@
 import { z } from 'zod';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// 개발 환경에서 .env 파일 로드 (production은 docker-compose에서 주입)
+if (process.env.NODE_ENV !== 'production') {
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  dotenv.config({ path: path.resolve(__dirname, '../../../../.env') });
+}
 
 /**
  * 환경 변수 스키마 정의
