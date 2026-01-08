@@ -28,6 +28,10 @@ COPY packages/shared ./packages/shared
 COPY apps/web ./apps/web
 COPY turbo.json ./
 
+# 빌드 시 API URL을 ARG로 받음 (NEXT_PUBLIC_* 변수는 빌드 타임에 번들에 포함됨)
+ARG NEXT_PUBLIC_API_URL=http://localhost:4000
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+
 # 환경 변수 설정
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
