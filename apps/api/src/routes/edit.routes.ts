@@ -72,7 +72,7 @@ const editRoutes: FastifyPluginAsync = async (fastify) => {
         },
       });
 
-      // 수정된 이미지 저장
+      // 수정된 이미지 저장 (첫 번째 이미지를 선택 상태로 설정)
       for (let i = 0; i < editedImages.length; i++) {
         const result = await uploadService.saveGeneratedImage(
           user.id,
@@ -82,12 +82,20 @@ const editRoutes: FastifyPluginAsync = async (fastify) => {
           i
         );
 
-        await generationService.saveGeneratedImage(
+        const savedImage = await generationService.saveGeneratedImage(
           newGeneration.id,
           result.filePath,
           result.thumbnailPath,
           result.metadata
         );
+
+        // 첫 번째 이미지를 선택 상태로 설정 (히스토리 썸네일 표시용)
+        if (i === 0) {
+          await prisma.generatedImage.update({
+            where: { id: savedImage.id },
+            data: { isSelected: true },
+          });
+        }
       }
 
       // 히스토리 저장
