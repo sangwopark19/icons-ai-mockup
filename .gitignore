@@ -45,3 +45,6 @@ data/characters
 # Docker 볼륨
 postgres_data
 redis_data
+
+## 실제 사진 저장 데이터
+apps/api/data
