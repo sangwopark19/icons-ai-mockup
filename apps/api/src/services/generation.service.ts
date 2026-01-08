@@ -1,6 +1,9 @@
 import { prisma } from '../lib/prisma.js';
 import { addGenerationJob, GenerationJobData } from '../lib/queue.js';
 import type { Generation, GeneratedImage } from '@prisma/client';
+import fs from 'fs/promises';
+import path from 'path';
+import { config } from '../config/index.js';
 
 /**
  * 생성 요청 입력 타입
@@ -183,6 +186,65 @@ export class GenerationService {
         fileSize: metadata.size,
       },
     });
+  }
+
+  /**
+   * 생성 기록 삭제 (연관된 모든 이미지 및 폴더 포함)
+   */
+  async deleteGeneration(userId: string, generationId: string): Promise<void> {
+    // 생성 기록 및 권한 확인
+    const generation = await prisma.generation.findFirst({
+      where: { id: generationId },
+      include: {
+        project: true,
+        images: true,
+      },
+    });
+
+    if (!generation || generation.project.userId !== userId) {
+      throw new Error('생성 기록을 찾을 수 없습니다');
+    }
+
+    // 이미지 디렉토리 경로 추출 (generations/{userId}/{generationId}/)
+    let generationDir: string | null = null;
+
+    // 이미지 파일 삭제
+    for (const image of generation.images) {
+      try {
+        const fullPath = path.join(config.uploadDir, image.filePath);
+        // 원본 이미지 삭제
+        await fs.unlink(fullPath);
+        // 썸네일 삭제
+        if (image.thumbnailPath) {
+          await fs.unlink(path.join(config.uploadDir, image.thumbnailPath));
+        }
+        
+        // 디렉토리 경로 추출 (첫 번째 이미지에서만)
+        if (!generationDir) {
+          generationDir = path.dirname(fullPath);
+        }
+      } catch {
+        // 파일 삭제 실패해도 계속 진행
+      }
+
+      // ImageHistory 삭제
+      await prisma.imageHistory.deleteMany({ where: { imageId: image.id } });
+    }
+
+    // 디렉토리 삭제 (비어있는 경우에만)
+    if (generationDir) {
+      try {
+        await fs.rmdir(generationDir);
+      } catch {
+        // 디렉토리가 비어있지 않거나 삭제 실패해도 계속 진행
+      }
+    }
+
+    // GeneratedImage 삭제
+    await prisma.generatedImage.deleteMany({ where: { generationId } });
+
+    // Generation 삭제
+    await prisma.generation.delete({ where: { id: generationId } });
   }
 
   /**

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useAuthStore } from '@/stores/auth.store';
 import { Button } from '@/components/ui/button';
 import { formatRelativeTime } from '@/lib/utils';
+import { imageApi } from '@/lib/api';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
@@ -37,6 +38,42 @@ export default function HistoryPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  /**
+   * 히스토리(생성 전체) 삭제
+   */
+  const handleDeleteGeneration = async (e: React.MouseEvent, generationId: string) => {
+    e.preventDefault(); // Link 클릭 방지
+    e.stopPropagation();
+
+    if (!accessToken) return;
+    if (!confirm('이 생성 기록과 모든 이미지를 삭제하시겠습니까?\n삭제된 데이터는 복구할 수 없습니다.')) return;
+
+    try {
+      setDeletingId(generationId);
+      
+      const response = await fetch(`${API_URL}/api/generations/${generationId}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('삭제 실패');
+      }
+      
+      // 로컬 상태에서 삭제된 항목 제거
+      setHistory((prev) => prev.filter((item) => item.id !== generationId));
+      alert('히스토리가 삭제되었습니다.');
+    } catch (error) {
+      console.error('히스토리 삭제 실패:', error);
+      alert('히스토리 삭제에 실패했습니다.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   /**
    * 히스토리 로드
@@ -133,13 +170,28 @@ export default function HistoryPage() {
 
                   {/* 정보 */}
                   <div className="p-3">
-                    <div className="flex items-center gap-2 text-sm">
-                      <span>
-                        {item.mode === 'ip_change' ? '⚡' : '✏️'}
-                      </span>
-                      <span className="text-[var(--text-secondary)]">
-                        {item.mode === 'ip_change' ? 'IP 변경' : '스케치 실사화'}
-                      </span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-sm">
+                        <span>
+                          {item.mode === 'ip_change' ? '⚡' : '✏️'}
+                        </span>
+                        <span className="text-[var(--text-secondary)]">
+                          {item.mode === 'ip_change' ? 'IP 변경' : '스케치 실사화'}
+                        </span>
+                      </div>
+                      {/* 삭제 버튼 - 생성 전체 삭제 */}
+                      <button
+                        onClick={(e) => handleDeleteGeneration(e, item.id)}
+                        disabled={deletingId === item.id}
+                        className="rounded-full p-1.5 text-[var(--text-tertiary)] transition-colors hover:bg-red-500/10 hover:text-red-500 disabled:opacity-50"
+                        title="히스토리 삭제"
+                      >
+                        {deletingId === item.id ? (
+                          <span className="block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                        ) : (
+                          <span className="text-base">🗑️</span>
+                        )}
+                      </button>
                     </div>
                     {item.character && (
                       <p className="mt-1 text-xs text-[var(--text-tertiary)]">

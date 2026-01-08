@@ -183,6 +183,9 @@ const imageRoutes: FastifyPluginAsync = async (fastify) => {
       // 파일 삭제 실패해도 DB는 삭제
     }
 
+    // ImageHistory 삭제
+    await prisma.imageHistory.deleteMany({ where: { imageId: id } });
+
     // DB 삭제
     await prisma.generatedImage.delete({ where: { id } });
 

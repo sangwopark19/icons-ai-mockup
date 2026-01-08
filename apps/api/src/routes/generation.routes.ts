@@ -137,6 +137,30 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   /**
+   * 생성 기록 삭제 (연관된 모든 이미지 포함)
+   * DELETE /api/generations/:id
+   */
+  fastify.delete('/:id', async (request, reply) => {
+    const user = (request as any).user;
+    const { id } = request.params as { id: string };
+
+    try {
+      await generationService.deleteGeneration(user.id, id);
+
+      return reply.send({
+        success: true,
+        message: '생성 기록이 삭제되었습니다',
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '삭제에 실패했습니다';
+      return reply.code(404).send({
+        success: false,
+        error: { code: 'DELETE_FAILED', message },
+      });
+    }
+  });
+
+  /**
    * 프로젝트 히스토리 조회
    * GET /api/generations/project/:projectId/history
    */
