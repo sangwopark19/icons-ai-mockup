@@ -26,9 +26,6 @@ const envSchema = z.object({
   MAX_FILE_SIZE: z.coerce.number().default(10 * 1024 * 1024), // 10MB
   UPLOAD_DIR: z.string().default('./data'),
 
-  // Real-ESRGAN
-  REALESRGAN_PATH: z.string().default('realesrgan-ncnn-vulkan'),
-
   // CORS
   CORS_ORIGIN: z.string().default('http://localhost:3000'),
 });
@@ -57,7 +54,6 @@ function parseEnv() {
         geminiApiKey: undefined,
         maxFileSize: 10 * 1024 * 1024,
         uploadDir: './data',
-        realesrganPath: 'realesrgan-ncnn-vulkan',
         corsOrigin: 'http://localhost:3000',
       };
     }
@@ -76,7 +72,6 @@ function parseEnv() {
     geminiApiKey: parsed.data.GEMINI_API_KEY,
     maxFileSize: parsed.data.MAX_FILE_SIZE,
     uploadDir: parsed.data.UPLOAD_DIR,
-    realesrganPath: parsed.data.REALESRGAN_PATH,
     corsOrigin: parsed.data.CORS_ORIGIN,
   };
 }

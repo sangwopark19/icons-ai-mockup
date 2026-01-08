@@ -1,4 +1,4 @@
-import { Queue, Worker, Job } from 'bullmq';
+import { Queue, Job } from 'bullmq';
 import { redis } from './redis.js';
 
 /**
@@ -21,17 +21,6 @@ export interface GenerationJobData {
 }
 
 /**
- * 업스케일 작업 데이터 타입
- */
-export interface UpscaleJobData {
-  imageId: string;
-  inputPath: string;
-  outputPath: string;
-  scale: number;
-  model: string;
-}
-
-/**
  * 생성 작업 큐
  */
 export const generationQueue = new Queue<GenerationJobData>('generation', {
@@ -48,32 +37,11 @@ export const generationQueue = new Queue<GenerationJobData>('generation', {
 });
 
 /**
- * 업스케일 작업 큐
- */
-export const upscaleQueue = new Queue<UpscaleJobData>('upscale', {
-  connection: redis,
-  defaultJobOptions: {
-    attempts: 2,
-    removeOnComplete: 50,
-    removeOnFail: 20,
-  },
-});
-
-/**
  * 생성 작업 추가
  */
 export async function addGenerationJob(data: GenerationJobData): Promise<Job<GenerationJobData>> {
   return generationQueue.add('generate', data, {
     priority: 1,
-  });
-}
-
-/**
- * 업스케일 작업 추가
- */
-export async function addUpscaleJob(data: UpscaleJobData): Promise<Job<UpscaleJobData>> {
-  return upscaleQueue.add('upscale', data, {
-    priority: 2,
   });
 }
 

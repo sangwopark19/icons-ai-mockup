@@ -1,9 +1,7 @@
 import { FastifyPluginAsync } from 'fastify';
-import { z } from 'zod';
 import fs from 'fs/promises';
 import path from 'path';
 import { prisma } from '../lib/prisma.js';
-import { addUpscaleJob } from '../lib/queue.js';
 import { config } from '../config/index.js';
 
 /**
@@ -37,7 +35,6 @@ const imageRoutes: FastifyPluginAsync = async (fastify) => {
         generation: {
           include: { project: true },
         },
-        upscaledImage: true,
       },
     });
 
@@ -60,15 +57,6 @@ const imageRoutes: FastifyPluginAsync = async (fastify) => {
         height: image.height,
         fileSize: image.fileSize,
         createdAt: image.createdAt,
-        hasUpscaled: !!image.upscaledImage,
-        upscaled: image.upscaledImage
-          ? {
-              filePath: image.upscaledImage.filePath,
-              scale: image.upscaledImage.scale,
-              width: image.upscaledImage.width,
-              height: image.upscaledImage.height,
-            }
-          : null,
       },
     });
   });
@@ -113,67 +101,6 @@ const imageRoutes: FastifyPluginAsync = async (fastify) => {
         error: { code: 'FILE_NOT_FOUND', message: '파일을 찾을 수 없습니다' },
       });
     }
-  });
-
-  /**
-   * 이미지 다운로드 (2K 업스케일)
-   * GET /api/images/:id/download/2k
-   */
-  fastify.get('/:id/download/2k', async (request, reply) => {
-    const user = (request as any).user;
-    const { id } = request.params as { id: string };
-
-    const image = await prisma.generatedImage.findFirst({
-      where: { id },
-      include: {
-        generation: {
-          include: { project: true },
-        },
-        upscaledImage: true,
-      },
-    });
-
-    if (!image || image.generation.project.userId !== user.id) {
-      return reply.code(404).send({
-        success: false,
-        error: { code: 'NOT_FOUND', message: '이미지를 찾을 수 없습니다' },
-      });
-    }
-
-    // 이미 업스케일된 이미지가 있으면 바로 다운로드
-    if (image.upscaledImage) {
-      const filePath = path.join(config.uploadDir, image.upscaledImage.filePath);
-
-      try {
-        const buffer = await fs.readFile(filePath);
-        const filename = path.basename(image.upscaledImage.filePath);
-
-        return reply
-          .header('Content-Disposition', `attachment; filename="${filename}"`)
-          .header('Content-Type', 'image/png')
-          .send(buffer);
-      } catch {
-        // 파일이 없으면 다시 업스케일
-      }
-    }
-
-    // 업스케일 작업 큐에 추가
-    const outputPath = image.filePath.replace('.png', '_2k.png');
-    await addUpscaleJob({
-      imageId: id,
-      inputPath: image.filePath,
-      outputPath,
-      scale: 2,
-      model: 'realesrgan-x4plus',
-    });
-
-    return reply.send({
-      success: true,
-      data: {
-        status: 'processing',
-        message: '업스케일 작업을 시작했습니다. 잠시 후 다시 시도해주세요.',
-      },
-    });
   });
 
   /**

@@ -162,7 +162,6 @@ model GeneratedImage {
   generation     Generation      @relation("GenerationImages", fields: [generationId], references: [id], onDelete: Cascade)
   usedAsSourceIn Generation[]    @relation("SourceImage")
   history        ImageHistory[]
-  upscaledImage  UpscaledImage?
 
   @@index([generationId])
   @@index([generationId, isSelected])
@@ -186,20 +185,4 @@ model ImageHistory {
   @@index([imageId, createdAt(sort: Desc)])
   @@index([parentHistoryId])
   @@map("image_history")
-}
-
-/// 업스케일 이미지 테이블
-model UpscaledImage {
-  id              String   @id @default(uuid())
-  originalImageId String   @unique @map("original_image_id")
-  filePath        String   @map("file_path")
-  scale           Int
-  width           Int
-  height          Int
-  fileSize        Int      @map("file_size")
-  createdAt       DateTime @default(now()) @map("created_at")
-
-  originalImage GeneratedImage @relation(fields: [originalImageId], references: [id], onDelete: Cascade)
-
-  @@map("upscaled_images")
 }

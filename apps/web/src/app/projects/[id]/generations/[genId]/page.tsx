@@ -120,13 +120,10 @@ export default function GenerationResultPage() {
   /**
    * 다운로드
    */
-  const handleDownload = async (imageId: string, resolution: '1k' | '2k') => {
+  const handleDownload = async (imageId: string) => {
     if (!accessToken) return;
 
-    const endpoint = resolution === '2k' 
-      ? `/api/images/${imageId}/download/2k`
-      : `/api/images/${imageId}/download`;
-
+    const endpoint = `/api/images/${imageId}/download`;
     window.open(`${API_URL}${endpoint}?token=${accessToken}`, '_blank');
   };
 
@@ -269,11 +266,8 @@ export default function GenerationResultPage() {
             </h1>
           </div>
           <div className="flex gap-2">
-            <Button variant="secondary" onClick={() => handleDownload(selectedImageId!, '1k')}>
-              1K 다운로드
-            </Button>
-            <Button onClick={() => handleDownload(selectedImageId!, '2k')}>
-              2K 다운로드
+            <Button onClick={() => handleDownload(selectedImageId!)}>
+              다운로드
             </Button>
           </div>
         </div>
