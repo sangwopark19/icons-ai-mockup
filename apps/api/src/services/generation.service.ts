@@ -193,7 +193,7 @@ export class GenerationService {
     projectId: string,
     page: number = 1,
     limit: number = 20
-  ): Promise<{ generations: Generation[]; total: number }> {
+  ): Promise<{ generations: any[]; total: number }> {
     // 프로젝트 소유권 확인
     const project = await prisma.project.findFirst({
       where: { id: projectId, userId },
