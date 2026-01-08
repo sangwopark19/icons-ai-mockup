@@ -1,4 +1,12 @@
-import 'dotenv/config';
+// Production에서는 docker-compose.yml에서 환경 변수 주입
+if (process.env.NODE_ENV !== 'production') {
+  try {
+    await import('dotenv/config');
+  } catch {
+    // dotenv 없이 실행
+  }
+}
+
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
@@ -128,8 +136,10 @@ function setupErrorHandler() {
   server.setErrorHandler((error, request, reply) => {
     server.log.error(error);
 
+    const err = error as Error & { statusCode?: number; code?: string };
+
     // Zod 유효성 검사 에러
-    if (error.name === 'ZodError') {
+    if (err.name === 'ZodError') {
       return reply.code(400).send({
         success: false,
         error: {
@@ -141,12 +151,12 @@ function setupErrorHandler() {
     }
 
     // 일반 에러
-    const statusCode = error.statusCode || 500;
+    const statusCode = err.statusCode || 500;
     return reply.code(statusCode).send({
       success: false,
       error: {
-        code: error.code || 'INTERNAL_ERROR',
-        message: error.message || '서버 오류가 발생했습니다',
+        code: err.code || 'INTERNAL_ERROR',
+        message: err.message || '서버 오류가 발생했습니다',
       },
     });
   });

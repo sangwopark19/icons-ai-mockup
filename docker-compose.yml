@@ -36,11 +36,80 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # Next.js 프론트엔드 (프로덕션)
+  # DB 마이그레이션 (한 번만 실행)
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: migrate
+    container_name: mockup-migrate
+    environment:
+      - DATABASE_URL=postgresql://user:password@postgres:5432/mockup?schema=public
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  # Fastify API 서버
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: mockup-api
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://user:password@postgres:5432/mockup?schema=public
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET:-super-secret-jwt-key-change-in-production}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - UPLOAD_DIR=/app/data
+    volumes:
+      - app_data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # 작업 처리 워커
+  worker:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile.worker
+    container_name: mockup-worker
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://user:password@postgres:5432/mockup?schema=public
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET:-super-secret-jwt-key-change-in-production}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - UPLOAD_DIR=/app/data
+    volumes:
+      - app_data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # Next.js 프론트엔드
   web:
     build:
-      context: ./apps/web
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/web/Dockerfile
     container_name: mockup-web
     ports:
       - "3000:3000"
@@ -50,62 +119,8 @@ services:
       api:
         condition: service_healthy
     restart: unless-stopped
-    profiles:
-      - production
-
-  # Fastify API 서버 (프로덕션)
-  api:
-    build:
-      context: ./apps/api
-      dockerfile: Dockerfile
-    container_name: mockup-api
-    ports:
-      - "4000:4000"
-    environment:
-      - NODE_ENV=production
-      - DATABASE_URL=postgresql://user:password@postgres:5432/mockup?schema=public
-      - REDIS_URL=redis://redis:6379
-      - JWT_SECRET=${JWT_SECRET}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-    volumes:
-      - ./data:/app/data
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    restart: unless-stopped
-    profiles:
-      - production
-
-  # 작업 처리 워커 (프로덕션)
-  worker:
-    build:
-      context: ./apps/api
-      dockerfile: Dockerfile.worker
-    container_name: mockup-worker
-    environment:
-      - NODE_ENV=production
-      - DATABASE_URL=postgresql://user:password@postgres:5432/mockup?schema=public
-      - REDIS_URL=redis://redis:6379
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - REALESRGAN_PATH=/usr/local/bin/realesrgan-ncnn-vulkan
-    volumes:
-      - ./data:/app/data
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-    profiles:
-      - production
 
 volumes:
   postgres_data:
   redis_data:
+  app_data:

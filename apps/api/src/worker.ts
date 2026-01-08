@@ -1,15 +1,18 @@
-import 'dotenv/config';
+// Production에서는 docker-compose.yml에서 환경 변수 주입
+if (process.env.NODE_ENV !== 'production') {
+  try {
+    await import('dotenv/config');
+  } catch {
+    // dotenv 없이 실행
+  }
+}
+
 import { Worker, Job } from 'bullmq';
-import fs from 'fs/promises';
-import path from 'path';
-import { spawn } from 'child_process';
 import { redis } from './lib/redis.js';
-import { prisma } from './lib/prisma.js';
 import { geminiService } from './services/gemini.service.js';
 import { uploadService } from './services/upload.service.js';
 import { generationService } from './services/generation.service.js';
-import { config } from './config/index.js';
-import type { GenerationJobData, UpscaleJobData } from './lib/queue.js';
+import type { GenerationJobData } from './lib/queue.js';
 
 /**
  * 생성 작업 처리 워커
@@ -116,82 +119,6 @@ const generationWorker = new Worker<GenerationJobData>(
   }
 );
 
-/**
- * 업스케일 작업 처리 워커
- */
-const upscaleWorker = new Worker<UpscaleJobData>(
-  'upscale',
-  async (job: Job<UpscaleJobData>) => {
-    const { imageId, inputPath, outputPath, scale, model } = job.data;
-    console.log(`🔍 업스케일 작업 시작: ${imageId}`);
-
-    try {
-      const inputFullPath = path.join(config.uploadDir, inputPath);
-      const outputFullPath = path.join(config.uploadDir, outputPath);
-
-      // 출력 디렉토리 생성
-      await fs.mkdir(path.dirname(outputFullPath), { recursive: true });
-
-      // Real-ESRGAN ncnn 실행
-      await new Promise<void>((resolve, reject) => {
-        const proc = spawn(config.realesrganPath, [
-          '-i', inputFullPath,
-          '-o', outputFullPath,
-          '-s', String(scale),
-          '-n', model,
-        ]);
-
-        proc.stdout.on('data', (data) => {
-          console.log(`stdout: ${data}`);
-        });
-
-        proc.stderr.on('data', (data) => {
-          console.error(`stderr: ${data}`);
-        });
-
-        proc.on('close', (code) => {
-          if (code === 0) {
-            resolve();
-          } else {
-            reject(new Error(`Real-ESRGAN 프로세스가 코드 ${code}로 종료되었습니다`));
-          }
-        });
-
-        proc.on('error', (err) => {
-          reject(new Error(`Real-ESRGAN 실행 실패: ${err.message}`));
-        });
-      });
-
-      // 결과 파일 정보
-      const stats = await fs.stat(outputFullPath);
-      const sharp = (await import('sharp')).default;
-      const metadata = await sharp(outputFullPath).metadata();
-
-      // DB에 업스케일 이미지 저장
-      await prisma.upscaledImage.create({
-        data: {
-          originalImageId: imageId,
-          filePath: outputPath,
-          scale,
-          width: metadata.width || 0,
-          height: metadata.height || 0,
-          fileSize: stats.size,
-        },
-      });
-
-      console.log(`✅ 업스케일 작업 완료: ${imageId}`);
-      return { success: true };
-    } catch (error) {
-      console.error(`❌ 업스케일 작업 실패: ${imageId}`, error);
-      throw error;
-    }
-  },
-  {
-    connection: redis,
-    concurrency: 1, // GPU 사용으로 동시 1개만
-  }
-);
-
 // 이벤트 핸들러
 generationWorker.on('completed', (job) => {
   console.log(`Job ${job.id} completed`);
@@ -201,20 +128,11 @@ generationWorker.on('failed', (job, err) => {
   console.error(`Job ${job?.id} failed:`, err);
 });
 
-upscaleWorker.on('completed', (job) => {
-  console.log(`Upscale job ${job.id} completed`);
-});
-
-upscaleWorker.on('failed', (job, err) => {
-  console.error(`Upscale job ${job?.id} failed:`, err);
-});
-
 console.log('🔧 Worker 프로세스 시작됨');
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
   console.log('Worker 종료 중...');
   await generationWorker.close();
-  await upscaleWorker.close();
   process.exit(0);
 });
