@@ -36,12 +36,32 @@ const envSchema = z.object({
   UPLOAD_DIR: z.string().default('./data'),
 
   // CORS
-  CORS_ORIGIN: z.string().default('http://localhost:3000'),
+  CORS_ORIGIN: z.string().default(''),
 });
 
 /**
  * 환경 변수 파싱 및 검증
  */
+const BASE_CORS_ORIGINS = [
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'http://172.30.1.40:3000',
+  'http://172.30.1.42:3000',
+  'http://100.69.75.47:3000',
+  'http://175.193.199.147:3000',
+  'http://221.147.112.147:3000',
+];
+
+function parseCorsOrigins(value: string) {
+  // 환경변수와 기본 목록을 병합해 중복 제거
+  const extraOrigins = value
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
+
+  return Array.from(new Set([...BASE_CORS_ORIGINS, ...extraOrigins]));
+}
+
 function parseEnv() {
   const parsed = envSchema.safeParse(process.env);
 
@@ -63,7 +83,7 @@ function parseEnv() {
         geminiApiKey: undefined,
         maxFileSize: 10 * 1024 * 1024,
         uploadDir: './data',
-        corsOrigin: 'http://localhost:3000',
+        corsOrigins: parseCorsOrigins(''),
       };
     }
 
@@ -81,7 +101,7 @@ function parseEnv() {
     geminiApiKey: parsed.data.GEMINI_API_KEY,
     maxFileSize: parsed.data.MAX_FILE_SIZE,
     uploadDir: parsed.data.UPLOAD_DIR,
-    corsOrigin: parsed.data.CORS_ORIGIN,
+    corsOrigins: parseCorsOrigins(parsed.data.CORS_ORIGIN),
   };
 }
 

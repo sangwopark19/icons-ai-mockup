@@ -37,8 +37,25 @@ const server = Fastify({
 async function registerPlugins() {
   // CORS 설정
   await server.register(cors, {
-    origin: config.corsOrigin,
+    origin: (origin, callback) => {
+      if (!origin) {
+        console.log('[CORS] ✅ ALLOWED: origin 없음');
+        callback(null, true);
+        return;
+      }
+
+      if (config.corsOrigins.includes(origin)) {
+        console.log(`[CORS] ✅ ALLOWED: ${origin}`);
+        callback(null, true);
+        return;
+      }
+
+      console.warn(`[CORS] ❌ BLOCKED: ${origin}`);
+      callback(new Error('CORS policy violation: Origin not allowed'), false);
+    },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
   // Multipart 파일 업로드
