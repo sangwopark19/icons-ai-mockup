@@ -123,7 +123,7 @@ async function registerRoutes() {
   server.get('/uploads/*', async (request, reply) => {
     const filePath = (request.params as any)['*'];
     const fullPath = `${config.uploadDir}/${filePath}`;
-    
+
     try {
       const fs = await import('fs/promises');
       const buffer = await fs.readFile(fullPath);
@@ -134,7 +134,7 @@ async function registerRoutes() {
         jpeg: 'image/jpeg',
         webp: 'image/webp',
       };
-      
+
       return reply
         .header('Content-Type', mimeTypes[ext || ''] || 'application/octet-stream')
         .send(buffer);
