@@ -1,0 +1,932 @@
+# PRD: Docker 모노레포 CORS 정책 위반 자동 해결
+
+**문서 버전**: 1.0  
+**작성일**: 2026-01-15  
+**우선순위**: 🔴 Critical  
+**담당자**: AI Agent (자동 실행)
+
+---
+
+## 1. 문제 정의 (Problem Statement)
+
+### 1.1 현재 상황
+
+사용자의 회사 사내 네트워크에서 Docker로 구동되는 모노레포 애플리케이션에 다중 네트워크 환경에서 접근할 때 **CORS(Cross-Origin Resource Sharing) 정책 위반** 에러 발생.
+
+### 1.2 에러 메시지
+
+```
+Access to fetch at 'http://172.30.1.42:4000/api/auth/login'
+from origin 'http://100.69.75.47:3000'
+has been blocked by CORS policy:
+Response to preflight request doesn't pass access control check:
+The 'Access-Control-Allow-Origin' header has a value 'http://172.30.1.42:3000'
+that is not equal to the supplied origin.
+```
+
+### 1.3 근본 원인
+
+| 항목                | 상세                                                                 |
+| ------------------- | -------------------------------------------------------------------- |
+| **클라이언트 출처** | `http://100.69.75.47:3000` (Tailscale IP)                            |
+| **백엔드 API**      | `http://172.30.1.42:4000/api/auth/login` (유선 IP)                   |
+| **서버 설정**       | `Access-Control-Allow-Origin: http://172.30.1.42:3000` (유선만 허용) |
+| **결과**            | Origin 불일치로 브라우저가 API 요청 차단                             |
+
+### 1.4 영향 범위
+
+- ❌ Tailscale VPN 네트워크에서 접근 불가
+- ❌ 다른 층 무선 네트워크에서 접근 불가 (221.147.112.147)
+- ❌ 다른 건물에서의 접근 불가
+- ✅ 유선 LAN(172.30.1.x)에서만 접근 가능
+
+### 1.5 비즈니스 임팩트
+
+- **개발 생산성 저하**: 개발자들이 모바일, 무선 환경에서 테스트 불가
+- **원격 협업 제약**: 다른 층/건물 팀원들의 애플리케이션 접근 불가
+- **배포 검증 제약**: 전체 네트워크 환경에서의 통합 테스트 불가
+
+---
+
+## 2. 목표 (Objectives)
+
+### 2.1 Primary Goal
+
+**모든 사내 네트워크 환경에서 인증 없이 백엔드 API에 접근 가능**하도록 CORS 정책 자동 수정
+
+### 2.2 Success Criteria
+
+| 기준                   | 상세                                 | 검증 방법                         |
+| ---------------------- | ------------------------------------ | --------------------------------- |
+| **유선 네트워크 접근** | 172.30.1.40:3000에서 로그인 성공     | 브라우저 테스트                   |
+| **Tailscale 접근**     | 100.69.75.47:3000에서 로그인 성공    | Tailscale 클라이언트 테스트       |
+| **무선 네트워크 접근** | 221.147.112.147:3000에서 로그인 성공 | WiFi 클라이언트 테스트            |
+| **CORS 헤더 정확성**   | Response Header에 올바른 Origin 반환 | DevTools Network 탭 확인          |
+| **credentials 지원**   | 쿠키/세션 토큰 포함 요청 성공        | 로그인 후 세션 유지 확인          |
+| **에러 핸들링**        | 신뢰할 수 없는 출처는 403 반환       | 허락되지 않은 IP에서 요청 시 확인 |
+
+### 2.3 완료 정의 (DoD - Definition of Done)
+
+- [ ] `apps/api/src/config/index.ts`에 기본 CORS 목록 및 파서 추가
+- [ ] `apps/api/src/server.ts`에 동적 origin 검증 콜백 적용
+- [ ] Docker Compose에 환경변수 설정됨
+- [ ] 4가지 네트워크 환경에서 로그인 테스트 완료
+- [ ] 콘솔 로그에 CORS 검증 메시지 출력 확인됨
+- [ ] 개발자 도구에서 Response Headers 확인됨
+
+---
+
+## 3. 범위 (Scope)
+
+### 3.1 포함 범위 (In Scope)
+
+✅ **백엔드 API 설정**
+
+- `apps/api/src/server.ts`에서 @fastify/cors 설정
+- 동적 Origin 검증 로직
+- 동적 Origin 검증 로직
+
+✅ **환경 설정**
+
+- `.env` 파일에 CORS_ORIGIN 추가
+- `docker-compose.yml`에 환경변수 매핑
+- 프로덕션 배포 설정
+
+✅ **네트워크 환경 지원**
+
+- 유선 LAN (172.30.1.0/24)
+- Tailscale VPN (100.x.x.x)
+- 무선 WiFi (175.193.199.x, 221.147.112.x 등)
+
+✅ **로깅 및 디버깅**
+
+- CORS 요청 로그 출력
+- Origin 매칭 결과 표시
+- 차단된 요청 에러 메시지
+
+### 3.2 제외 범위 (Out of Scope)
+
+❌ 사내 방화벽 규칙 변경  
+❌ 네트워크 인프라 재설계  
+❌ 기존 API 엔드포인트 수정  
+❌ 데이터베이스 마이그레이션  
+❌ 프론트엔드 코드 수정
+
+---
+
+## 4. 기술 요구사항 (Technical Requirements)
+
+### 4.1 프로젝트 구조 분석
+
+```
+mockup-ai/                           # 모노레포 루트
+├── apps/
+│   ├── api/                         # ⚙️ Fastify 백엔드 (수정 대상)
+│   │   ├── src/
+│   │   │   ├── config/
+│   │   │   │   └── index.ts        # 🔧 CORS 설정 수정 필요
+│   │   │   ├── plugins/
+│   │   │   │   └── auth.plugin.ts  # JWT 인증 플러그인
+│   │   │   ├── routes/
+│   │   │   │   └── auth.routes.ts  # 기존 인증 라우트
+│   │   │   ├── services/
+│   │   │   │   └── auth.service.ts # 인증 서비스
+│   │   │   ├── server.ts           # 🔧 CORS 플러그인 설정
+│   │   │   └── worker.ts           # BullMQ 워커
+│   │   ├── prisma/
+│   │   │   └── schema.prisma       # DB 스키마
+│   │   └── package.json
+│   ├── web/                         # Next.js 프론트엔드
+│   │   ├── src/
+│   │   │   └── app/
+│   │   │       └── (auth)/
+│   │   │           └── login/
+│   │   │               └── page.tsx # 로그인 페이지 (App Router)
+│   │   └── package.json
+│   └── ...
+├── packages/
+│   └── shared/                      # 공유 패키지
+├── docker-compose.yml               # 🔧 CORS_ORIGIN 환경변수 수정 필요
+├── pnpm-workspace.yaml
+├── turbo.json                       # Turborepo 설정
+└── package.json
+```
+
+### 4.2 환경 정보
+
+| 항목                  | 값                          | 설명                              |
+| --------------------- | --------------------------- | --------------------------------- |
+| **패키지 매니저**     | pnpm                        | workspace 지원                    |
+| **모노레포**          | pnpm-workspace + Turborepo  | apps/, packages/ 패턴             |
+| **백엔드 프레임워크** | **Fastify 5.1**             | TypeScript, @fastify/cors 사용    |
+| **ORM**               | Prisma 6.2                  | PostgreSQL 16 관리                |
+| **프론트엔드**        | **Next.js 16.1** (React 19) | App Router, Turbopack             |
+| **상태 관리**         | Zustand 5, TanStack Query 5 | 클라이언트/서버 상태              |
+| **작업 큐**           | BullMQ + Redis 7            | 이미지 생성 비동기 처리           |
+| **AI**                | Gemini API (@google/genai)  | 이미지 생성                       |
+| **컨테이너**          | Docker Compose              | postgres, redis, api, worker, web |
+
+### 4.3 CORS 허용 Origin 목록
+
+#### 개발 환경
+
+- `http://localhost:3000`
+- `http://127.0.0.1:3000`
+- `http://dev-server.local:3000`
+
+#### 유선 LAN (같은 층)
+
+- `http://172.30.1.42:3000` (서버 맥 - 로컬)
+- `http://172.30.1.40:3000` (클라이언트 맥)
+
+#### Tailscale VPN (모든 층/건물)
+
+- `http://100.69.75.47:3000` (현재 서버)
+- `http://[tailscale-ip]:3000` (기타 클라이언트)
+
+#### 무선 WiFi (각 층/건물별 다름)
+
+- `http://175.193.199.147:3000` (서버 무선)
+- `http://221.147.112.147:3000` (클라이언트 무선)
+- `http://[other-floor-ip]:3000` (추후 추가)
+
+### 4.4 CORS 정책 상세
+
+```
+Method: Dynamic Origin Matching
+Approach: 요청의 Origin 헤더를 신뢰 목록과 비교
+
+Headers to Set:
+├─ Access-Control-Allow-Origin: <matched-origin>
+├─ Access-Control-Allow-Methods: GET, POST, PUT, DELETE, PATCH, OPTIONS
+├─ Access-Control-Allow-Headers: Content-Type, Authorization
+├─ Access-Control-Allow-Credentials: true
+├─ Access-Control-Max-Age: 3600
+└─ Access-Control-Expose-Headers: Content-Range, X-Content-Range
+
+Preflight Handling: OPTIONS 요청 자동 처리
+```
+
+---
+
+## 5. 구현 방법 (Implementation Strategy)
+
+### 5.1 Phase 1: config/index.ts CORS 설정 수정
+
+**파일**: `apps/api/src/config/index.ts` (기존 파일 수정)
+
+```typescript
+import { z } from 'zod';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// 개발 환경에서 .env 파일 로드 (production은 docker-compose에서 주입)
+if (process.env.NODE_ENV !== 'production') {
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  dotenv.config({ path: path.resolve(__dirname, '../../../../.env') });
+}
+
+/**
+ * ✅ 신뢰할 수 있는 모든 출처 목록
+ * 사내 네트워크의 모든 환경(유선/무선/Tailscale)에서 접근 허용
+ */
+const BASE_CORS_ORIGINS = [
+  // 개발 환경
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+
+  // 유선 LAN (172.30.1.0/24)
+  'http://172.30.1.42:3000', // 서버 맥 - 로컬
+  'http://172.30.1.40:3000', // 클라이언트 맥
+
+  // Tailscale VPN (100.x.x.x)
+  'http://100.69.75.47:3000', // 현재 서버 Tailscale IP
+
+  // 무선 WiFi
+  'http://175.193.199.147:3000', // 서버 무선 IP
+  'http://221.147.112.147:3000', // 클라이언트 무선 IP
+];
+
+/**
+ * 환경 변수 스키마 정의
+ */
+const envSchema = z.object({
+  // 서버 설정
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  API_PORT: z.coerce.number().default(4000),
+
+  // 데이터베이스
+  DATABASE_URL: z.string().url(),
+
+  // Redis
+  REDIS_URL: z.string().url(),
+
+  // JWT
+  JWT_SECRET: z.string().min(32),
+  JWT_ACCESS_EXPIRY: z.string().default('15m'),
+  JWT_REFRESH_EXPIRY: z.string().default('7d'),
+
+  // Gemini API
+  GEMINI_API_KEY: z.string().optional(),
+
+  // 파일 업로드
+  MAX_FILE_SIZE: z.coerce.number().default(10 * 1024 * 1024), // 10MB
+  UPLOAD_DIR: z.string().default('./data'),
+
+  // CORS (쉼표로 구분된 여러 origin 지원)
+  CORS_ORIGIN: z.string().default('http://localhost:3000'),
+});
+
+/**
+ * CORS Origin 파싱
+ * 환경변수의 쉼표로 구분된 origin 목록 + 하드코딩된 목록 병합
+ */
+function parseCorsOrigins(envOrigin: string): string[] {
+  const envOrigins = envOrigin
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+  // 환경변수와 하드코딩된 목록 병합 (중복 제거)
+  return [...new Set([...BASE_CORS_ORIGINS, ...envOrigins])];
+}
+
+/**
+ * 환경 변수 파싱 및 검증
+ */
+function parseEnv() {
+  const parsed = envSchema.safeParse(process.env);
+
+  if (!parsed.success) {
+    console.error('❌ 환경 변수 검증 실패:');
+    console.error(parsed.error.format());
+
+    // 개발 환경에서는 기본값 사용
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('⚠️ 개발 환경에서 기본값을 사용합니다');
+      return {
+        nodeEnv: 'development' as const,
+        port: 4000,
+        databaseUrl: 'postgresql://user:password@localhost:5432/mockup?schema=public',
+        redisUrl: 'redis://localhost:6379',
+        jwtSecret: 'development-secret-key-change-in-production',
+        jwtAccessExpiry: '15m',
+        jwtRefreshExpiry: '7d',
+        geminiApiKey: undefined,
+        maxFileSize: 10 * 1024 * 1024,
+        uploadDir: './data',
+        corsOrigins: BASE_CORS_ORIGINS,
+      };
+    }
+
+    throw new Error('환경 변수 설정이 올바르지 않습니다');
+  }
+
+  return {
+    nodeEnv: parsed.data.NODE_ENV,
+    port: parsed.data.API_PORT,
+    databaseUrl: parsed.data.DATABASE_URL,
+    redisUrl: parsed.data.REDIS_URL,
+    jwtSecret: parsed.data.JWT_SECRET,
+    jwtAccessExpiry: parsed.data.JWT_ACCESS_EXPIRY,
+    jwtRefreshExpiry: parsed.data.JWT_REFRESH_EXPIRY,
+    geminiApiKey: parsed.data.GEMINI_API_KEY,
+    maxFileSize: parsed.data.MAX_FILE_SIZE,
+    uploadDir: parsed.data.UPLOAD_DIR,
+    corsOrigins: parseCorsOrigins(parsed.data.CORS_ORIGIN),
+  };
+}
+
+export const config = parseEnv();
+
+export type Config = typeof config;
+```
+
+**설명**:
+
+- `BASE_CORS_ORIGINS` 배열에 모든 사내 네트워크 IP 하드코딩
+- 환경변수 `CORS_ORIGIN`에서 추가 origin을 쉼표로 구분하여 동적 추가 가능
+- `parseCorsOrigins` 함수로 하드코딩 목록과 환경변수 병합
+- 기존 `corsOrigin` (단일) → `corsOrigins` (배열)로 변경
+
+### 5.2 Phase 2: 백엔드 서버 파일 수정
+
+**파일**: `apps/api/src/server.ts`
+
+**수정 전**:
+
+```typescript
+import cors from '@fastify/cors';
+import { config } from './config/index.js';
+
+// ...
+
+async function registerPlugins() {
+  // ❌ 기존: 단일 origin만 허용
+  await server.register(cors, {
+    origin: config.corsOrigin,
+    credentials: true,
+  });
+  // ...
+}
+```
+
+**수정 후**:
+
+```typescript
+import Fastify from 'fastify';
+import cors from '@fastify/cors';
+import multipart from '@fastify/multipart';
+import { config } from './config/index.js';
+import authPlugin from './plugins/auth.plugin.js';
+import authRoutes from './routes/auth.routes.js';
+import projectRoutes from './routes/project.routes.js';
+import uploadRoutes from './routes/upload.routes.js';
+import characterRoutes from './routes/character.routes.js';
+import generationRoutes from './routes/generation.routes.js';
+import imageRoutes from './routes/image.routes.js';
+import editRoutes from './routes/edit.routes.js';
+
+/**
+ * Fastify 서버 인스턴스 생성
+ */
+const server = Fastify({
+  logger: {
+    level: config.nodeEnv === 'development' ? 'debug' : 'info',
+    transport:
+      config.nodeEnv === 'development'
+        ? {
+            target: 'pino-pretty',
+            options: {
+              colorize: true,
+              translateTime: 'HH:MM:ss Z',
+              ignore: 'pid,hostname',
+            },
+          }
+        : undefined,
+  },
+});
+
+/**
+ * 플러그인 등록
+ */
+async function registerPlugins() {
+  // ✅ CORS 설정 (다중 Origin 지원)
+  await server.register(cors, {
+    origin: (origin, cb) => {
+      if (!origin) {
+        console.log('[CORS] ✅ ALLOWED: origin 없음');
+        return cb(null, true);
+      }
+
+      if (config.corsOrigins.includes(origin)) {
+        console.log(`[CORS] ✅ ALLOWED: ${origin}`);
+        return cb(null, true);
+      }
+
+      console.warn(`[CORS] ❌ BLOCKED: ${origin}`);
+      return cb(new Error('CORS policy violation: Origin not allowed'), false);
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  });
+
+  // Multipart 파일 업로드
+  await server.register(multipart, {
+    limits: {
+      fileSize: config.maxFileSize,
+    },
+  });
+
+  // JWT 인증 플러그인
+  await server.register(authPlugin);
+}
+
+// ... 나머지 코드 동일 ...
+```
+
+**@fastify/cors origin 콜백 설명**:
+
+- `origin` 파라미터: 요청의 Origin 헤더 값 (없으면 undefined)
+- `cb(null, true)`: 해당 origin 허용
+- `cb(error, false)`: 해당 origin 차단
+- `config.corsOrigins`: config/index.ts에서 파싱된 허용 origin 배열
+
+### 5.3 Phase 3: 환경설정 파일 수정
+
+**파일**: `.env` (프로젝트 루트)
+
+```env
+# 서버 설정
+NODE_ENV=development
+API_PORT=4000
+
+# 데이터베이스
+DATABASE_URL=postgresql://user:password@localhost:5432/mockup?schema=public
+
+# Redis
+REDIS_URL=redis://localhost:6379
+
+# JWT (최소 32자 이상)
+JWT_SECRET=your-super-secret-jwt-key-at-least-32-chars
+
+# Gemini API
+GEMINI_API_KEY=your-gemini-api-key
+
+# 🆕 CORS 설정 (쉼표로 구분된 추가 origin - 하드코딩된 목록에 병합됨)
+# config/index.ts의 BASE_CORS_ORIGINS 배열과 합쳐져서 사용됨
+CORS_ORIGIN=http://localhost:3000,http://172.30.1.42:3000,http://100.69.75.47:3000
+
+# 프론트엔드 API URL
+NEXT_PUBLIC_API_URL=http://localhost:4000
+```
+
+**참고**: 개발 환경에서는 루트 `.env` 파일을, Docker 프로덕션 환경에서는 `docker-compose.yml`의 environment 섹션을 사용합니다.
+
+### 5.4 Phase 4: Docker Compose 수정
+
+**파일**: `docker-compose.yml`
+
+**수정 전**:
+
+```yaml
+services:
+  api:
+    # ...
+    environment:
+      # ❌ 기존: 단일 origin만 허용
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3000}
+```
+
+**수정 후**:
+
+```yaml
+services:
+  # PostgreSQL 데이터베이스
+  postgres:
+    image: postgres:16-alpine
+    container_name: mockup-postgres
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: mockup
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U user -d mockup']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis 캐시 및 작업 큐
+  redis:
+    image: redis:7-alpine
+    container_name: mockup-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # DB 마이그레이션 (한 번만 실행)
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: migrate
+    container_name: mockup-migrate
+    environment:
+      - DATABASE_URL=postgresql://user:password@postgres:5432/mockup?schema=public
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: 'no'
+
+  # Fastify API 서버
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: mockup-api
+    ports:
+      - '4000:4000'
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://user:password@postgres:5432/mockup?schema=public
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET:-super-secret-jwt-key-change-in-production}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - UPLOAD_DIR=/app/data
+      # ✅ CORS 허용 origin (쉼표로 구분, config/index.ts의 BASE_CORS_ORIGINS와 병합됨)
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3000,http://172.30.1.42:3000,http://100.69.75.47:3000,http://175.193.199.147:3000,http://221.147.112.147:3000}
+    volumes:
+      - app_data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://localhost:4000/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # 작업 처리 워커 (이미지 생성 등)
+  worker:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile.worker
+    container_name: mockup-worker
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://user:password@postgres:5432/mockup?schema=public
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET:-super-secret-jwt-key-change-in-production}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - UPLOAD_DIR=/app/data
+    volumes:
+      - app_data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # Next.js 프론트엔드
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        # ✅ 서버 배포 시 실제 서버 IP로 변경 필요
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://172.30.1.42:4000}
+    container_name: mockup-web
+    ports:
+      - '3000:3000'
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  app_data:
+```
+
+**주요 변경사항**:
+
+- `CORS_ORIGIN` 환경변수에 모든 네트워크 IP 추가 (쉼표 구분)
+- `NEXT_PUBLIC_API_URL`로 프론트엔드 API URL 설정 (Next.js 형식)
+- PostgreSQL 16, Redis 7 사용
+- worker 서비스로 비동기 이미지 생성 처리
+
+---
+
+## 6. 실행 순서 (Execution Plan)
+
+### 6.1 로컬 개발 환경에서 테스트
+
+```bash
+# Step 1: 프로젝트 디렉토리로 이동
+cd mockup-ai
+
+# Step 2: apps/api/src/config/index.ts 수정
+# - BASE_CORS_ORIGINS 배열에 모든 네트워크 IP 추가
+# - corsOrigin → corsOrigins (배열)로 변경
+
+# Step 3: apps/api/src/server.ts 수정
+# - @fastify/cors origin 콜백 함수로 변경
+# - config.corsOrigins 배열 사용
+
+# Step 4: 루트 .env 파일 확인/생성
+cat .env
+# 필요 시 CORS_ORIGIN 환경변수 추가
+
+# Step 5: 로컬 개발 서버 실행 (Turborepo)
+pnpm dev
+
+# Step 6: API 서버 로그 확인
+# [CORS] ✅ ALLOWED: http://xxx.xxx.xxx.xxx:3000 메시지 확인
+```
+
+### 6.2 Docker 환경에서 테스트
+
+```bash
+# Step 1: 이미지 빌드 (변경사항 포함)
+docker-compose build
+
+# Step 2: 컨테이너 시작
+docker-compose up -d
+
+# Step 3: 로그 확인
+docker-compose logs -f api
+
+# Step 4: 각 네트워크에서 테스트 (아래 6.3 참조)
+```
+
+### 6.3 네트워크별 접근 테스트
+
+#### Test 1: 유선 LAN (같은 층)
+
+```bash
+# 172.30.1.40 (또는 172.30.1.42)에서 실행
+curl -X OPTIONS \
+  -H "Origin: http://172.30.1.40:3000" \
+  -H "Access-Control-Request-Method: POST" \
+  http://172.30.1.42:4000/api/auth/login \
+  -v
+
+# 예상 결과:
+# < HTTP/1.1 200 OK
+# < Access-Control-Allow-Origin: http://172.30.1.40:3000
+# < Access-Control-Allow-Methods: GET, POST, PUT, DELETE, PATCH, OPTIONS
+```
+
+#### Test 2: Tailscale VPN
+
+```bash
+# Tailscale 클라이언트가 설치된 디바이스에서 실행
+curl -X OPTIONS \
+  -H "Origin: http://100.69.75.47:3000" \
+  -H "Access-Control-Request-Method: POST" \
+  http://172.30.1.42:4000/api/auth/login \
+  -v
+
+# 예상 결과:
+# < HTTP/1.1 200 OK
+# < Access-Control-Allow-Origin: http://100.69.75.47:3000
+```
+
+#### Test 3: 무선 WiFi (다른 층/건물)
+
+```bash
+# 221.147.112.147 또는 175.193.199.147에서 실행
+curl -X OPTIONS \
+  -H "Origin: http://221.147.112.147:3000" \
+  -H "Access-Control-Request-Method: POST" \
+  http://172.30.1.42:4000/api/auth/login \
+  -v
+
+# 예상 결과:
+# < HTTP/1.1 200 OK
+# < Access-Control-Allow-Origin: http://221.147.112.147:3000
+```
+
+#### Test 4: 브라우저 로그인 (실제 테스트)
+
+```
+1. http://172.30.1.42:3000 에서 로그인 시도
+   → ✅ 성공 (유선 LAN)
+
+2. Tailscale IP로 접근 후 로그인 시도
+   → ✅ 성공 (VPN)
+
+3. 다른 층 WiFi에서 로그인 시도
+   → ✅ 성공 (무선)
+
+4. 개발자 도구 (F12) → Network → login 요청 확인
+   → Response Headers에 Access-Control-Allow-Origin 확인
+```
+
+---
+
+## 7. 검증 방법 (Validation)
+
+### 7.1 자동 검증 (자동화된 테스트)
+
+```bash
+# 유효한 origin 테스트
+for origin in "http://172.30.1.40:3000" "http://100.69.75.47:3000" "http://221.147.112.147:3000"; do
+  echo "Testing: $origin"
+  curl -s -X OPTIONS \
+    -H "Origin: $origin" \
+    -H "Access-Control-Request-Method: POST" \
+    http://172.30.1.42:4000/api/auth/login \
+    | grep "Access-Control-Allow-Origin"
+done
+
+# 유효하지 않은 origin 테스트
+echo "Testing invalid origin: http://evil.com:3000"
+curl -s -X OPTIONS \
+  -H "Origin: http://evil.com:3000" \
+  -H "Access-Control-Request-Method: POST" \
+  http://172.30.1.42:4000/api/auth/login \
+  -w "\nHTTP Status: %{http_code}\n"
+```
+
+### 7.2 수동 검증 (개발자)
+
+| 테스트 항목          | 기대 결과                                | 확인 방법                             |
+| -------------------- | ---------------------------------------- | ------------------------------------- |
+| **CORS 헤더 존재**   | `Access-Control-Allow-Origin` 헤더 포함  | DevTools → Network → Response Headers |
+| **Origin 매칭**      | 요청 origin과 응답 header의 값이 동일    | curl -v 또는 DevTools 확인            |
+| **credentials 지원** | `Access-Control-Allow-Credentials: true` | Response Headers에 표시               |
+| **OPTIONS 처리**     | Preflight 요청이 200 응답                | Network 탭에서 OPTIONS 요청 확인      |
+| **로그 출력**        | `[CORS] ✅ ALLOWED:` 메시지 출력         | docker-compose logs api               |
+| **차단된 origin**    | 허락되지 않은 IP는 403 또는 CORS 에러    | curl 또는 DevTools에서 확인           |
+
+---
+
+## 8. 롤백 계획 (Rollback Plan)
+
+문제 발생 시 이전 상태로 복구:
+
+### 8.1 문제 증상
+
+- CORS 에러 여전히 발생
+- 특정 네트워크만 접근 불가
+- 500 Internal Server Error
+
+### 8.2 롤백 절차
+
+```bash
+# Step 1: 변경사항 되돌리기
+git checkout -- apps/api/src/server.ts
+git checkout -- apps/api/src/config/index.ts
+git checkout -- docker-compose.yml
+
+# Step 3: Docker 재시작
+docker-compose down
+docker-compose up -d
+
+# Step 4: 로그 확인
+docker-compose logs -f api
+```
+
+### 8.3 디버깅 체크리스트
+
+- [ ] `apps/api/src/config/index.ts`의 `BASE_CORS_ORIGINS` 배열에 모든 네트워크 IP가 포함되어 있는가?
+- [ ] `apps/api/src/server.ts`에서 `@fastify/cors`의 `origin` 옵션이 콜백 함수로 설정되어 있는가?
+- [ ] `config.corsOrigins` (배열)을 사용하고 있는가? (기존 `corsOrigin` 단일 값 아님)
+- [ ] docker-compose의 `CORS_ORIGIN` 환경변수에 쉼표로 구분된 모든 origin이 있는가?
+- [ ] 네트워크 방화벽이 포트 3000(web), 4000(api)을 열어두었는가?
+- [ ] TypeScript 컴파일 에러가 없는가? (`pnpm type-check`)
+
+---
+
+## 9. 추가 고려사항 (Additional Considerations)
+
+### 9.1 보안
+
+⚠️ **주의**: 현재 설정은 회사 내부망용입니다. 외부 인터넷 노출 시 위험:
+
+- Tailscale IP를 `allowedOrigins`에 포함 (제한된 VPN이므로 안전)
+- 와일드카드 `*` 사용 금지
+- 프로덕션에서는 신뢰할 수 있는 IP만 명시적으로 추가
+
+### 9.2 확장성
+
+향후 다른 건물/층이 추가되면:
+
+```javascript
+const allowedOrigins = [
+  // 기존
+  'http://172.30.1.42:3000',
+
+  // 🆕 2층
+  'http://172.30.2.x:3000',
+
+  // 🆕 3층
+  'http://172.30.3.x:3000',
+
+  // 🆕 B 건물
+  'http://172.31.1.x:3000',
+];
+```
+
+또는 정규표현식 기반 매칭:
+
+```javascript
+origin: (origin, callback) => {
+  // 172.30.x.x 대역 모두 허용
+  if (!origin || /^http:\/\/172\.30\.\d+\.\d+:3000$/.test(origin)) {
+    callback(null, true);
+  } else {
+    callback(new Error('CORS blocked'));
+  }
+};
+```
+
+### 9.3 모니터링
+
+프로덕션 배포 후 CORS 관련 메트릭 모니터링:
+
+```typescript
+server.addHook('onRequest', async (request) => {
+  const origin = request.headers.origin;
+  if (origin) {
+    console.log(`[CORS][METRICS] ${request.method} ${request.url} from ${origin}`);
+    // Datadog, New Relic 등에 전송
+  }
+});
+```
+
+---
+
+## 10. 완료 체크리스트 (Completion Checklist)
+
+### Phase 1: 개발
+
+- [ ] `apps/api/src/config/index.ts` 수정 완료
+- [ ] `apps/api/src/server.ts` 수정 완료
+- [ ] `apps/api/.env` 확인 및 필요 시 업데이트
+- [ ] 로컬 `pnpm dev`로 테스트
+
+### Phase 2: Docker 배포
+
+- [ ] `docker-compose.yml` 수정
+- [ ] `docker-compose build` 실행
+- [ ] `docker-compose up -d` 실행
+- [ ] `docker-compose logs -f api` 로그 확인
+
+### Phase 3: 네트워크 테스트
+
+- [ ] 유선 LAN에서 로그인 성공
+- [ ] Tailscale VPN에서 로그인 성공
+- [ ] 무선 WiFi (221.147.112.147)에서 로그인 성공
+- [ ] 다른 건물 무선에서 로그인 성공 (추후 IP 추가)
+
+### Phase 4: 검증
+
+- [ ] DevTools → Network → login 요청 확인
+- [ ] Response Headers에 `Access-Control-Allow-Origin` 확인
+- [ ] 콘솔 로그에 `[CORS] ✅ ALLOWED:` 메시지 확인
+- [ ] 쿠키/세션 로그인 유지 확인
+
+### Phase 5: 문서화
+
+- [ ] 이 PRD 문서 완료
+- [ ] TRD (기술 요구사항) 업데이트
+- [ ] 팀원들에게 변경사항 공유
+- [ ] 향후 네트워크 추가 시 procedures 정의
+
+---
+
+## 11. 참고 자료 (References)
+
+- [@fastify/cors Docs](https://github.com/fastify/fastify-cors)
+- [MDN CORS Documentation](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS)
+- [Tailscale Networking](https://tailscale.com/kb/)
+- [Docker Compose Networking](https://docs.docker.com/compose/networking/)
+
+---
+
+**문서 작성자**: AI Agent  
+**최종 검토**: 필수  
+**배포 전 승인**: 필수

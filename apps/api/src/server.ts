@@ -35,6 +35,13 @@ const server = Fastify({
  * 플러그인 등록
  */
 async function registerPlugins() {
+  server.addHook('onRequest', async (request) => {
+    const origin = request.headers.origin;
+    if (origin) {
+      console.log(`[CORS][METRICS] ${request.method} ${request.url} from ${origin}`);
+    }
+  });
+
   // CORS 설정
   await server.register(cors, {
     origin: (origin, callback) => {
@@ -145,6 +152,18 @@ function setupErrorHandler() {
     server.log.error(error);
 
     const err = error as Error & { statusCode?: number; code?: string };
+
+    // CORS 정책 위반은 403으로 명확히 반환
+    if (err.message === 'CORS policy violation: Origin not allowed') {
+      return reply.code(403).send({
+        success: false,
+        error: {
+          code: 'CORS_FORBIDDEN',
+          message: '허용되지 않은 Origin입니다',
+          origin: request.headers.origin ?? null,
+        },
+      });
+    }
 
     // Zod 유효성 검사 에러
     if (err.name === 'ZodError') {
