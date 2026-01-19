@@ -212,7 +212,7 @@ export default function GenerationResultPage() {
   if (authLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--bg-primary)]">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+        <div className="border-brand-500 h-8 w-8 animate-spin rounded-full border-2 border-t-transparent" />
       </div>
     );
   }
@@ -221,12 +221,16 @@ export default function GenerationResultPage() {
   if (!generation || generation.status === 'pending' || generation.status === 'processing') {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--bg-primary)]">
-        <div className="mb-4 h-12 w-12 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" />
+        <div className="border-brand-500 mb-4 h-12 w-12 animate-spin rounded-full border-4 border-t-transparent" />
         <h2 className="text-xl font-semibold text-[var(--text-primary)]">
           목업을 생성하고 있습니다...
         </h2>
         <p className="mt-2 text-[var(--text-secondary)]">
           {generation?.status === 'processing' ? 'AI가 이미지를 생성 중입니다' : '작업 대기 중...'}
+        </p>
+        <p className="mt-3 max-w-md text-center text-sm text-[var(--text-secondary)]">
+          고품질 결과를 위해 고성능 AI로 처리 중이라 시간이 오래 걸릴 수 있습니다. 완료까지 잠시만
+          다른작업을 하면서 기다려주세요.
         </p>
       </div>
     );
@@ -237,9 +241,7 @@ export default function GenerationResultPage() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--bg-primary)]">
         <div className="mb-4 text-5xl">❌</div>
-        <h2 className="text-xl font-semibold text-[var(--text-primary)]">
-          생성에 실패했습니다
-        </h2>
+        <h2 className="text-xl font-semibold text-[var(--text-primary)]">생성에 실패했습니다</h2>
         <p className="mt-2 text-[var(--text-secondary)]">
           {generation.errorMessage || '알 수 없는 오류가 발생했습니다'}
         </p>
@@ -258,17 +260,16 @@ export default function GenerationResultPage() {
       <header className="border-b border-[var(--border-default)] bg-[var(--bg-secondary)]">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
           <div className="flex items-center gap-4">
-            <Link href={`/projects/${projectId}`} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+            <Link
+              href={`/projects/${projectId}`}
+              className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            >
               ← 프로젝트로
             </Link>
-            <h1 className="text-lg font-semibold text-[var(--text-primary)]">
-              생성 결과
-            </h1>
+            <h1 className="text-lg font-semibold text-[var(--text-primary)]">생성 결과</h1>
           </div>
           <div className="flex gap-2">
-            <Button onClick={() => handleDownload(selectedImageId!)}>
-              다운로드
-            </Button>
+            <Button onClick={() => handleDownload(selectedImageId!)}>다운로드</Button>
           </div>
         </div>
       </header>
@@ -309,8 +310,8 @@ export default function GenerationResultPage() {
                     className="aspect-square w-full object-cover"
                   />
                   {selectedImageId === image.id && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-brand-500/20">
-                      <span className="rounded-full bg-brand-500 px-2 py-1 text-xs text-white">
+                    <div className="bg-brand-500/20 absolute inset-0 flex items-center justify-center">
+                      <span className="bg-brand-500 rounded-full px-2 py-1 text-xs text-white">
                         선택됨
                       </span>
                     </div>
@@ -321,15 +322,11 @@ export default function GenerationResultPage() {
 
             {/* 추가 액션 */}
             <div className="space-y-2 pt-4">
-              <Button 
-                variant="secondary" 
-                className="w-full"
-                onClick={() => setShowEditModal(true)}
-              >
+              <Button variant="secondary" className="w-full" onClick={() => setShowEditModal(true)}>
                 ✏️ 부분 수정
               </Button>
-              <Button 
-                variant="secondary" 
+              <Button
+                variant="secondary"
                 className="w-full"
                 onClick={handleSaveToHistory}
                 isLoading={isSaving}
@@ -337,15 +334,9 @@ export default function GenerationResultPage() {
                 📚 히스토리에 저장
               </Button>
               {saveMessage && (
-                <p className="text-center text-sm text-[var(--text-secondary)]">
-                  {saveMessage}
-                </p>
+                <p className="text-center text-sm text-[var(--text-secondary)]">{saveMessage}</p>
               )}
-              <Button 
-                variant="ghost" 
-                className="w-full" 
-                onClick={handleRegenerate}
-              >
+              <Button variant="ghost" className="w-full" onClick={handleRegenerate}>
                 🔄 다시 생성
               </Button>
             </div>
@@ -357,9 +348,7 @@ export default function GenerationResultPage() {
       {showEditModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <div className="w-full max-w-md rounded-xl bg-[var(--bg-secondary)] p-6">
-            <h2 className="mb-4 text-xl font-semibold text-[var(--text-primary)]">
-              ✏️ 부분 수정
-            </h2>
+            <h2 className="mb-4 text-xl font-semibold text-[var(--text-primary)]">✏️ 부분 수정</h2>
             <p className="mb-4 text-sm text-[var(--text-secondary)]">
               수정하고 싶은 부분을 자세히 설명해주세요. 요청한 부분만 변경되고 나머지는 유지됩니다.
             </p>
@@ -371,8 +360,8 @@ export default function GenerationResultPage() {
               onKeyDown={(e) => e.key === 'Enter' && handleEdit()}
             />
             <div className="mt-6 flex justify-end gap-3">
-              <Button 
-                variant="secondary" 
+              <Button
+                variant="secondary"
                 onClick={() => {
                   setShowEditModal(false);
                   setEditPrompt('');
@@ -380,11 +369,7 @@ export default function GenerationResultPage() {
               >
                 취소
               </Button>
-              <Button
-                onClick={handleEdit}
-                isLoading={isEditing}
-                disabled={!editPrompt.trim()}
-              >
+              <Button onClick={handleEdit} isLoading={isEditing} disabled={!editPrompt.trim()}>
                 수정 요청
               </Button>
             </div>
