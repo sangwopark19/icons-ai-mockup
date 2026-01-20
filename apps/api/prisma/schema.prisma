@@ -119,14 +119,21 @@ model Generation {
   createdAt     DateTime         @default(now()) @map("created_at")
   completedAt   DateTime?        @map("completed_at")
 
-  project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  ipCharacter IPCharacter?     @relation(fields: [ipCharacterId], references: [id], onDelete: SetNull)
-  sourceImage GeneratedImage?  @relation("SourceImage", fields: [sourceImageId], references: [id], onDelete: SetNull)
-  images      GeneratedImage[] @relation("GenerationImages")
+  thoughtSignatures Json?   @map("thought_signatures")
+  styleReferenceId  String? @map("style_reference_id")
+  userInstructions  String? @map("user_instructions")
+
+  project        Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  ipCharacter    IPCharacter?     @relation(fields: [ipCharacterId], references: [id], onDelete: SetNull)
+  sourceImage    GeneratedImage?  @relation("SourceImage", fields: [sourceImageId], references: [id], onDelete: SetNull)
+  images         GeneratedImage[] @relation("GenerationImages")
+  styleReference Generation?      @relation("StyleReference", fields: [styleReferenceId], references: [id])
+  styleFollowers Generation[]     @relation("StyleReference")
 
   @@index([projectId, createdAt(sort: Desc)])
   @@index([status])
   @@index([ipCharacterId])
+  @@index([styleReferenceId])
   @@map("generations")
 }
 
