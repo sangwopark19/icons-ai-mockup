@@ -1,6 +1,6 @@
 import { prisma } from '../lib/prisma.js';
 import { addGenerationJob, GenerationJobData } from '../lib/queue.js';
-import type { Generation, GeneratedImage } from '@prisma/client';
+import { Prisma, type Generation, type GeneratedImage } from '@prisma/client';
 import type { ThoughtSignatureData } from '@mockup-ai/shared/types';
 import fs from 'fs/promises';
 import path from 'path';
@@ -172,9 +172,14 @@ export class GenerationService {
     generationId: string,
     signatures: ThoughtSignatureData[]
   ): Promise<void> {
+    const payload = signatures.map((signature) => ({
+      ...signature,
+      createdAt: signature.createdAt.toISOString(),
+    }));
+
     await prisma.generation.update({
       where: { id: generationId },
-      data: { thoughtSignatures: signatures },
+      data: { thoughtSignatures: payload as Prisma.JsonArray },
     });
   }
 
