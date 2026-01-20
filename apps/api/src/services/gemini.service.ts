@@ -8,6 +8,11 @@ interface GenerationOptions {
   preserveStructure: boolean;
   transparentBackground: boolean;
   prompt?: string;
+  preserveHardware?: boolean;
+  fixedBackground?: boolean;
+  fixedViewpoint?: boolean;
+  removeShadows?: boolean;
+  userInstructions?: string;
 }
 
 /**
@@ -18,6 +23,42 @@ export class GeminiService {
   private readonly ai: GoogleGenAI;
   // 고품질 이미지 생성용 모델 (Nano Banana Pro)
   private readonly imageModel = 'gemini-3-pro-image-preview';
+  private readonly CONSTRAINT_TEMPLATES = {
+    viewpoint: `
+## 시점(Viewpoint) 고정
+✓ MUST: 원본 이미지와 동일한 카메라 각도 유지
+✗ MUST NOT: 제품의 촬영 각도 변경
+`,
+    background: `
+## 배경(Background) 고정
+✓ MUST: 순수 흰색 배경 (#ffffff) 생성
+✗ MUST NOT: 그라데이션, 패턴, 환경 배경 추가
+`,
+    shadow: `
+## 그림자(Shadow) 제거
+✓ MUST: 모든 그림자 제거
+✗ MUST NOT: 드롭 쉐도우, 소프트 쉐도우 적용
+`,
+    hardware: `
+## 부자재 보존 규칙
+| 구성요소 | 잠금 상태 |
+|---------|----------|
+| 지퍼 (Zipper) | 🔒 LOCKED |
+| 금속 고리 (D-ring, O-ring) | 🔒 LOCKED |
+| 버클 (Buckle) | 🔒 LOCKED |
+| 가죽 패치 (Leather patch) | 🔒 LOCKED |
+
+✗ MUST NOT: 부자재의 색상/위치/크기 변경
+`,
+    userPriority: `
+## 🚨 사용자 지정 규칙 (HIGHEST PRIORITY)
+아래 규칙은 다른 모든 규칙보다 우선합니다. 반드시 준수하세요:
+
+{USER_INSTRUCTIONS}
+
+IMPORTANT: 위 규칙은 필수입니다. 절대 위반하지 마세요.
+`,
+  };
 
   constructor() {
     const apiKey = config.geminiApiKey || process.env.GEMINI_API_KEY || '';
@@ -49,7 +90,6 @@ export class GeminiService {
             {
               role: 'user',
               parts: [
-                { text: systemPrompt },
                 {
                   inlineData: {
                     mimeType: 'image/png',
@@ -67,6 +107,7 @@ export class GeminiService {
             },
           ],
           config: {
+            systemInstruction: systemPrompt,
             // 고품질 이미지 설정
             imageConfig: {
               aspectRatio: '1:1',
@@ -240,6 +281,29 @@ export class GeminiService {
 
     if (options.transparentBackground) {
       prompt += '\n6. 배경을 투명하게 처리 (PNG 투명 배경)';
+    }
+
+    if (options.fixedViewpoint) {
+      prompt += this.CONSTRAINT_TEMPLATES.viewpoint;
+    }
+
+    if (options.fixedBackground) {
+      prompt += this.CONSTRAINT_TEMPLATES.background;
+    }
+
+    if (options.removeShadows) {
+      prompt += this.CONSTRAINT_TEMPLATES.shadow;
+    }
+
+    if (options.preserveHardware) {
+      prompt += this.CONSTRAINT_TEMPLATES.hardware;
+    }
+
+    if (options.userInstructions) {
+      prompt += this.CONSTRAINT_TEMPLATES.userPriority.replace(
+        '{USER_INSTRUCTIONS}',
+        options.userInstructions
+      );
     }
 
     return prompt;
