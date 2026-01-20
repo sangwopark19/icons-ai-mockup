@@ -137,6 +137,34 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   /**
+   * 동일 조건 재생성
+   * POST /api/generations/:id/regenerate
+   */
+  fastify.post('/:id/regenerate', async (request, reply) => {
+    const user = (request as any).user;
+    const { id } = request.params as { id: string };
+
+    try {
+      const generation = await generationService.regenerate(user.id, id);
+
+      return reply.code(201).send({
+        success: true,
+        data: {
+          id: generation.id,
+          status: generation.status,
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '재생성에 실패했습니다';
+      const statusCode = message.includes('찾을 수 없습니다') ? 404 : 400;
+      return reply.code(statusCode).send({
+        success: false,
+        error: { code: 'REGENERATE_FAILED', message },
+      });
+    }
+  });
+
+  /**
    * 생성 기록 삭제 (연관된 모든 이미지 포함)
    * DELETE /api/generations/:id
    */

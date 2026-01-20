@@ -179,6 +179,34 @@ export class GenerationService {
   }
 
   /**
+   * 동일 조건으로 재생성
+   */
+  async regenerate(userId: string, generationId: string): Promise<Generation> {
+    const original = await this.getById(userId, generationId);
+    if (!original) {
+      throw new Error('생성 기록을 찾을 수 없습니다');
+    }
+
+    const promptData = (original.promptData as Record<string, unknown>) || {};
+    const options = (original.options as Record<string, unknown>) || {};
+
+    return this.create(userId, {
+      projectId: original.projectId,
+      mode: original.mode,
+      sourceImagePath: promptData.sourceImagePath as string | undefined,
+      characterId: original.ipCharacterId || undefined,
+      characterImagePath: promptData.characterImagePath as string | undefined,
+      textureImagePath: promptData.textureImagePath as string | undefined,
+      prompt: promptData.userPrompt as string | undefined,
+      options: {
+        preserveStructure: (options.preserveStructure as boolean | undefined) ?? false,
+        transparentBackground: (options.transparentBackground as boolean | undefined) ?? false,
+        outputCount: (options.outputCount as number | undefined) ?? 2,
+      },
+    });
+  }
+
+  /**
    * 생성된 이미지 저장
    */
   async saveGeneratedImage(
