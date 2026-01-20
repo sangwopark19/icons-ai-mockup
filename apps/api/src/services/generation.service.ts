@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma.js';
 import { addGenerationJob, GenerationJobData } from '../lib/queue.js';
 import type { Generation, GeneratedImage } from '@prisma/client';
+import type { ThoughtSignatureData } from '@mockup-ai/shared/types';
 import fs from 'fs/promises';
 import path from 'path';
 import { config } from '../config/index.js';
@@ -161,6 +162,19 @@ export class GenerationService {
         errorMessage: errorMessage || null,
         completedAt: status === 'completed' || status === 'failed' ? new Date() : null,
       },
+    });
+  }
+
+  /**
+   * thoughtSignature 저장
+   */
+  async updateThoughtSignatures(
+    generationId: string,
+    signatures: ThoughtSignatureData[]
+  ): Promise<void> {
+    await prisma.generation.update({
+      where: { id: generationId },
+      data: { thoughtSignatures: signatures },
     });
   }
 

@@ -1,4 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
+import type { ThoughtSignatureData } from '@mockup-ai/shared/types';
 import { config } from '../config/index.js';
 
 /**
@@ -15,6 +16,11 @@ interface GenerationOptions {
   userInstructions?: string;
 }
 
+interface GenerationResult {
+  images: Buffer[];
+  signatures: ThoughtSignatureData[];
+}
+
 /**
  * Gemini API 서비스
  * @google/genai SDK 사용 (가이드 준수)
@@ -23,6 +29,7 @@ export class GeminiService {
   private readonly ai: GoogleGenAI;
   // 고품질 이미지 생성용 모델 (Nano Banana Pro)
   private readonly imageModel = 'gemini-3-pro-image-preview';
+  private readonly signatureBypass = 'context_engineering_is_the_way_to_go';
   private readonly CONSTRAINT_TEMPLATES = {
     viewpoint: `
 ## 시점(Viewpoint) 고정
@@ -75,11 +82,12 @@ IMPORTANT: 위 규칙은 필수입니다. 절대 위반하지 마세요.
     sourceImageBase64: string,
     characterImageBase64: string,
     options: GenerationOptions
-  ): Promise<Buffer[]> {
+  ): Promise<GenerationResult> {
     const systemPrompt = this.buildIPChangePrompt(options);
 
     // 이미지 생성 요청 (가이드에 따른 구조)
     const images: Buffer[] = [];
+    const signatures: ThoughtSignatureData[] = [];
     const outputCount = 2;
 
     for (let i = 0; i < outputCount; i++) {
@@ -119,6 +127,7 @@ IMPORTANT: 위 규칙은 필수입니다. 절대 위반하지 마세요.
         // 응답에서 이미지 추출
         const extractedImages = this.extractImagesFromResponse(response);
         images.push(...extractedImages);
+        signatures.push(this.extractSignatures(response));
       } catch (error) {
         console.error(`이미지 생성 ${i + 1} 실패:`, error);
       }
@@ -128,7 +137,7 @@ IMPORTANT: 위 규칙은 필수입니다. 절대 위반하지 마세요.
       throw new Error('이미지 생성에 실패했습니다');
     }
 
-    return images;
+    return { images, signatures };
   }
 
   /**
@@ -138,7 +147,7 @@ IMPORTANT: 위 규칙은 필수입니다. 절대 위반하지 마세요.
     sketchImageBase64: string,
     textureImageBase64: string | null,
     options: GenerationOptions
-  ): Promise<Buffer[]> {
+  ): Promise<GenerationResult> {
     const systemPrompt = this.buildSketchToRealPrompt(options);
 
     // 요청 파츠 구성
@@ -167,6 +176,7 @@ IMPORTANT: 위 규칙은 필수입니다. 절대 위반하지 마세요.
     }
 
     const images: Buffer[] = [];
+    const signatures: ThoughtSignatureData[] = [];
     const outputCount = 2;
 
     for (let i = 0; i < outputCount; i++) {
@@ -189,6 +199,7 @@ IMPORTANT: 위 규칙은 필수입니다. 절대 위반하지 마세요.
 
         const extractedImages = this.extractImagesFromResponse(response);
         images.push(...extractedImages);
+        signatures.push(this.extractSignatures(response));
       } catch (error) {
         console.error(`이미지 생성 ${i + 1} 실패:`, error);
       }
@@ -198,7 +209,7 @@ IMPORTANT: 위 규칙은 필수입니다. 절대 위반하지 마세요.
       throw new Error('이미지 생성에 실패했습니다');
     }
 
-    return images;
+    return { images, signatures };
   }
 
   /**
@@ -260,6 +271,75 @@ IMPORTANT: 위 규칙은 필수입니다. 절대 위반하지 마세요.
     }
 
     return images;
+  }
+
+  /**
+   * 응답에서 thoughtSignature 추출
+   */
+  extractSignatures(response: any): ThoughtSignatureData {
+    const signatures: ThoughtSignatureData = {
+      imageSignatures: [],
+      createdAt: new Date(),
+    };
+
+    const parts = response.candidates?.[0]?.content?.parts || [];
+    parts.forEach((part: any, index: number) => {
+      if (!part?.thoughtSignature) {
+        return;
+      }
+
+      if (index === 0) {
+        signatures.textSignature = part.thoughtSignature;
+      }
+
+      if (part.inlineData) {
+        signatures.imageSignatures.push(part.thoughtSignature);
+      }
+    });
+
+    return signatures;
+  }
+
+  /**
+   * 대화형 편집용 히스토리 구성
+   */
+  buildConversationHistory(
+    previousPrompt: string,
+    previousImageBase64: string,
+    signatures: ThoughtSignatureData,
+    newRequest: string
+  ): Array<{ role: 'user' | 'model'; parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string }; thoughtSignature?: string }> }> {
+    const textSignature = this.ensureSignature(signatures.textSignature);
+    const imageSignature =
+      signatures.imageSignatures[0] || this.signatureBypass;
+
+    return [
+      {
+        role: 'user',
+        parts: [{ text: previousPrompt }],
+      },
+      {
+        role: 'model',
+        parts: [
+          {
+            text: '생성 완료',
+            thoughtSignature: textSignature,
+          },
+          {
+            inlineData: { mimeType: 'image/png', data: previousImageBase64 },
+            thoughtSignature: this.ensureSignature(imageSignature),
+          },
+        ],
+      },
+      {
+        role: 'user',
+        parts: [{ text: newRequest }],
+      },
+    ];
+  }
+
+  private ensureSignature(signature?: string): string {
+    return signature?.trim() ? signature : this.signatureBypass;
   }
 
   /**

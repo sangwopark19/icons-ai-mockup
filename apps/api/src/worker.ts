@@ -4,6 +4,7 @@ import { geminiService } from './services/gemini.service.js';
 import { uploadService } from './services/upload.service.js';
 import { generationService } from './services/generation.service.js';
 import type { GenerationJobData } from './lib/queue.js';
+import type { ThoughtSignatureData } from '@mockup-ai/shared/types';
 
 /**
  * 생성 작업 처리 워커
@@ -40,13 +41,14 @@ const generationWorker = new Worker<GenerationJobData>(
 
       // Gemini API 호출
       let generatedImages: Buffer[];
+      let thoughtSignatures: ThoughtSignatureData[] = [];
 
       if (mode === 'ip_change') {
         if (!sourceImageBase64 || !characterImageBase64) {
           throw new Error('IP 변경에는 원본 이미지와 캐릭터 이미지가 필요합니다');
         }
 
-        generatedImages = await geminiService.generateIPChange(
+        const result = await geminiService.generateIPChange(
           sourceImageBase64,
           characterImageBase64,
           {
@@ -55,12 +57,14 @@ const generationWorker = new Worker<GenerationJobData>(
             prompt: job.data.prompt,
           }
         );
+        generatedImages = result.images;
+        thoughtSignatures = result.signatures;
       } else if (mode === 'sketch_to_real') {
         if (!sourceImageBase64) {
           throw new Error('스케치 이미지가 필요합니다');
         }
 
-        generatedImages = await geminiService.generateSketchToReal(
+        const result = await geminiService.generateSketchToReal(
           sourceImageBase64,
           textureImageBase64 || null,
           {
@@ -69,6 +73,8 @@ const generationWorker = new Worker<GenerationJobData>(
             prompt: job.data.prompt,
           }
         );
+        generatedImages = result.images;
+        thoughtSignatures = result.signatures;
       } else {
         throw new Error(`알 수 없는 생성 모드: ${mode}`);
       }
@@ -89,6 +95,10 @@ const generationWorker = new Worker<GenerationJobData>(
           result.thumbnailPath,
           result.metadata
         );
+      }
+
+      if (thoughtSignatures.length > 0) {
+        await generationService.updateThoughtSignatures(generationId, thoughtSignatures);
       }
 
       // 완료 상태로 업데이트
