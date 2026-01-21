@@ -42,6 +42,7 @@ export default function GenerationResultPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editPrompt, setEditPrompt] = useState('');
   const [isEditing, setIsEditing] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
@@ -196,9 +197,39 @@ export default function GenerationResultPage() {
   };
 
   /**
-   * 다시 생성
+   * 동일 조건 재생성
    */
-  const handleRegenerate = () => {
+  const handleRegenerateWithSameInputs = async () => {
+    if (!accessToken) return;
+
+    setIsRegenerating(true);
+    try {
+      const response = await fetch(`${API_URL}/api/generations/${genId}/regenerate`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        router.push(`/projects/${projectId}/generations/${data.data.id}`);
+        return;
+      }
+
+      alert(data.error?.message || '동일 조건 재생성에 실패했습니다');
+    } catch (error) {
+      console.error('동일 조건 재생성 실패:', error);
+      alert('동일 조건 재생성에 실패했습니다');
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
+  /**
+   * 조건 수정
+   */
+  const handleModifyConditions = () => {
     // 모드에 따라 해당 페이지로 이동
     if (generation?.mode === 'ip_change') {
       router.push(`/projects/${projectId}/ip-change`);
@@ -207,6 +238,15 @@ export default function GenerationResultPage() {
     } else {
       router.back();
     }
+  };
+
+  /**
+   * 스타일 복사
+   */
+  const handleStyleCopy = (copyTarget: 'ip-change' | 'new-product') => {
+    const styleRef = generation?.id ?? genId;
+    const query = new URLSearchParams({ styleRef, copyTarget });
+    router.push(`/projects/${projectId}/ip-change?${query.toString()}`);
   };
 
   if (authLoading) {
@@ -333,11 +373,33 @@ export default function GenerationResultPage() {
               >
                 📚 히스토리에 저장
               </Button>
+              <Button
+                variant="secondary"
+                className="w-full"
+                onClick={() => handleStyleCopy('ip-change')}
+              >
+                🎨 스타일 복사 (IP 변경)
+              </Button>
+              <Button
+                variant="secondary"
+                className="w-full"
+                onClick={() => handleStyleCopy('new-product')}
+              >
+                🧩 스타일 복사 (새 제품 적용)
+              </Button>
               {saveMessage && (
                 <p className="text-center text-sm text-[var(--text-secondary)]">{saveMessage}</p>
               )}
-              <Button variant="ghost" className="w-full" onClick={handleRegenerate}>
-                🔄 다시 생성
+              <Button
+                variant="ghost"
+                className="w-full"
+                onClick={handleRegenerateWithSameInputs}
+                isLoading={isRegenerating}
+              >
+                🔁 동일 조건 재생성
+              </Button>
+              <Button variant="ghost" className="w-full" onClick={handleModifyConditions}>
+                🛠️ 조건 수정
               </Button>
             </div>
           </div>
