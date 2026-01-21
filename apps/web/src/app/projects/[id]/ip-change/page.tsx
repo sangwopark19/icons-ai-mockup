@@ -25,7 +25,13 @@ export default function IPChangePage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [preserveStructure, setPreserveStructure] = useState(false);
   const [transparentBg, setTransparentBg] = useState(false);
+  const [preserveHardware, setPreserveHardware] = useState(false);
+  const [fixedBackground, setFixedBackground] = useState(false);
+  const [fixedViewpoint, setFixedViewpoint] = useState(false);
+  const [removeShadows, setRemoveShadows] = useState(false);
+  const [userInstructions, setUserInstructions] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const maxUserInstructionsLength = 2000;
 
   // 인증 체크
   useEffect(() => {
@@ -68,6 +74,10 @@ export default function IPChangePage() {
     if (!sourceImage || !characterImage || !accessToken) return;
 
     setError(null);
+    if (userInstructions.length > maxUserInstructionsLength) {
+      setError('사용자 지시문은 2000자 이내로 입력해주세요');
+      return;
+    }
     setIsGenerating(true);
 
     try {
@@ -92,6 +102,11 @@ export default function IPChangePage() {
           options: {
             preserveStructure,
             transparentBackground: transparentBg,
+            preserveHardware,
+            fixedBackground,
+            fixedViewpoint,
+            removeShadows,
+            userInstructions: userInstructions.trim() || undefined,
             outputCount: 2,
           },
         }),
@@ -127,6 +142,11 @@ export default function IPChangePage() {
     const reader = new FileReader();
     reader.onload = (e) => setCharacterPreview(e.target?.result as string);
     reader.readAsDataURL(file);
+  };
+
+  const handleUserInstructionsChange = (value: string) => {
+    if (value.length > maxUserInstructionsLength) return;
+    setUserInstructions(value);
   };
 
   if (authLoading) {
@@ -211,6 +231,65 @@ export default function IPChangePage() {
                 투명 배경 (누끼)
               </span>
             </label>
+            <label className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                checked={preserveHardware}
+                onChange={(e) => setPreserveHardware(e.target.checked)}
+                className="h-4 w-4 rounded border-[var(--border-default)] bg-[var(--bg-tertiary)]"
+              />
+              <span className="text-sm text-[var(--text-secondary)]">부자재 보존</span>
+            </label>
+            <label className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                checked={fixedBackground}
+                onChange={(e) => setFixedBackground(e.target.checked)}
+                className="h-4 w-4 rounded border-[var(--border-default)] bg-[var(--bg-tertiary)]"
+              />
+              <span className="text-sm text-[var(--text-secondary)]">배경 고정</span>
+            </label>
+            <label className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                checked={fixedViewpoint}
+                onChange={(e) => setFixedViewpoint(e.target.checked)}
+                className="h-4 w-4 rounded border-[var(--border-default)] bg-[var(--bg-tertiary)]"
+              />
+              <span className="text-sm text-[var(--text-secondary)]">시점 고정</span>
+            </label>
+            <label className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                checked={removeShadows}
+                onChange={(e) => setRemoveShadows(e.target.checked)}
+                className="h-4 w-4 rounded border-[var(--border-default)] bg-[var(--bg-tertiary)]"
+              />
+              <span className="text-sm text-[var(--text-secondary)]">그림자 제거</span>
+            </label>
+          </div>
+          <div className="mt-6">
+            <label
+              htmlFor="user-instructions"
+              className="block text-sm font-medium text-[var(--text-primary)]"
+            >
+              사용자 지시문
+            </label>
+            <p className="mt-1 text-xs text-[var(--text-secondary)]">
+              생성 규칙을 추가로 입력하면 다른 옵션보다 우선 적용됩니다
+            </p>
+            <textarea
+              id="user-instructions"
+              value={userInstructions}
+              onChange={(e) => handleUserInstructionsChange(e.target.value)}
+              maxLength={maxUserInstructionsLength}
+              rows={4}
+              placeholder="예: 배경은 항상 흰색, 캐릭터는 정면에서 보이도록 유지"
+              className="mt-3 w-full resize-none rounded-lg border border-[var(--border-default)] bg-[var(--bg-tertiary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
+            />
+            <div className="mt-2 text-right text-xs text-[var(--text-secondary)]">
+              {userInstructions.length}/{maxUserInstructionsLength}
+            </div>
           </div>
         </div>
 
