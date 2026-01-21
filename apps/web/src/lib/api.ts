@@ -13,6 +13,7 @@ interface RequestOptions extends RequestInit {
  */
 async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
   const { token, ...fetchOptions } = options;
+  const method = fetchOptions.method ?? 'GET';
 
   const headers: HeadersInit = {
     ...options.headers,
@@ -27,6 +28,28 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
   }
 
+  // #region 에이전트 로그
+  fetch('http://127.0.0.1:7243/ingest/b191ce02-4f7f-42aa-8e8d-6f1eb4eff476', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      sessionId: 'debug-session',
+      runId: 'pre-fix',
+      hypothesisId: 'H2',
+      location: 'api.ts:request:start',
+      message: '요청 시작',
+      data: {
+        endpoint,
+        method,
+        hasToken: Boolean(token),
+        hasBody: Boolean(options.body),
+        apiUrl: API_URL,
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion 에이전트 로그
+
   const response = await fetch(`${API_URL}${endpoint}`, {
     ...fetchOptions,
     headers,
@@ -34,9 +57,46 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
 
   const data = await response.json();
 
+  // #region 에이전트 로그
+  fetch('http://127.0.0.1:7243/ingest/b191ce02-4f7f-42aa-8e8d-6f1eb4eff476', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      sessionId: 'debug-session',
+      runId: 'pre-fix',
+      hypothesisId: 'H1',
+      location: 'api.ts:request:response',
+      message: '응답 수신',
+      data: {
+        endpoint,
+        method,
+        status: response.status,
+        ok: response.ok,
+        errorCode: data?.error?.code ?? null,
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion 에이전트 로그
+
   if (!response.ok) {
     // 401 에러 시 토큰 만료 이벤트 발생
     if (response.status === 401) {
+      // #region 에이전트 로그
+      fetch('http://127.0.0.1:7243/ingest/b191ce02-4f7f-42aa-8e8d-6f1eb4eff476', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'pre-fix',
+          hypothesisId: 'H1',
+          location: 'api.ts:request:401',
+          message: '401 처리 분기',
+          data: { endpoint, method },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion 에이전트 로그
       // 브라우저 환경에서만 이벤트 발생
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('auth:token-expired'));

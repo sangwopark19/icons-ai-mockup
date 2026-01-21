@@ -66,6 +66,22 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     const body = LoginSchema.parse(request.body);
 
     try {
+      // #region 에이전트 로그
+      fetch('http://127.0.0.1:7243/ingest/b191ce02-4f7f-42aa-8e8d-6f1eb4eff476', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'pre-fix',
+          hypothesisId: 'H3',
+          location: 'auth.routes.ts:login:start',
+          message: '로그인 요청 수신',
+          data: { hasBody: Boolean(body) },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion 에이전트 로그
+
       const { user, accessToken, refreshToken } = await authService.login(
         body.email,
         body.password
@@ -87,6 +103,21 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : '로그인에 실패했습니다';
+      // #region 에이전트 로그
+      fetch('http://127.0.0.1:7243/ingest/b191ce02-4f7f-42aa-8e8d-6f1eb4eff476', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'pre-fix',
+          hypothesisId: 'H3',
+          location: 'auth.routes.ts:login:error',
+          message: '로그인 실패',
+          data: { errorMessage: message },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion 에이전트 로그
       return reply.code(401).send({
         success: false,
         error: {

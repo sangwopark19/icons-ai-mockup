@@ -60,12 +60,43 @@ export class AuthService {
       where: { email },
     });
 
+    // #region 에이전트 로그
+    fetch('http://127.0.0.1:7243/ingest/b191ce02-4f7f-42aa-8e8d-6f1eb4eff476', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'debug-session',
+        runId: 'pre-fix',
+        hypothesisId: 'H3',
+        location: 'auth.service.ts:login:user-lookup',
+        message: '사용자 조회 결과',
+        data: { userFound: Boolean(user) },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion 에이전트 로그
+
     if (!user) {
       throw new Error('이메일 또는 비밀번호가 올바르지 않습니다');
     }
 
     // 비밀번호 검증
     const isValid = await bcrypt.compare(password, user.passwordHash);
+    // #region 에이전트 로그
+    fetch('http://127.0.0.1:7243/ingest/b191ce02-4f7f-42aa-8e8d-6f1eb4eff476', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'debug-session',
+        runId: 'pre-fix',
+        hypothesisId: 'H3',
+        location: 'auth.service.ts:login:password-compare',
+        message: '비밀번호 검증 결과',
+        data: { passwordValid: isValid },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion 에이전트 로그
     if (!isValid) {
       throw new Error('이메일 또는 비밀번호가 올바르지 않습니다');
     }
