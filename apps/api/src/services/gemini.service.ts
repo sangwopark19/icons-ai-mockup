@@ -307,8 +307,11 @@ IMPORTANT: 위 규칙은 필수입니다. 절대 위반하지 마세요.
     previousPrompt: string,
     previousImageBase64: string,
     signatures: ThoughtSignatureData,
-    newRequest: string
-  ): Array<{ role: 'user' | 'model'; parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string }; thoughtSignature?: string }> }> {
+    newParts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }>
+  ): Array<{
+    role: 'user' | 'model';
+    parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string }; thoughtSignature?: string }>;
+  }> {
     const textSignature = this.ensureSignature(signatures.textSignature);
     const imageSignature =
       signatures.imageSignatures[0] || this.signatureBypass;
@@ -331,15 +334,48 @@ IMPORTANT: 위 규칙은 필수입니다. 절대 위반하지 마세요.
           },
         ],
       },
-      {
-        role: 'user',
-        parts: [{ text: newRequest }],
-      },
+      { role: 'user', parts: newParts },
     ];
   }
 
   private ensureSignature(signature?: string): string {
     return signature?.trim() ? signature : this.signatureBypass;
+  }
+
+  /**
+   * 스타일 복사 생성 (Chat 모드 히스토리 포함)
+   */
+  async generateWithStyleCopy(
+    previousPrompt: string,
+    previousImageBase64: string,
+    signatures: ThoughtSignatureData,
+    newParts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }>,
+    options: GenerationOptions
+  ): Promise<GenerationResult> {
+    const systemPrompt = this.buildIPChangePrompt(options);
+    const contents = this.buildConversationHistory(
+      previousPrompt,
+      previousImageBase64,
+      signatures,
+      newParts
+    );
+
+    const response = await this.ai.models.generateContent({
+      model: this.imageModel,
+      contents,
+      config: {
+        systemInstruction: systemPrompt,
+        imageConfig: {
+          aspectRatio: '1:1',
+          imageSize: '2K',
+        },
+      },
+    });
+
+    return {
+      images: this.extractImagesFromResponse(response),
+      signatures: [this.extractSignatures(response)],
+    };
   }
 
   /**
