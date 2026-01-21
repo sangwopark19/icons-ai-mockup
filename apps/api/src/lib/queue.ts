@@ -9,6 +9,7 @@ export interface GenerationJobData {
   userId: string;
   projectId: string;
   mode: 'ip_change' | 'sketch_to_real';
+  styleReferenceId?: string;
   sourceImagePath?: string;
   characterImagePath?: string;
   textureImagePath?: string;
@@ -16,6 +17,11 @@ export interface GenerationJobData {
   options: {
     preserveStructure: boolean;
     transparentBackground: boolean;
+    preserveHardware?: boolean;
+    fixedBackground?: boolean;
+    fixedViewpoint?: boolean;
+    removeShadows?: boolean;
+    userInstructions?: string;
     outputCount: number;
   };
 }

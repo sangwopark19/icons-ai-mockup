@@ -12,14 +12,24 @@ import { config } from '../config/index.js';
 interface CreateGenerationInput {
   projectId: string;
   mode: 'ip_change' | 'sketch_to_real';
+  styleReferenceId?: string;
   sourceImagePath?: string;
   characterId?: string;
   characterImagePath?: string; // 직접 업로드된 캐릭터 이미지 경로
   textureImagePath?: string;
   prompt?: string;
+  regenerationMeta?: {
+    originalGenerationId: string;
+    regeneratedAt: string;
+  };
   options?: {
     preserveStructure?: boolean;
     transparentBackground?: boolean;
+    preserveHardware?: boolean;
+    fixedBackground?: boolean;
+    fixedViewpoint?: boolean;
+    removeShadows?: boolean;
+    userInstructions?: string;
     outputCount?: number;
   };
 }
@@ -57,6 +67,8 @@ export class GenerationService {
       characterImagePath = character.filePath;
     }
 
+    const userInstructions = input.options?.userInstructions?.trim();
+
     // 생성 기록 저장
     const generation = await prisma.generation.create({
       data: {
@@ -65,15 +77,23 @@ export class GenerationService {
         sourceImageId: null, // 나중에 업데이트
         mode: input.mode,
         status: 'pending',
+        styleReferenceId: input.styleReferenceId || null,
+        userInstructions: userInstructions || null,
         promptData: {
           sourceImagePath: input.sourceImagePath,
           characterImagePath,
           textureImagePath: input.textureImagePath,
           userPrompt: input.prompt,
+          regenerationMeta: input.regenerationMeta,
         },
         options: {
           preserveStructure: input.options?.preserveStructure ?? false,
           transparentBackground: input.options?.transparentBackground ?? false,
+          preserveHardware: input.options?.preserveHardware ?? false,
+          fixedBackground: input.options?.fixedBackground ?? false,
+          fixedViewpoint: input.options?.fixedViewpoint ?? false,
+          removeShadows: input.options?.removeShadows ?? false,
+          userInstructions: userInstructions || undefined,
           outputCount: input.options?.outputCount ?? 2,
         },
       },
@@ -85,6 +105,7 @@ export class GenerationService {
       userId,
       projectId: input.projectId,
       mode: input.mode,
+      styleReferenceId: input.styleReferenceId,
       sourceImagePath: input.sourceImagePath,
       characterImagePath,
       textureImagePath: input.textureImagePath,
@@ -92,6 +113,11 @@ export class GenerationService {
       options: {
         preserveStructure: input.options?.preserveStructure ?? false,
         transparentBackground: input.options?.transparentBackground ?? false,
+        preserveHardware: input.options?.preserveHardware ?? false,
+        fixedBackground: input.options?.fixedBackground ?? false,
+        fixedViewpoint: input.options?.fixedViewpoint ?? false,
+        removeShadows: input.options?.removeShadows ?? false,
+        userInstructions: userInstructions || undefined,
         outputCount: input.options?.outputCount ?? 2,
       },
     });
@@ -195,7 +221,7 @@ export class GenerationService {
     const promptData = (original.promptData as Record<string, unknown>) || {};
     const options = (original.options as Record<string, unknown>) || {};
 
-    return this.create(userId, {
+    const regenerationInput = {
       projectId: original.projectId,
       mode: original.mode,
       sourceImagePath: promptData.sourceImagePath as string | undefined,
@@ -203,9 +229,137 @@ export class GenerationService {
       characterImagePath: promptData.characterImagePath as string | undefined,
       textureImagePath: promptData.textureImagePath as string | undefined,
       prompt: promptData.userPrompt as string | undefined,
+      regenerationMeta: {
+        originalGenerationId: original.id,
+        regeneratedAt: new Date().toISOString(),
+      },
       options: {
         preserveStructure: (options.preserveStructure as boolean | undefined) ?? false,
         transparentBackground: (options.transparentBackground as boolean | undefined) ?? false,
+        preserveHardware: (options.preserveHardware as boolean | undefined) ?? false,
+        fixedBackground: (options.fixedBackground as boolean | undefined) ?? false,
+        fixedViewpoint: (options.fixedViewpoint as boolean | undefined) ?? false,
+        removeShadows: (options.removeShadows as boolean | undefined) ?? false,
+        userInstructions:
+          (options.userInstructions as string | undefined) ?? original.userInstructions ?? undefined,
+        outputCount: (options.outputCount as number | undefined) ?? 2,
+      },
+    };
+
+    // 재생성 입력값이 원본과 일치하는지 검증
+    this.validateRegenerationInputs(original.mode, promptData, options, regenerationInput);
+
+    return this.create(userId, regenerationInput);
+  }
+
+  private validateRegenerationInputs(
+    mode: Generation['mode'],
+    promptData: Record<string, unknown>,
+    options: Record<string, unknown>,
+    regenerationInput: CreateGenerationInput
+  ): void {
+    if (!promptData || typeof promptData !== 'object') {
+      throw new Error('재생성 입력 데이터가 유효하지 않습니다');
+    }
+
+    if (typeof options !== 'object' || options === null) {
+      throw new Error('재생성 옵션 데이터가 유효하지 않습니다');
+    }
+
+    const outputCount = options.outputCount;
+    if (outputCount !== undefined && typeof outputCount !== 'number') {
+      throw new Error('재생성 옵션 값이 유효하지 않습니다');
+    }
+
+    if (mode === 'ip_change') {
+      if (!promptData.sourceImagePath || !promptData.characterImagePath) {
+        throw new Error('재생성 입력값이 불완전합니다');
+      }
+    }
+
+    if (mode === 'sketch_to_real') {
+      if (!promptData.sourceImagePath) {
+        throw new Error('재생성 입력값이 불완전합니다');
+      }
+    }
+
+    const normalizedOriginal = this.normalizeRegenerationInputs(promptData, options);
+    const normalizedNew = this.normalizeRegenerationInputs(
+      {
+        sourceImagePath: regenerationInput.sourceImagePath,
+        characterImagePath: regenerationInput.characterImagePath,
+        textureImagePath: regenerationInput.textureImagePath,
+        userPrompt: regenerationInput.prompt,
+      },
+      regenerationInput.options || {}
+    );
+
+    if (normalizedOriginal !== normalizedNew) {
+      throw new Error('재생성 입력값이 원본과 일치하지 않습니다');
+    }
+  }
+
+  private normalizeRegenerationInputs(
+    promptData: Record<string, unknown>,
+    options: Record<string, unknown>
+  ): string {
+    return JSON.stringify({
+      sourceImagePath: promptData.sourceImagePath ?? null,
+      characterImagePath: promptData.characterImagePath ?? null,
+      textureImagePath: promptData.textureImagePath ?? null,
+      userPrompt: promptData.userPrompt ?? null,
+      options: {
+        preserveStructure: options.preserveStructure ?? false,
+        transparentBackground: options.transparentBackground ?? false,
+        preserveHardware: options.preserveHardware ?? false,
+        fixedBackground: options.fixedBackground ?? false,
+        fixedViewpoint: options.fixedViewpoint ?? false,
+        removeShadows: options.removeShadows ?? false,
+        userInstructions: options.userInstructions ?? null,
+        outputCount: options.outputCount ?? 2,
+      },
+    });
+  }
+
+  /**
+   * 스타일 복사 생성
+   */
+  async copyStyle(
+    userId: string,
+    generationId: string,
+    input: { characterImagePath?: string; sourceImagePath?: string }
+  ): Promise<Generation> {
+    const original = await this.getById(userId, generationId);
+    if (!original) {
+      throw new Error('생성 기록을 찾을 수 없습니다');
+    }
+
+    if (!input.characterImagePath && !input.sourceImagePath) {
+      throw new Error('새 캐릭터 또는 제품 이미지를 제공해야 합니다');
+    }
+
+    const promptData = (original.promptData as Record<string, unknown>) || {};
+    const options = (original.options as Record<string, unknown>) || {};
+
+    return this.create(userId, {
+      projectId: original.projectId,
+      mode: original.mode,
+      styleReferenceId: original.id,
+      sourceImagePath: input.sourceImagePath || (promptData.sourceImagePath as string | undefined),
+      characterId: original.ipCharacterId || undefined,
+      characterImagePath:
+        input.characterImagePath || (promptData.characterImagePath as string | undefined),
+      textureImagePath: promptData.textureImagePath as string | undefined,
+      prompt: promptData.userPrompt as string | undefined,
+      options: {
+        preserveStructure: (options.preserveStructure as boolean | undefined) ?? false,
+        transparentBackground: (options.transparentBackground as boolean | undefined) ?? false,
+        preserveHardware: (options.preserveHardware as boolean | undefined) ?? false,
+        fixedBackground: (options.fixedBackground as boolean | undefined) ?? false,
+        fixedViewpoint: (options.fixedViewpoint as boolean | undefined) ?? false,
+        removeShadows: (options.removeShadows as boolean | undefined) ?? false,
+        userInstructions:
+          (options.userInstructions as string | undefined) ?? original.userInstructions ?? undefined,
         outputCount: (options.outputCount as number | undefined) ?? 2,
       },
     });

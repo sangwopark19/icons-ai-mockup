@@ -74,6 +74,7 @@ export const GenerationOptionsSchema = z.object({
   fixedBackground: z.boolean().default(true),
   fixedViewpoint: z.boolean().default(true),
   removeShadows: z.boolean().default(false),
+  userInstructions: z.string().max(2000).optional(),
 });
 
 export type GenerationOptions = z.infer<typeof GenerationOptionsSchema>;

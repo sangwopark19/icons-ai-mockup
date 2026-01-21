@@ -17,6 +17,11 @@ const CreateGenerationSchema = z.object({
     .object({
       preserveStructure: z.boolean().optional(),
       transparentBackground: z.boolean().optional(),
+      preserveHardware: z.boolean().optional(),
+      fixedBackground: z.boolean().optional(),
+      fixedViewpoint: z.boolean().optional(),
+      removeShadows: z.boolean().optional(),
+      userInstructions: z.string().max(2000).optional(),
       outputCount: z.number().int().min(1).max(4).optional(),
     })
     .optional(),
@@ -24,6 +29,11 @@ const CreateGenerationSchema = z.object({
 
 const SelectImageSchema = z.object({
   imageId: z.string().uuid(),
+});
+
+const CopyStyleSchema = z.object({
+  characterImagePath: z.string().optional(),
+  sourceImagePath: z.string().optional(),
 });
 
 /**
@@ -79,13 +89,19 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
       });
     }
 
+    const options = (generation.options as Record<string, unknown>) || {};
+    const userInstructions =
+      typeof generation.userInstructions === 'string' && generation.userInstructions.trim()
+        ? generation.userInstructions
+        : (options.userInstructions as string | undefined);
+
     return reply.send({
       success: true,
       data: {
         id: generation.id,
         status: generation.status,
         mode: generation.mode,
-        options: generation.options,
+        options: userInstructions ? { ...options, userInstructions } : options,
         errorMessage: generation.errorMessage,
         createdAt: generation.createdAt,
         completedAt: generation.completedAt,
@@ -160,6 +176,38 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.code(statusCode).send({
         success: false,
         error: { code: 'REGENERATE_FAILED', message },
+      });
+    }
+  });
+
+  /**
+   * 스타일 복사
+   * POST /api/generations/:id/copy-style
+   */
+  fastify.post('/:id/copy-style', async (request, reply) => {
+    const user = (request as any).user;
+    const { id } = request.params as { id: string };
+    const body = CopyStyleSchema.parse(request.body);
+
+    if (!body.characterImagePath && !body.sourceImagePath) {
+      return reply.code(400).send({
+        success: false,
+        error: { code: 'INVALID_REQUEST', message: '새 캐릭터 또는 제품 이미지를 제공해야 합니다' },
+      });
+    }
+
+    try {
+      const generation = await generationService.copyStyle(user.id, id, body);
+      return reply.code(201).send({
+        success: true,
+        data: { id: generation.id, status: generation.status },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '스타일 복사에 실패했습니다';
+      const statusCode = message.includes('찾을 수 없습니다') ? 404 : 400;
+      return reply.code(statusCode).send({
+        success: false,
+        error: { code: 'COPY_STYLE_FAILED', message },
       });
     }
   });
