@@ -1,5 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
-import type { ThoughtSignatureData } from '@mockup-ai/shared/types';
+import type { HardwareSpec, ThoughtSignatureData } from '@mockup-ai/shared/types';
 import { config } from '../config/index.js';
 
 /**
@@ -14,6 +14,8 @@ interface GenerationOptions {
   fixedViewpoint?: boolean;
   removeShadows?: boolean;
   userInstructions?: string;
+  hardwareSpecInput?: string;
+  hardwareSpecs?: HardwareSpec;
 }
 
 interface GenerationResult {
@@ -47,15 +49,20 @@ export class GeminiService {
 ✗ MUST NOT: 드롭 쉐도우, 소프트 쉐도우 적용
 `,
     hardware: `
-## 부자재 보존 규칙
-| 구성요소 | 잠금 상태 |
-|---------|----------|
-| 지퍼 (Zipper) | 🔒 LOCKED |
-| 금속 고리 (D-ring, O-ring) | 🔒 LOCKED |
-| 버클 (Buckle) | 🔒 LOCKED |
-| 가죽 패치 (Leather patch) | 🔒 LOCKED |
+## 부자재 보존 매트릭스 (Hardware Preservation Matrix)
+| 구성요소 | 잠금 항목 | 잠금 수준 |
+|---------|----------|-----------|
+| 지퍼 (Zipper) | 색상, 위치, 길이, 치형 | 🔒 LOCKED |
+| 금속 고리 (D/O-ring) | 소재, 마감, 크기, 위치 | 🔒 LOCKED |
+| 버클 (Buckle) | 형태, 소재, 구조, 위치 | 🔒 LOCKED |
+| 가죽 패치 (Leather patch) | 위치, 크기, 질감, 각인 | 🔒 LOCKED |
 
-✗ MUST NOT: 부자재의 색상/위치/크기 변경
+### 필수 규칙
+✗ MUST NOT: 부자재의 색상 변경
+✗ MUST NOT: 부자재의 위치 이동
+✗ MUST NOT: 부자재의 크기 변경
+✗ MUST NOT: 부자재의 형태/구조 변경
+✗ MUST NOT: 부자재 제거 또는 추가
 `,
     userPriority: `
 ## 🚨 사용자 지정 규칙 (HIGHEST PRIORITY)
@@ -412,7 +419,7 @@ IMPORTANT: 위 규칙은 필수입니다. 절대 위반하지 마세요.
     }
 
     if (options.preserveHardware) {
-      prompt += this.CONSTRAINT_TEMPLATES.hardware;
+      prompt += this.buildHardwareConstraints(options);
     }
 
     if (options.userInstructions) {
@@ -423,6 +430,113 @@ IMPORTANT: 위 규칙은 필수입니다. 절대 위반하지 마세요.
     }
 
     return prompt;
+  }
+
+  private buildHardwareConstraints(options: GenerationOptions): string {
+    const details = this.buildHardwareSpecDetails(options);
+    return `${this.CONSTRAINT_TEMPLATES.hardware}${details}`;
+  }
+
+  private buildHardwareSpecDetails(options: GenerationOptions): string {
+    const specs = this.resolveHardwareSpecs(options);
+    if (!specs || specs.items.length === 0) {
+      return '';
+    }
+
+    const lines = specs.items.map((item, index) => {
+      const typeLabel = this.getHardwareTypeLabel(item.type);
+      const attributes = [item.material, item.color, item.position, item.size]
+        .map((value) => value?.trim())
+        .filter((value) => value);
+      const description = attributes.length > 0 ? attributes.join(', ') : '세부 정보 미기재';
+      return `${index + 1}. ${typeLabel}: ${description}`;
+    });
+
+    return `
+## 감지된 부자재 상세
+${lines.join('\n')}
+
+위 부자재는 원본 사양(소재/색상/위치/형태)을 반드시 그대로 유지해야 합니다.
+`;
+  }
+
+  private resolveHardwareSpecs(options: GenerationOptions): HardwareSpec | null {
+    if (options.hardwareSpecs?.items?.length) {
+      return options.hardwareSpecs;
+    }
+
+    const input = options.hardwareSpecInput?.trim();
+    if (!input) {
+      return null;
+    }
+
+    return this.parseHardwareSpecInput(input);
+  }
+
+  private parseHardwareSpecInput(input: string): HardwareSpec {
+    const lines = input
+      .split(/\n|;/)
+      .map((line) => line.replace(/^[•\-\s]+/, '').trim())
+      .filter((line) => line.length > 0);
+
+    const items = lines
+      .map((line) => this.parseHardwareSpecLine(line))
+      .filter((item): item is HardwareSpec['items'][number] => Boolean(item));
+
+    return { items };
+  }
+
+  private parseHardwareSpecLine(
+    line: string
+  ): HardwareSpec['items'][number] | null {
+    const type = this.detectHardwareType(line);
+    const cleaned = line.replace(/^[^:：]+[:：]\s*/, '').trim();
+    const payload = cleaned || line;
+    const tokens = payload
+      .split(',')
+      .map((token) => token.trim())
+      .filter((token) => token.length > 0);
+
+    if (!type && tokens.length === 0) {
+      return null;
+    }
+
+    const [material = '', color = '', position = '', size] = tokens;
+
+    return {
+      type: type ?? 'other',
+      material: material || payload,
+      color,
+      position,
+      size,
+    };
+  }
+
+  private detectHardwareType(input: string): HardwareSpec['items'][number]['type'] | null {
+    const lower = input.toLowerCase();
+    if (/(지퍼|zipper)/.test(input) || lower.includes('zip')) return 'zipper';
+    if (/(고리|링|ring|d-ring|o-ring)/.test(input) || lower.includes('ring')) return 'ring';
+    if (/(버클|buckle)/.test(input) || lower.includes('buckle')) return 'buckle';
+    if (/(패치|patch)/.test(input) || lower.includes('patch')) return 'patch';
+    if (/(버튼|button|snap)/.test(input) || lower.includes('button')) return 'button';
+    return null;
+  }
+
+  private getHardwareTypeLabel(type: HardwareSpec['items'][number]['type']): string {
+    switch (type) {
+      case 'zipper':
+        return '지퍼';
+      case 'ring':
+        return '금속 고리';
+      case 'buckle':
+        return '버클';
+      case 'patch':
+        return '가죽 패치';
+      case 'button':
+        return '버튼';
+      default:
+        return '기타 부자재';
+    }
   }
 
   /**

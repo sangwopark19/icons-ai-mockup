@@ -30,8 +30,10 @@ export default function IPChangePage() {
   const [fixedViewpoint, setFixedViewpoint] = useState(false);
   const [removeShadows, setRemoveShadows] = useState(false);
   const [userInstructions, setUserInstructions] = useState('');
+  const [hardwareSpecInput, setHardwareSpecInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const maxUserInstructionsLength = 2000;
+  const maxHardwareSpecLength = 2000;
 
   // 인증 체크
   useEffect(() => {
@@ -78,6 +80,10 @@ export default function IPChangePage() {
       setError('사용자 지시문은 2000자 이내로 입력해주세요');
       return;
     }
+    if (hardwareSpecInput.length > maxHardwareSpecLength) {
+      setError('부자재 상세는 2000자 이내로 입력해주세요');
+      return;
+    }
     setIsGenerating(true);
 
     try {
@@ -107,6 +113,7 @@ export default function IPChangePage() {
             fixedViewpoint,
             removeShadows,
             userInstructions: userInstructions.trim() || undefined,
+            hardwareSpecInput: preserveHardware ? hardwareSpecInput.trim() || undefined : undefined,
             outputCount: 2,
           },
         }),
@@ -147,6 +154,11 @@ export default function IPChangePage() {
   const handleUserInstructionsChange = (value: string) => {
     if (value.length > maxUserInstructionsLength) return;
     setUserInstructions(value);
+  };
+
+  const handleHardwareSpecChange = (value: string) => {
+    if (value.length > maxHardwareSpecLength) return;
+    setHardwareSpecInput(value);
   };
 
   if (authLoading) {
@@ -240,6 +252,24 @@ export default function IPChangePage() {
               />
               <span className="text-sm text-[var(--text-secondary)]">부자재 보존</span>
             </label>
+            {preserveHardware && (
+              <div className="rounded-lg border border-[var(--border-default)] bg-[var(--bg-tertiary)] p-3 text-sm text-[var(--text-secondary)]">
+                <p className="text-xs text-[var(--text-tertiary)]">
+                  부자재 상세를 입력하면 해당 사양을 우선적으로 보존합니다.
+                </p>
+                <textarea
+                  value={hardwareSpecInput}
+                  onChange={(e) => handleHardwareSpecChange(e.target.value)}
+                  maxLength={maxHardwareSpecLength}
+                  rows={3}
+                  placeholder="예: 지퍼: YKK #5, 건메탈 그레이, 상단 중앙"
+                  className="mt-2 w-full resize-none rounded-lg border border-[var(--border-default)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
+                />
+                <div className="mt-1 text-right text-xs text-[var(--text-tertiary)]">
+                  {hardwareSpecInput.length}/{maxHardwareSpecLength}
+                </div>
+              </div>
+            )}
             <label className="flex items-center gap-3">
               <input
                 type="checkbox"

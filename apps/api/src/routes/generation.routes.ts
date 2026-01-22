@@ -22,6 +22,20 @@ const CreateGenerationSchema = z.object({
       fixedViewpoint: z.boolean().optional(),
       removeShadows: z.boolean().optional(),
       userInstructions: z.string().max(2000).optional(),
+      hardwareSpecInput: z.string().max(2000).optional(),
+      hardwareSpecs: z
+        .object({
+          items: z.array(
+            z.object({
+              type: z.enum(['zipper', 'ring', 'buckle', 'patch', 'button', 'other']),
+              material: z.string(),
+              color: z.string(),
+              position: z.string(),
+              size: z.string().optional(),
+            })
+          ),
+        })
+        .optional(),
       outputCount: z.number().int().min(1).max(4).optional(),
     })
     .optional(),

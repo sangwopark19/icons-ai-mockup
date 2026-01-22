@@ -75,6 +75,20 @@ export const GenerationOptionsSchema = z.object({
   fixedViewpoint: z.boolean().default(true),
   removeShadows: z.boolean().default(false),
   userInstructions: z.string().max(2000).optional(),
+  hardwareSpecInput: z.string().max(2000).optional(),
+  hardwareSpecs: z
+    .object({
+      items: z.array(
+        z.object({
+          type: z.enum(['zipper', 'ring', 'buckle', 'patch', 'button', 'other']),
+          material: z.string(),
+          color: z.string(),
+          position: z.string(),
+          size: z.string().optional(),
+        })
+      ),
+    })
+    .optional(),
 });
 
 export type GenerationOptions = z.infer<typeof GenerationOptionsSchema>;

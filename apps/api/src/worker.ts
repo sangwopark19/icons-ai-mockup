@@ -129,6 +129,8 @@ const generationWorker = new Worker<GenerationJobData>(
               fixedViewpoint: options.fixedViewpoint,
               removeShadows: options.removeShadows,
               userInstructions: options.userInstructions,
+              hardwareSpecInput: options.hardwareSpecInput,
+              hardwareSpecs: options.hardwareSpecs,
               prompt: job.data.prompt,
             }
           );
@@ -147,6 +149,8 @@ const generationWorker = new Worker<GenerationJobData>(
               fixedViewpoint: options.fixedViewpoint,
               removeShadows: options.removeShadows,
               userInstructions: options.userInstructions,
+              hardwareSpecInput: options.hardwareSpecInput,
+              hardwareSpecs: options.hardwareSpecs,
               prompt: job.data.prompt,
             }
           );
@@ -169,6 +173,8 @@ const generationWorker = new Worker<GenerationJobData>(
             fixedViewpoint: options.fixedViewpoint,
             removeShadows: options.removeShadows,
             userInstructions: options.userInstructions,
+            hardwareSpecInput: options.hardwareSpecInput,
+            hardwareSpecs: options.hardwareSpecs,
             prompt: job.data.prompt,
           }
         );

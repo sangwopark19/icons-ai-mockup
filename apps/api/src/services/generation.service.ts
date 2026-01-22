@@ -30,9 +30,21 @@ interface CreateGenerationInput {
     fixedViewpoint?: boolean;
     removeShadows?: boolean;
     userInstructions?: string;
+    hardwareSpecInput?: string;
+    hardwareSpecs?: {
+      items: Array<{
+        type: 'zipper' | 'ring' | 'buckle' | 'patch' | 'button' | 'other';
+        material: string;
+        color: string;
+        position: string;
+        size?: string;
+      }>;
+    };
     outputCount?: number;
   };
 }
+
+type HardwareSpecOption = NonNullable<CreateGenerationInput['options']>['hardwareSpecs'];
 
 /**
  * 생성 서비스
@@ -68,6 +80,7 @@ export class GenerationService {
     }
 
     const userInstructions = input.options?.userInstructions?.trim();
+    const hardwareSpecInput = input.options?.hardwareSpecInput?.trim();
 
     // 생성 기록 저장
     const generation = await prisma.generation.create({
@@ -94,6 +107,8 @@ export class GenerationService {
           fixedViewpoint: input.options?.fixedViewpoint ?? false,
           removeShadows: input.options?.removeShadows ?? false,
           userInstructions: userInstructions || undefined,
+          hardwareSpecInput: hardwareSpecInput || undefined,
+          hardwareSpecs: input.options?.hardwareSpecs,
           outputCount: input.options?.outputCount ?? 2,
         },
       },
@@ -118,6 +133,8 @@ export class GenerationService {
         fixedViewpoint: input.options?.fixedViewpoint ?? false,
         removeShadows: input.options?.removeShadows ?? false,
         userInstructions: userInstructions || undefined,
+        hardwareSpecInput: hardwareSpecInput || undefined,
+        hardwareSpecs: input.options?.hardwareSpecs,
         outputCount: input.options?.outputCount ?? 2,
       },
     });
@@ -242,6 +259,8 @@ export class GenerationService {
         removeShadows: (options.removeShadows as boolean | undefined) ?? false,
         userInstructions:
           (options.userInstructions as string | undefined) ?? original.userInstructions ?? undefined,
+        hardwareSpecInput: (options.hardwareSpecInput as string | undefined) ?? undefined,
+        hardwareSpecs: (options.hardwareSpecs as HardwareSpecOption | undefined) ?? undefined,
         outputCount: (options.outputCount as number | undefined) ?? 2,
       },
     };
@@ -316,6 +335,8 @@ export class GenerationService {
         fixedViewpoint: options.fixedViewpoint ?? false,
         removeShadows: options.removeShadows ?? false,
         userInstructions: options.userInstructions ?? null,
+        hardwareSpecInput: options.hardwareSpecInput ?? null,
+        hardwareSpecs: options.hardwareSpecs ?? null,
         outputCount: options.outputCount ?? 2,
       },
     });
@@ -360,6 +381,8 @@ export class GenerationService {
         removeShadows: (options.removeShadows as boolean | undefined) ?? false,
         userInstructions:
           (options.userInstructions as string | undefined) ?? original.userInstructions ?? undefined,
+        hardwareSpecInput: (options.hardwareSpecInput as string | undefined) ?? undefined,
+        hardwareSpecs: (options.hardwareSpecs as HardwareSpecOption | undefined) ?? undefined,
         outputCount: (options.outputCount as number | undefined) ?? 2,
       },
     });

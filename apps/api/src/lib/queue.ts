@@ -22,6 +22,16 @@ export interface GenerationJobData {
     fixedViewpoint?: boolean;
     removeShadows?: boolean;
     userInstructions?: string;
+    hardwareSpecInput?: string;
+    hardwareSpecs?: {
+      items: Array<{
+        type: 'zipper' | 'ring' | 'buckle' | 'patch' | 'button' | 'other';
+        material: string;
+        color: string;
+        position: string;
+        size?: string;
+      }>;
+    };
     outputCount: number;
   };
 }
