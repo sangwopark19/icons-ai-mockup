@@ -12,29 +12,27 @@ import imageRoutes from './routes/image.routes.js';
 import editRoutes from './routes/edit.routes.js';
 
 /**
- * Fastify 서버 인스턴스 생성
+ * Fastify 서버 인스턴스 생성 (테스트용 빌드 함수)
  */
-const server = Fastify({
-  logger: {
-    level: config.nodeEnv === 'development' ? 'debug' : 'info',
-    transport:
-      config.nodeEnv === 'development'
-        ? {
-            target: 'pino-pretty',
-            options: {
-              colorize: true,
-              translateTime: 'HH:MM:ss Z',
-              ignore: 'pid,hostname',
-            },
-          }
-        : undefined,
-  },
-});
+export async function build() {
+  const server = Fastify({
+    logger: {
+      level: config.nodeEnv === 'development' ? 'debug' : 'info',
+      transport:
+        config.nodeEnv === 'development'
+          ? {
+              target: 'pino-pretty',
+              options: {
+                colorize: true,
+                translateTime: 'HH:MM:ss Z',
+                ignore: 'pid,hostname',
+              },
+            }
+          : undefined,
+    },
+  });
 
-/**
- * 플러그인 등록
- */
-async function registerPlugins() {
+  // 플러그인 등록
   server.addHook('onRequest', async (request) => {
     const origin = request.headers.origin;
     if (origin) {
@@ -74,12 +72,7 @@ async function registerPlugins() {
 
   // JWT 인증 플러그인
   await server.register(authPlugin);
-}
 
-/**
- * 라우트 등록
- */
-async function registerRoutes() {
   // 헬스체크 엔드포인트
   server.get('/health', async () => {
     return {
@@ -142,12 +135,8 @@ async function registerRoutes() {
       return reply.code(404).send({ error: 'File not found' });
     }
   });
-}
 
-/**
- * 에러 핸들러 설정
- */
-function setupErrorHandler() {
+  // 에러 핸들러 설정
   server.setErrorHandler((error, request, reply) => {
     server.log.error(error);
 
@@ -187,6 +176,8 @@ function setupErrorHandler() {
       },
     });
   });
+
+  return server;
 }
 
 /**
@@ -194,9 +185,7 @@ function setupErrorHandler() {
  */
 async function start() {
   try {
-    await registerPlugins();
-    await registerRoutes();
-    setupErrorHandler();
+    const server = await build();
 
     await server.listen({
       port: config.port,
@@ -204,21 +193,23 @@ async function start() {
     });
 
     server.log.info(`🚀 서버가 http://localhost:${config.port} 에서 실행 중입니다`);
+
+    // Graceful shutdown
+    const signals: NodeJS.Signals[] = ['SIGINT', 'SIGTERM'];
+    signals.forEach((signal) => {
+      process.on(signal, async () => {
+        server.log.info(`${signal} 신호 수신, 서버 종료 중...`);
+        await server.close();
+        process.exit(0);
+      });
+    });
   } catch (error) {
-    server.log.error(error);
+    console.error(error);
     process.exit(1);
   }
 }
 
-// 서버 시작
-start();
-
-// Graceful shutdown
-const signals: NodeJS.Signals[] = ['SIGINT', 'SIGTERM'];
-signals.forEach((signal) => {
-  process.on(signal, async () => {
-    server.log.info(`${signal} 신호 수신, 서버 종료 중...`);
-    await server.close();
-    process.exit(0);
-  });
-});
+// 서버 시작 (테스트 환경이 아닐 때만)
+if (process.env.NODE_ENV !== 'test') {
+  start();
+}
