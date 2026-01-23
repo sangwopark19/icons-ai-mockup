@@ -39,6 +39,8 @@ describe('Generation Routes Integration Tests', () => {
       },
     });
 
+    expect(registerResponse.statusCode).toBe(201);
+
     const loginResponse = await app.inject({
       method: 'POST',
       url: '/api/auth/login',
@@ -48,16 +50,20 @@ describe('Generation Routes Integration Tests', () => {
       },
     });
 
+    expect(loginResponse.statusCode).toBe(200);
     const loginData = JSON.parse(loginResponse.body);
     authToken = loginData.data.token;
     userId = loginData.data.user.id;
+
+    expect(authToken).toBeDefined();
+    expect(userId).toBeDefined();
 
     // 테스트 프로젝트 생성
     const projectResponse = await app.inject({
       method: 'POST',
       url: '/api/projects',
       headers: {
-        authorization: `Bearer ${authToken}`,
+        Authorization: `Bearer ${authToken}`,
       },
       payload: {
         name: 'Test Project for Routes',
@@ -65,6 +71,11 @@ describe('Generation Routes Integration Tests', () => {
       },
     });
 
+    if (projectResponse.statusCode !== 201) {
+      console.error('프로젝트 생성 실패:', projectResponse.body);
+    }
+
+    expect(projectResponse.statusCode).toBe(201);
     const projectData = JSON.parse(projectResponse.body);
     projectId = projectData.data.id;
 
@@ -101,7 +112,7 @@ describe('Generation Routes Integration Tests', () => {
         method: 'POST',
         url: '/api/generations',
         headers: {
-          authorization: `Bearer ${authToken}`,
+          Authorization: `Bearer ${authToken}`,
         },
         payload: {
           projectId,
@@ -132,7 +143,7 @@ describe('Generation Routes Integration Tests', () => {
         method: 'POST',
         url: '/api/generations',
         headers: {
-          authorization: `Bearer ${authToken}`,
+          Authorization: `Bearer ${authToken}`,
         },
         payload: {
           projectId: 'invalid-uuid',
@@ -166,7 +177,7 @@ describe('Generation Routes Integration Tests', () => {
         method: 'GET',
         url: `/api/generations/${generationId}`,
         headers: {
-          authorization: `Bearer ${authToken}`,
+          Authorization: `Bearer ${authToken}`,
         },
       });
 
@@ -182,7 +193,7 @@ describe('Generation Routes Integration Tests', () => {
         method: 'GET',
         url: `/api/generations/00000000-0000-0000-0000-000000000000`,
         headers: {
-          authorization: `Bearer ${authToken}`,
+          Authorization: `Bearer ${authToken}`,
         },
       });
 
@@ -223,7 +234,7 @@ describe('Generation Routes Integration Tests', () => {
         method: 'POST',
         url: `/api/generations/${generationId}/regenerate`,
         headers: {
-          authorization: `Bearer ${authToken}`,
+          Authorization: `Bearer ${authToken}`,
         },
         payload: {},
       });
@@ -240,7 +251,7 @@ describe('Generation Routes Integration Tests', () => {
         method: 'POST',
         url: `/api/generations/${generationId}/regenerate`,
         headers: {
-          authorization: `Bearer ${authToken}`,
+          Authorization: `Bearer ${authToken}`,
         },
         payload: {
           viewpointLock: true,
@@ -273,7 +284,7 @@ describe('Generation Routes Integration Tests', () => {
         method: 'POST',
         url: `/api/generations/00000000-0000-0000-0000-000000000000/regenerate`,
         headers: {
-          authorization: `Bearer ${authToken}`,
+          Authorization: `Bearer ${authToken}`,
         },
         payload: {},
       });
@@ -288,7 +299,7 @@ describe('Generation Routes Integration Tests', () => {
         method: 'POST',
         url: `/api/generations/${generationId}/regenerate`,
         headers: {
-          authorization: `Bearer ${authToken}`,
+          Authorization: `Bearer ${authToken}`,
         },
         payload: {
           outputCount: 10, // max는 4
@@ -359,7 +370,7 @@ describe('Generation Routes Integration Tests', () => {
         method: 'POST',
         url: `/api/generations/${generationId}/style-copy`,
         headers: {
-          authorization: `Bearer ${authToken}`,
+          Authorization: `Bearer ${authToken}`,
         },
         payload: {
           characterId: secondCharacterId,
@@ -403,7 +414,7 @@ describe('Generation Routes Integration Tests', () => {
         method: 'POST',
         url: `/api/generations/${pendingGen.id}/style-copy`,
         headers: {
-          authorization: `Bearer ${authToken}`,
+          Authorization: `Bearer ${authToken}`,
         },
         payload: {
           characterId: secondCharacterId,
@@ -420,7 +431,7 @@ describe('Generation Routes Integration Tests', () => {
         method: 'POST',
         url: `/api/generations/${generationId}/style-copy`,
         headers: {
-          authorization: `Bearer ${authToken}`,
+          Authorization: `Bearer ${authToken}`,
         },
         payload: {
           characterId: 'invalid-uuid',
@@ -452,7 +463,7 @@ describe('Generation Routes Integration Tests', () => {
         method: 'DELETE',
         url: `/api/generations/${generationId}`,
         headers: {
-          authorization: `Bearer ${authToken}`,
+          Authorization: `Bearer ${authToken}`,
         },
       });
 
@@ -472,7 +483,7 @@ describe('Generation Routes Integration Tests', () => {
         method: 'DELETE',
         url: `/api/generations/00000000-0000-0000-0000-000000000000`,
         headers: {
-          authorization: `Bearer ${authToken}`,
+          Authorization: `Bearer ${authToken}`,
         },
       });
 
@@ -503,7 +514,7 @@ describe('Generation Routes Integration Tests', () => {
         method: 'GET',
         url: `/api/generations/project/${projectId}/history`,
         headers: {
-          authorization: `Bearer ${authToken}`,
+          Authorization: `Bearer ${authToken}`,
         },
         query: {
           page: '1',
@@ -524,7 +535,7 @@ describe('Generation Routes Integration Tests', () => {
         method: 'GET',
         url: `/api/generations/project/${projectId}/history`,
         headers: {
-          authorization: `Bearer ${authToken}`,
+          Authorization: `Bearer ${authToken}`,
         },
         query: {
           page: '2',
