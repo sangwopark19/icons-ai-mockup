@@ -312,9 +312,21 @@ export class GenerationService {
    * 기존 생성 요청 다시 생성 (동일한 설정으로 재생성)
    * @param userId - 사용자 ID
    * @param generationId - 복사할 Generation ID
+   * @param optionOverrides - 덮어쓸 v3 옵션 (선택적)
    * @returns 새로 생성된 Generation 레코드
    */
-  async regenerate(userId: string, generationId: string): Promise<Generation> {
+  async regenerate(
+    userId: string,
+    generationId: string,
+    optionOverrides?: {
+      viewpointLock?: boolean;
+      whiteBackground?: boolean;
+      userInstructions?: string;
+      accessoryPreservation?: boolean;
+      styleCopy?: boolean;
+      outputCount?: number;
+    }
+  ): Promise<Generation> {
     // 기존 Generation 조회 및 권한 확인
     const existingGeneration = await this.getById(userId, generationId);
 
@@ -332,7 +344,21 @@ export class GenerationService {
     // options JSON 필드에서 옵션 추출
     const existingOptions = existingGeneration.options as any;
 
-    // 새 Generation 레코드 생성 (동일한 설정)
+    // 옵션 병합: 기존 옵션 + 오버라이드
+    const finalViewpointLock =
+      optionOverrides?.viewpointLock ?? existingGeneration.viewpointLock;
+    const finalWhiteBackground =
+      optionOverrides?.whiteBackground ?? existingGeneration.whiteBackground;
+    const finalUserInstructions =
+      optionOverrides?.userInstructions ?? existingGeneration.userInstructions;
+    const finalAccessoryPreservation =
+      optionOverrides?.accessoryPreservation ?? existingOptions?.accessoryPreservation ?? false;
+    const finalStyleCopy =
+      optionOverrides?.styleCopy ?? existingOptions?.styleCopy ?? false;
+    const finalOutputCount =
+      optionOverrides?.outputCount ?? existingOptions?.outputCount ?? 2;
+
+    // 새 Generation 레코드 생성 (병합된 설정)
     const newGeneration = await prisma.generation.create({
       data: {
         projectId: existingGeneration.projectId,
@@ -340,21 +366,21 @@ export class GenerationService {
         sourceImageId: existingGeneration.sourceImageId,
         mode: existingGeneration.mode,
         status: 'pending',
-        // v3: Prisma 컬럼에 직접 저장
-        viewpointLock: existingGeneration.viewpointLock,
-        whiteBackground: existingGeneration.whiteBackground,
-        userInstructions: existingGeneration.userInstructions,
+        // v3: Prisma 컬럼에 직접 저장 (오버라이드 반영)
+        viewpointLock: finalViewpointLock,
+        whiteBackground: finalWhiteBackground,
+        userInstructions: finalUserInstructions,
         promptData: {
           sourceImagePath,
           characterImagePath,
           textureImagePath,
           userPrompt,
         },
-        // v3: options JSON 필드
+        // v3: options JSON 필드 (오버라이드 반영)
         options: {
-          accessoryPreservation: existingOptions?.accessoryPreservation ?? false,
-          styleCopy: existingOptions?.styleCopy ?? false,
-          outputCount: existingOptions?.outputCount ?? 2,
+          accessoryPreservation: finalAccessoryPreservation,
+          styleCopy: finalStyleCopy,
+          outputCount: finalOutputCount,
           // 레거시 옵션
           preserveStructure: existingOptions?.preserveStructure,
           transparentBackground: existingOptions?.transparentBackground,
@@ -362,7 +388,7 @@ export class GenerationService {
       },
     });
 
-    // 작업 큐에 추가
+    // 작업 큐에 추가 (병합된 옵션 사용)
     await addGenerationJob({
       generationId: newGeneration.id,
       userId,
@@ -373,12 +399,12 @@ export class GenerationService {
       textureImagePath,
       prompt: userPrompt,
       options: {
-        viewpointLock: existingGeneration.viewpointLock,
-        whiteBackground: existingGeneration.whiteBackground,
-        accessoryPreservation: existingOptions?.accessoryPreservation,
-        styleCopy: existingOptions?.styleCopy,
-        userInstructions: existingGeneration.userInstructions || undefined,
-        outputCount: existingOptions?.outputCount ?? 2,
+        viewpointLock: finalViewpointLock,
+        whiteBackground: finalWhiteBackground,
+        accessoryPreservation: finalAccessoryPreservation,
+        styleCopy: finalStyleCopy,
+        userInstructions: finalUserInstructions || undefined,
+        outputCount: finalOutputCount,
       },
     });
 

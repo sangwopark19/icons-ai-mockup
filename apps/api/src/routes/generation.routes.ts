@@ -1,6 +1,23 @@
 import { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 import { generationService } from '../services/generation.service.js';
+
+/**
+ * 공통 응답 스키마
+ */
+const SuccessResponseSchema = z.object({
+  success: z.literal(true),
+  data: z.any(),
+});
+
+const ErrorResponseSchema = z.object({
+  success: z.literal(false),
+  error: z.object({
+    code: z.string(),
+    message: z.string(),
+  }),
+});
 
 /**
  * 요청 스키마 (v3)
@@ -38,6 +55,21 @@ const StyleCopySchema = z.object({
 });
 
 /**
+ * Regenerate 요청 스키마 (v3)
+ * 기존 Generation을 재생성하되, 일부 옵션을 덮어쓸 수 있음
+ */
+const RegenerateSchema = z
+  .object({
+    viewpointLock: z.boolean().optional(),
+    whiteBackground: z.boolean().optional(),
+    userInstructions: z.string().max(500).optional(),
+    accessoryPreservation: z.boolean().optional(),
+    styleCopy: z.boolean().optional(),
+    outputCount: z.number().int().min(1).max(4).optional(),
+  })
+  .optional();
+
+/**
  * 생성 라우트
  */
 const generationRoutes: FastifyPluginAsync = async (fastify) => {
@@ -48,7 +80,17 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
    * 생성 요청
    * POST /api/generations
    */
-  fastify.post('/', async (request, reply) => {
+  fastify.post('/', {
+    schema: {
+      description: 'AI 이미지 생성 요청 생성',
+      tags: ['generations'],
+      body: zodToJsonSchema(CreateGenerationSchema),
+      response: {
+        201: zodToJsonSchema(SuccessResponseSchema),
+        400: zodToJsonSchema(ErrorResponseSchema),
+      },
+    },
+  }, async (request, reply) => {
     const user = (request as any).user;
     const body = CreateGenerationSchema.parse(request.body);
 
@@ -77,7 +119,17 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
    * 생성 상태 조회
    * GET /api/generations/:id
    */
-  fastify.get('/:id', async (request, reply) => {
+  fastify.get('/:id', {
+    schema: {
+      description: '생성 요청 상태 및 결과 이미지 조회',
+      tags: ['generations'],
+      params: zodToJsonSchema(z.object({ id: z.string().uuid() })),
+      response: {
+        200: zodToJsonSchema(SuccessResponseSchema),
+        404: zodToJsonSchema(ErrorResponseSchema),
+      },
+    },
+  }, async (request, reply) => {
     const user = (request as any).user;
     const { id } = request.params as { id: string };
 
@@ -116,7 +168,19 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
    * 이미지 선택
    * POST /api/generations/:id/select
    */
-  fastify.post('/:id/select', async (request, reply) => {
+  fastify.post('/:id/select', {
+    schema: {
+      description: '생성된 이미지 중 하나를 선택',
+      tags: ['generations'],
+      params: zodToJsonSchema(z.object({ id: z.string().uuid() })),
+      body: zodToJsonSchema(SelectImageSchema),
+      response: {
+        200: zodToJsonSchema(SuccessResponseSchema),
+        400: zodToJsonSchema(ErrorResponseSchema),
+        404: zodToJsonSchema(ErrorResponseSchema),
+      },
+    },
+  }, async (request, reply) => {
     const user = (request as any).user;
     const { id } = request.params as { id: string };
     const body = SelectImageSchema.parse(request.body);
@@ -151,7 +215,17 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
    * 생성 기록 삭제 (연관된 모든 이미지 포함)
    * DELETE /api/generations/:id
    */
-  fastify.delete('/:id', async (request, reply) => {
+  fastify.delete('/:id', {
+    schema: {
+      description: '생성 기록 및 연관된 이미지 삭제',
+      tags: ['generations'],
+      params: zodToJsonSchema(z.object({ id: z.string().uuid() })),
+      response: {
+        200: zodToJsonSchema(z.object({ success: z.literal(true), message: z.string() })),
+        404: zodToJsonSchema(ErrorResponseSchema),
+      },
+    },
+  }, async (request, reply) => {
     const user = (request as any).user;
     const { id } = request.params as { id: string };
 
@@ -172,15 +246,29 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   /**
-   * 다시 생성 (기존 설정으로 재생성)
+   * 다시 생성 (기존 설정으로 재생성, 일부 옵션 덮어쓰기 가능)
    * POST /api/generations/:id/regenerate
    */
-  fastify.post('/:id/regenerate', async (request, reply) => {
+  fastify.post('/:id/regenerate', {
+    schema: {
+      description: '기존 생성 요청을 재실행 (일부 옵션 덮어쓰기 가능)',
+      tags: ['generations'],
+      params: zodToJsonSchema(z.object({ id: z.string().uuid() })),
+      body: zodToJsonSchema(RegenerateSchema),
+      response: {
+        201: zodToJsonSchema(SuccessResponseSchema),
+        400: zodToJsonSchema(ErrorResponseSchema),
+      },
+    },
+  }, async (request, reply) => {
     const user = (request as any).user;
     const { id } = request.params as { id: string };
+    
+    // 요청 body 파싱 (옵션 오버라이드)
+    const optionOverrides = RegenerateSchema.parse(request.body);
 
     try {
-      const generation = await generationService.regenerate(user.id, id);
+      const generation = await generationService.regenerate(user.id, id, optionOverrides);
 
       return reply.code(201).send({
         success: true,
@@ -204,7 +292,18 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
    * 스타일 복사 (기존 스타일 + 새 캐릭터)
    * POST /api/generations/:id/style-copy
    */
-  fastify.post('/:id/style-copy', async (request, reply) => {
+  fastify.post('/:id/style-copy', {
+    schema: {
+      description: '기존 생성 결과의 스타일을 유지하며 새 캐릭터 적용',
+      tags: ['generations'],
+      params: zodToJsonSchema(z.object({ id: z.string().uuid() })),
+      body: zodToJsonSchema(StyleCopySchema),
+      response: {
+        201: zodToJsonSchema(SuccessResponseSchema),
+        400: zodToJsonSchema(ErrorResponseSchema),
+      },
+    },
+  }, async (request, reply) => {
     const user = (request as any).user;
     const { id } = request.params as { id: string };
     const body = StyleCopySchema.parse(request.body);
@@ -235,7 +334,34 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
    * 프로젝트 히스토리 조회
    * GET /api/generations/project/:projectId/history
    */
-  fastify.get('/project/:projectId/history', async (request, reply) => {
+  fastify.get('/project/:projectId/history', {
+    schema: {
+      description: '프로젝트의 완료된 생성 기록 조회 (페이지네이션)',
+      tags: ['generations'],
+      params: zodToJsonSchema(z.object({ projectId: z.string().uuid() })),
+      querystring: zodToJsonSchema(
+        z.object({
+          page: z.string().optional(),
+          limit: z.string().optional(),
+        })
+      ),
+      response: {
+        200: zodToJsonSchema(
+          z.object({
+            success: z.literal(true),
+            data: z.array(z.any()),
+            pagination: z.object({
+              page: z.number(),
+              limit: z.number(),
+              total: z.number(),
+              totalPages: z.number(),
+            }),
+          })
+        ),
+        404: zodToJsonSchema(ErrorResponseSchema),
+      },
+    },
+  }, async (request, reply) => {
     const user = (request as any).user;
     const { projectId } = request.params as { projectId: string };
     const { page = '1', limit = '20' } = request.query as { page?: string; limit?: string };
