@@ -1,10 +1,12 @@
 import { GoogleGenAI } from '@google/genai';
 import { config } from '../config/index.js';
+import { GenerationOptions, buildFinalPrompt } from '../lib/prompts.js';
 
 /**
- * 생성 옵션 타입
+ * 레거시 생성 옵션 타입 (하위 호환성 유지)
+ * @deprecated v3 GenerationOptions 사용 권장
  */
-interface GenerationOptions {
+interface LegacyGenerationOptions {
   preserveStructure: boolean;
   transparentBackground: boolean;
   prompt?: string;
@@ -28,12 +30,135 @@ export class GeminiService {
   }
 
   /**
+   * 통합 이미지 생성 함수 (v3)
+   * 옵션별 프롬프트를 동적으로 적용하여 Gemini API 호출
+   * 
+   * @param basePrompt - 기본 프롬프트 (시스템 프롬프트)
+   * @param options - v3 생성 옵션 (viewpointLock, whiteBackground 등)
+   * @param referenceImages - 참조 이미지 배열 (base64, 최대 14개)
+   * @param chatHistory - Multi-turn Chat을 위한 대화 히스토리
+   * @returns 생성된 이미지 Buffer 배열
+   */
+  async generateImage(
+    basePrompt: string,
+    options?: Partial<GenerationOptions>,
+    referenceImages?: string[],
+    chatHistory?: Array<{ role: 'user' | 'model'; parts: any[] }>
+  ): Promise<Buffer[]> {
+    // 1. 옵션별 프롬프트 생성
+    const { prompt: optionsPrompt, appliedOptions } = buildFinalPrompt(options || {});
+    
+    // 2. 최종 프롬프트 조합
+    const finalPrompt = [basePrompt, optionsPrompt]
+      .filter(p => p.trim().length > 0)
+      .join('\n\n');
+
+    console.log(`📝 적용된 옵션: ${appliedOptions.join(', ') || '없음'}`);
+
+    // 3. 참조 이미지 처리 (최대 14개 제한)
+    const validReferenceImages = (referenceImages || []).slice(0, 14);
+    if (referenceImages && referenceImages.length > 14) {
+      console.warn(`⚠️ 참조 이미지가 ${referenceImages.length}개 제공되었으나 최대 14개만 사용됩니다.`);
+    }
+
+    // 4. parts 배열 구성
+    const parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> = [
+      { text: finalPrompt }
+    ];
+
+    // 참조 이미지 추가
+    validReferenceImages.forEach((imageBase64, index) => {
+      if (index > 0) {
+        parts.push({ text: `참조 이미지 ${index + 1}:` });
+      }
+      parts.push({
+        inlineData: {
+          mimeType: 'image/png',
+          data: imageBase64,
+        },
+      });
+    });
+
+    // 5. Gemini API 호출 (Multi-turn Chat 또는 일반 생성)
+    const images: Buffer[] = [];
+    const outputCount = 2;
+
+    // Multi-turn Chat 모드 (스타일 복사 시나리오)
+    if (chatHistory && chatHistory.length > 0) {
+      console.log(`🔄 Multi-turn Chat 모드: ${chatHistory.length}개 히스토리 사용`);
+      
+      const chat = this.ai.chats.create({ model: this.imageModel });
+      
+      try {
+        // 대화 히스토리를 Chat 세션에 반영
+        // Gemini API는 chat.sendMessage로 순차적으로 전송
+        for (const historyItem of chatHistory) {
+          await chat.sendMessage({
+            message: historyItem.parts,
+          });
+        }
+
+        // 현재 요청 전송
+        const response = await chat.sendMessage({
+          message: parts,
+        });
+
+        const extractedImages = this.extractImagesFromResponse(response);
+        images.push(...extractedImages);
+
+        // Chat 모드에서는 1회만 생성 (대화 컨텍스트 유지를 위해)
+        if (images.length === 0) {
+          throw new Error('Chat 모드 이미지 생성에 실패했습니다');
+        }
+
+        return images;
+      } catch (error) {
+        console.error('Chat 모드 이미지 생성 실패:', error);
+        throw new Error('Chat 모드 이미지 생성에 실패했습니다');
+      }
+    }
+
+    // 일반 생성 모드 (Stateless)
+    for (let i = 0; i < outputCount; i++) {
+      try {
+        const response = await this.ai.models.generateContent({
+          model: this.imageModel,
+          contents: [
+            {
+              role: 'user',
+              parts,
+            },
+          ],
+          config: {
+            imageConfig: {
+              aspectRatio: '1:1',
+              imageSize: '2K',
+            },
+          },
+        });
+
+        const extractedImages = this.extractImagesFromResponse(response);
+        images.push(...extractedImages);
+      } catch (error) {
+        console.error(`이미지 생성 ${i + 1} 실패:`, error);
+      }
+    }
+
+    if (images.length === 0) {
+      throw new Error('이미지 생성에 실패했습니다');
+    }
+
+    return images;
+  }
+
+  /**
    * IP 변경 목업 생성
+   * @deprecated 내부적으로 generateImage() 사용 권장
    */
   async generateIPChange(
     sourceImageBase64: string,
     characterImageBase64: string,
-    options: GenerationOptions
+    options: LegacyGenerationOptions
   ): Promise<Buffer[]> {
     const systemPrompt = this.buildIPChangePrompt(options);
 
@@ -92,11 +217,12 @@ export class GeminiService {
 
   /**
    * 스케치 실사화 생성
+   * @deprecated 내부적으로 generateImage() 사용 권장
    */
   async generateSketchToReal(
     sketchImageBase64: string,
     textureImageBase64: string | null,
-    options: GenerationOptions
+    options: LegacyGenerationOptions
   ): Promise<Buffer[]> {
     const systemPrompt = this.buildSketchToRealPrompt(options);
 
@@ -222,9 +348,10 @@ export class GeminiService {
   }
 
   /**
-   * IP 변경 프롬프트 생성
+   * IP 변경 프롬프트 생성 (레거시)
+   * @deprecated
    */
-  private buildIPChangePrompt(options: GenerationOptions): string {
+  private buildIPChangePrompt(options: LegacyGenerationOptions): string {
     let prompt = `당신은 제품 목업 이미지 생성 전문가입니다.
 주어진 제품 이미지에서 기존 캐릭터/IP를 새로운 캐릭터로 교체하여 실제 제품처럼 보이는 목업을 생성하세요.
 
@@ -246,9 +373,10 @@ export class GeminiService {
   }
 
   /**
-   * 스케치 실사화 프롬프트 생성
+   * 스케치 실사화 프롬프트 생성 (레거시)
+   * @deprecated
    */
-  private buildSketchToRealPrompt(options: GenerationOptions): string {
+  private buildSketchToRealPrompt(options: LegacyGenerationOptions): string {
     let prompt = `당신은 2D 스케치를 실제 제품 사진으로 변환하는 전문가입니다.
 주어진 스케치를 실제 제품처럼 보이는 고품질 3D 렌더링으로 변환하세요.
 

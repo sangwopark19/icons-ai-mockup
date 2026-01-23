@@ -1,8 +1,9 @@
 import { Queue, Job } from 'bullmq';
 import { redis } from './redis.js';
+import type { GenerationOptions } from './prompts.js';
 
 /**
- * 생성 작업 데이터 타입
+ * 생성 작업 데이터 타입 (v3)
  */
 export interface GenerationJobData {
   generationId: string;
@@ -13,10 +14,9 @@ export interface GenerationJobData {
   characterImagePath?: string;
   textureImagePath?: string;
   prompt?: string;
-  options: {
-    preserveStructure: boolean;
-    transparentBackground: boolean;
-    outputCount: number;
+  /** v3 생성 옵션 */
+  options: Partial<GenerationOptions> & {
+    outputCount?: number;
   };
 }
 

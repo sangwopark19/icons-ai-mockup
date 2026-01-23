@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { generationService } from '../services/generation.service.js';
 
 /**
- * 요청 스키마
+ * 요청 스키마 (v3)
  */
 const CreateGenerationSchema = z.object({
   projectId: z.string().uuid(),
@@ -15,9 +15,16 @@ const CreateGenerationSchema = z.object({
   prompt: z.string().max(2000).optional(),
   options: z
     .object({
+      // v3 옵션
+      viewpointLock: z.boolean().optional(),
+      whiteBackground: z.boolean().optional(),
+      accessoryPreservation: z.boolean().optional(),
+      styleCopy: z.boolean().optional(),
+      userInstructions: z.string().max(500).optional(),
+      outputCount: z.number().int().min(1).max(4).optional(),
+      // 레거시 옵션 (하위 호환성)
       preserveStructure: z.boolean().optional(),
       transparentBackground: z.boolean().optional(),
-      outputCount: z.number().int().min(1).max(4).optional(),
     })
     .optional(),
 });

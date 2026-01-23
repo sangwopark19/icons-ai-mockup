@@ -6,7 +6,7 @@ import path from 'path';
 import { config } from '../config/index.js';
 
 /**
- * 생성 요청 입력 타입
+ * 생성 요청 입력 타입 (v3)
  */
 interface CreateGenerationInput {
   projectId: string;
@@ -17,9 +17,16 @@ interface CreateGenerationInput {
   textureImagePath?: string;
   prompt?: string;
   options?: {
+    // v3 옵션
+    viewpointLock?: boolean;
+    whiteBackground?: boolean;
+    accessoryPreservation?: boolean;
+    styleCopy?: boolean;
+    userInstructions?: string;
+    outputCount?: number;
+    // 레거시 옵션
     preserveStructure?: boolean;
     transparentBackground?: boolean;
-    outputCount?: number;
   };
 }
 
@@ -56,7 +63,7 @@ export class GenerationService {
       characterImagePath = character.filePath;
     }
 
-    // 생성 기록 저장
+    // 생성 기록 저장 (v3)
     const generation = await prisma.generation.create({
       data: {
         projectId: input.projectId,
@@ -64,21 +71,29 @@ export class GenerationService {
         sourceImageId: null, // 나중에 업데이트
         mode: input.mode,
         status: 'pending',
+        // v3: Prisma 컬럼에 직접 저장
+        viewpointLock: input.options?.viewpointLock ?? false,
+        whiteBackground: input.options?.whiteBackground ?? false,
+        userInstructions: input.options?.userInstructions || null,
         promptData: {
           sourceImagePath: input.sourceImagePath,
           characterImagePath,
           textureImagePath: input.textureImagePath,
           userPrompt: input.prompt,
         },
+        // v3: options JSON 필드
         options: {
-          preserveStructure: input.options?.preserveStructure ?? false,
-          transparentBackground: input.options?.transparentBackground ?? false,
+          accessoryPreservation: input.options?.accessoryPreservation ?? false,
+          styleCopy: input.options?.styleCopy ?? false,
           outputCount: input.options?.outputCount ?? 2,
+          // 레거시 옵션 (하위 호환성)
+          preserveStructure: input.options?.preserveStructure,
+          transparentBackground: input.options?.transparentBackground,
         },
       },
     });
 
-    // 작업 큐에 추가
+    // 작업 큐에 추가 (v3 옵션)
     await addGenerationJob({
       generationId: generation.id,
       userId,
@@ -89,8 +104,12 @@ export class GenerationService {
       textureImagePath: input.textureImagePath,
       prompt: input.prompt,
       options: {
-        preserveStructure: input.options?.preserveStructure ?? false,
-        transparentBackground: input.options?.transparentBackground ?? false,
+        // v3 옵션
+        viewpointLock: input.options?.viewpointLock,
+        whiteBackground: input.options?.whiteBackground,
+        accessoryPreservation: input.options?.accessoryPreservation,
+        styleCopy: input.options?.styleCopy,
+        userInstructions: input.options?.userInstructions,
         outputCount: input.options?.outputCount ?? 2,
       },
     });
