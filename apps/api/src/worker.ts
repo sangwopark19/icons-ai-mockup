@@ -3,6 +3,7 @@ import { redis } from './lib/redis.js';
 import { geminiService } from './services/gemini.service.js';
 import { uploadService } from './services/upload.service.js';
 import { generationService } from './services/generation.service.js';
+import { prisma } from './lib/prisma.js';
 import type { GenerationJobData } from './lib/queue.js';
 
 /**
@@ -11,7 +12,7 @@ import type { GenerationJobData } from './lib/queue.js';
 const generationWorker = new Worker<GenerationJobData>(
   'generation',
   async (job: Job<GenerationJobData>) => {
-    const { generationId, userId, projectId, mode, options } = job.data;
+    const { generationId, userId, projectId, mode, options, parentGenerationId } = job.data;
     console.log(`🚀 생성 작업 시작: ${generationId}`);
 
     try {
@@ -36,6 +37,53 @@ const generationWorker = new Worker<GenerationJobData>(
       if (job.data.textureImagePath) {
         const buffer = await uploadService.readFile(job.data.textureImagePath);
         textureImageBase64 = buffer.toString('base64');
+      }
+
+      // 스타일 복사: 부모 Generation의 선택된 이미지 로드
+      let chatHistory: Array<{ role: 'user' | 'model'; parts: any[] }> | undefined;
+
+      if (parentGenerationId && options.styleCopy) {
+        console.log(`🎨 스타일 복사 모드: 부모 Generation ${parentGenerationId}에서 이미지 로드`);
+
+        try {
+          const parentGeneration = await prisma.generation.findFirst({
+            where: { id: parentGenerationId },
+            include: {
+              images: {
+                where: { isSelected: true },
+                take: 1,
+              },
+            },
+          });
+
+          if (parentGeneration?.images[0]) {
+            const parentImagePath = parentGeneration.images[0].filePath;
+            const parentImageBuffer = await uploadService.readFile(parentImagePath);
+            const parentImageBase64 = parentImageBuffer.toString('base64');
+
+            // chatHistory 구성: 이전 대화 턴으로 부모 이미지 전달
+            chatHistory = [
+              {
+                role: 'model',
+                parts: [
+                  {
+                    inlineData: {
+                      mimeType: 'image/png',
+                      data: parentImageBase64,
+                    },
+                  },
+                ],
+              },
+            ];
+
+            console.log(`✅ 부모 이미지 로드 완료: ${parentImagePath}`);
+          } else {
+            console.warn(`⚠️ 부모 Generation에 선택된 이미지가 없습니다: ${parentGenerationId}`);
+          }
+        } catch (error) {
+          console.error(`❌ 부모 이미지 로드 실패:`, error);
+          // 스타일 복사 실패 시에도 계속 진행 (일반 생성으로 대체)
+        }
       }
 
       // v3 옵션 준비
@@ -73,7 +121,8 @@ const generationWorker = new Worker<GenerationJobData>(
         generatedImages = await geminiService.generateImage(
           basePrompt,
           v3Options,
-          referenceImages
+          referenceImages,
+          chatHistory // 스타일 복사 시 chatHistory 전달
         );
       } else if (mode === 'sketch_to_real') {
         if (!sourceImageBase64) {
@@ -98,7 +147,8 @@ const generationWorker = new Worker<GenerationJobData>(
         generatedImages = await geminiService.generateImage(
           basePrompt,
           v3Options,
-          referenceImages
+          referenceImages,
+          chatHistory // 스타일 복사 시 chatHistory 전달
         );
       } else {
         throw new Error(`알 수 없는 생성 모드: ${mode}`);

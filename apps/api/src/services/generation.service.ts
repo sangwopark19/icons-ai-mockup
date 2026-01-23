@@ -307,6 +307,183 @@ export class GenerationService {
 
     return { generations, total };
   }
+
+  /**
+   * 기존 생성 요청 다시 생성 (동일한 설정으로 재생성)
+   * @param userId - 사용자 ID
+   * @param generationId - 복사할 Generation ID
+   * @returns 새로 생성된 Generation 레코드
+   */
+  async regenerate(userId: string, generationId: string): Promise<Generation> {
+    // 기존 Generation 조회 및 권한 확인
+    const existingGeneration = await this.getById(userId, generationId);
+
+    if (!existingGeneration) {
+      throw new Error('생성 기록을 찾을 수 없습니다');
+    }
+
+    // promptData에서 이미지 경로 추출
+    const promptData = existingGeneration.promptData as any;
+    const sourceImagePath = promptData?.sourceImagePath;
+    const characterImagePath = promptData?.characterImagePath;
+    const textureImagePath = promptData?.textureImagePath;
+    const userPrompt = promptData?.userPrompt;
+
+    // options JSON 필드에서 옵션 추출
+    const existingOptions = existingGeneration.options as any;
+
+    // 새 Generation 레코드 생성 (동일한 설정)
+    const newGeneration = await prisma.generation.create({
+      data: {
+        projectId: existingGeneration.projectId,
+        ipCharacterId: existingGeneration.ipCharacterId,
+        sourceImageId: existingGeneration.sourceImageId,
+        mode: existingGeneration.mode,
+        status: 'pending',
+        // v3: Prisma 컬럼에 직접 저장
+        viewpointLock: existingGeneration.viewpointLock,
+        whiteBackground: existingGeneration.whiteBackground,
+        userInstructions: existingGeneration.userInstructions,
+        promptData: {
+          sourceImagePath,
+          characterImagePath,
+          textureImagePath,
+          userPrompt,
+        },
+        // v3: options JSON 필드
+        options: {
+          accessoryPreservation: existingOptions?.accessoryPreservation ?? false,
+          styleCopy: existingOptions?.styleCopy ?? false,
+          outputCount: existingOptions?.outputCount ?? 2,
+          // 레거시 옵션
+          preserveStructure: existingOptions?.preserveStructure,
+          transparentBackground: existingOptions?.transparentBackground,
+        },
+      },
+    });
+
+    // 작업 큐에 추가
+    await addGenerationJob({
+      generationId: newGeneration.id,
+      userId,
+      projectId: existingGeneration.projectId,
+      mode: existingGeneration.mode,
+      sourceImagePath,
+      characterImagePath,
+      textureImagePath,
+      prompt: userPrompt,
+      options: {
+        viewpointLock: existingGeneration.viewpointLock,
+        whiteBackground: existingGeneration.whiteBackground,
+        accessoryPreservation: existingOptions?.accessoryPreservation,
+        styleCopy: existingOptions?.styleCopy,
+        userInstructions: existingGeneration.userInstructions || undefined,
+        outputCount: existingOptions?.outputCount ?? 2,
+      },
+    });
+
+    return newGeneration;
+  }
+
+  /**
+   * 스타일 복사: 기존 결과물의 스타일 유지하며 새 캐릭터 적용
+   * @param userId - 사용자 ID
+   * @param parentGenId - 스타일을 복사할 부모 Generation ID
+   * @param newCharacterId - 새로 적용할 캐릭터 ID
+   * @returns 새로 생성된 Generation 레코드
+   */
+  async styleCopy(
+    userId: string,
+    parentGenId: string,
+    newCharacterId: string
+  ): Promise<Generation> {
+    // 부모 Generation 조회 및 권한 확인
+    const parentGeneration = await this.getById(userId, parentGenId);
+
+    if (!parentGeneration) {
+      throw new Error('부모 생성 기록을 찾을 수 없습니다');
+    }
+
+    // 완료된 Generation인지 확인
+    if (parentGeneration.status !== 'completed') {
+      throw new Error('완료된 생성 기록만 스타일 복사가 가능합니다');
+    }
+
+    // 새 캐릭터 조회
+    const newCharacter = await prisma.iPCharacter.findFirst({
+      where: {
+        id: newCharacterId,
+        projectId: parentGeneration.projectId,
+      },
+    });
+
+    if (!newCharacter) {
+      throw new Error('새 캐릭터를 찾을 수 없습니다');
+    }
+
+    // promptData에서 이미지 경로 추출
+    const promptData = parentGeneration.promptData as any;
+    const sourceImagePath = promptData?.sourceImagePath;
+    const textureImagePath = promptData?.textureImagePath;
+    const userPrompt = promptData?.userPrompt;
+
+    // options JSON 필드에서 옵션 추출
+    const existingOptions = parentGeneration.options as any;
+
+    // 새 Generation 레코드 생성 (styleCopy 활성화)
+    const newGeneration = await prisma.generation.create({
+      data: {
+        projectId: parentGeneration.projectId,
+        ipCharacterId: newCharacterId,
+        sourceImageId: parentGeneration.sourceImageId,
+        parentGenerationId: parentGenId, // 부모 Generation 설정
+        mode: parentGeneration.mode,
+        status: 'pending',
+        // v3: Prisma 컬럼에 직접 저장
+        viewpointLock: parentGeneration.viewpointLock,
+        whiteBackground: parentGeneration.whiteBackground,
+        userInstructions: parentGeneration.userInstructions,
+        promptData: {
+          sourceImagePath,
+          characterImagePath: newCharacter.filePath, // 새 캐릭터 이미지
+          textureImagePath,
+          userPrompt,
+        },
+        // v3: options JSON 필드 (styleCopy 활성화)
+        options: {
+          accessoryPreservation: existingOptions?.accessoryPreservation ?? false,
+          styleCopy: true, // 스타일 복사 활성화
+          outputCount: existingOptions?.outputCount ?? 2,
+          // 레거시 옵션
+          preserveStructure: existingOptions?.preserveStructure,
+          transparentBackground: existingOptions?.transparentBackground,
+        },
+      },
+    });
+
+    // 작업 큐에 추가 (parentGenerationId 포함)
+    await addGenerationJob({
+      generationId: newGeneration.id,
+      userId,
+      projectId: parentGeneration.projectId,
+      mode: parentGeneration.mode,
+      sourceImagePath,
+      characterImagePath: newCharacter.filePath,
+      textureImagePath,
+      prompt: userPrompt,
+      parentGenerationId: parentGenId, // worker에서 기존 이미지 로드용
+      options: {
+        viewpointLock: parentGeneration.viewpointLock,
+        whiteBackground: parentGeneration.whiteBackground,
+        accessoryPreservation: existingOptions?.accessoryPreservation,
+        styleCopy: true, // 스타일 복사 활성화
+        userInstructions: parentGeneration.userInstructions || undefined,
+        outputCount: existingOptions?.outputCount ?? 2,
+      },
+    });
+
+    return newGeneration;
+  }
 }
 
 export const generationService = new GenerationService();

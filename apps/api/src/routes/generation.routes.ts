@@ -33,6 +33,10 @@ const SelectImageSchema = z.object({
   imageId: z.string().uuid(),
 });
 
+const StyleCopySchema = z.object({
+  characterId: z.string().uuid(),
+});
+
 /**
  * 생성 라우트
  */
@@ -163,6 +167,66 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.code(404).send({
         success: false,
         error: { code: 'DELETE_FAILED', message },
+      });
+    }
+  });
+
+  /**
+   * 다시 생성 (기존 설정으로 재생성)
+   * POST /api/generations/:id/regenerate
+   */
+  fastify.post('/:id/regenerate', async (request, reply) => {
+    const user = (request as any).user;
+    const { id } = request.params as { id: string };
+
+    try {
+      const generation = await generationService.regenerate(user.id, id);
+
+      return reply.code(201).send({
+        success: true,
+        data: {
+          id: generation.id,
+          status: generation.status,
+          mode: generation.mode,
+          createdAt: generation.createdAt,
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '다시 생성에 실패했습니다';
+      return reply.code(400).send({
+        success: false,
+        error: { code: 'REGENERATE_FAILED', message },
+      });
+    }
+  });
+
+  /**
+   * 스타일 복사 (기존 스타일 + 새 캐릭터)
+   * POST /api/generations/:id/style-copy
+   */
+  fastify.post('/:id/style-copy', async (request, reply) => {
+    const user = (request as any).user;
+    const { id } = request.params as { id: string };
+    const body = StyleCopySchema.parse(request.body);
+
+    try {
+      const generation = await generationService.styleCopy(user.id, id, body.characterId);
+
+      return reply.code(201).send({
+        success: true,
+        data: {
+          id: generation.id,
+          status: generation.status,
+          mode: generation.mode,
+          parentGenerationId: generation.parentGenerationId,
+          createdAt: generation.createdAt,
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '스타일 복사에 실패했습니다';
+      return reply.code(400).send({
+        success: false,
+        error: { code: 'STYLE_COPY_FAILED', message },
       });
     }
   });

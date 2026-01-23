@@ -14,6 +14,8 @@ export interface GenerationJobData {
   characterImagePath?: string;
   textureImagePath?: string;
   prompt?: string;
+  /** 스타일 복사 시 부모 Generation ID */
+  parentGenerationId?: string;
   /** v3 생성 옵션 */
   options: Partial<GenerationOptions> & {
     outputCount?: number;
