@@ -52,7 +52,8 @@ describe('Generation Routes Integration Tests', () => {
 
     expect(loginResponse.statusCode).toBe(200);
     const loginData = JSON.parse(loginResponse.body);
-    authToken = loginData.data.token;
+    
+    authToken = loginData.data.accessToken; // accessToken이 맞습니다
     userId = loginData.data.user.id;
 
     expect(authToken).toBeDefined();
