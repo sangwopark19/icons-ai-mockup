@@ -121,3 +121,43 @@ export const ERROR_CODES = {
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];
+
+// ===================
+// v3 프롬프트 템플릿 (Phase 5.1)
+// ===================
+
+/**
+ * v3 생성 옵션별 프롬프트 템플릿
+ * PRD 명세에 따른 정확한 프롬프트 텍스트
+ */
+export const PROMPT_TEMPLATES_V3 = {
+  /** 시점 고정 프롬프트 */
+  VIEWPOINT_LOCK: [
+    'Keep the exact same camera angle, perspective, and viewpoint as the original image',
+    "Do not change the product's orientation or angle",
+  ] as const,
+
+  /** 백색 배경 프롬프트 */
+  WHITE_BACKGROUND: [
+    'The background must be pure white with no shadows',
+    'Clean, studio-lit product photograph on white background',
+  ] as const,
+
+  /** 부자재 보존 프롬프트 (스케치 실사화용) */
+  ACCESSORY_PRESERVATION: [
+    'CRITICAL: Keep all accessories (zippers, key rings, buttons, buckles) exactly as shown in the original',
+    'Preserve the exact colors and shapes of all hardware and decorative elements',
+    'Do not modify, add, or remove any accessory details',
+  ] as const,
+
+  /** 스타일 복사 프롬프트 (IP 변경용) */
+  STYLE_COPY: [
+    'Maintain the exact same material texture, color tone, and accessory details from the reference image',
+    'Only change the character while preserving all other visual elements',
+  ] as const,
+} as const;
+
+/**
+ * 프롬프트 템플릿 키 타입
+ */
+export type PromptTemplateKey = keyof typeof PROMPT_TEMPLATES_V3;

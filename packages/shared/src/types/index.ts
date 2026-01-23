@@ -74,6 +74,38 @@ export const GenerationOptionsSchema = z.object({
 
 export type GenerationOptions = z.infer<typeof GenerationOptionsSchema>;
 
+// ===================
+// v3 생성 옵션 (Phase 5.1)
+// ===================
+
+/**
+ * v3 생성 옵션 Zod 스키마
+ * Phase 5.1 피드백 기반 개선 기능
+ */
+export const GenerationOptionsV3Schema = z.object({
+  /** 시점 고정: 원본 이미지의 카메라 앵글/시점 유지 */
+  viewpointLock: z.boolean().default(false),
+  /** 백색 배경: 그림자 없는 완전한 백색 배경 */
+  whiteBackground: z.boolean().default(false),
+  /** 사용자 지시사항: IP 변경 시 추가 지시 텍스트 (최대 500자) */
+  userInstructions: z.string().max(500).optional(),
+});
+
+/**
+ * v3 생성 옵션 타입
+ * @see GenerationOptionsV3Schema
+ */
+export type GenerationOptionsV3 = z.infer<typeof GenerationOptionsV3Schema>;
+
+/**
+ * v3 생성 옵션 타입 가드
+ * @param obj - 검증할 객체
+ * @returns obj가 GenerationOptionsV3 타입인지 여부
+ */
+export function isGenerationOptionsV3(obj: unknown): obj is GenerationOptionsV3 {
+  return GenerationOptionsV3Schema.safeParse(obj).success;
+}
+
 export const CreateGenerationSchema = z.object({
   projectId: z.string().uuid(),
   mode: GenerationModeEnum,
