@@ -87,7 +87,6 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
       body: zodToJsonSchema(CreateGenerationSchema),
       response: {
         201: zodToJsonSchema(SuccessResponseSchema),
-        400: zodToJsonSchema(ErrorResponseSchema),
       },
     },
   }, async (request, reply) => {
@@ -176,7 +175,6 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
       body: zodToJsonSchema(SelectImageSchema),
       response: {
         200: zodToJsonSchema(SuccessResponseSchema),
-        400: zodToJsonSchema(ErrorResponseSchema),
         404: zodToJsonSchema(ErrorResponseSchema),
       },
     },
@@ -257,7 +255,6 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
       body: zodToJsonSchema(RegenerateSchema),
       response: {
         201: zodToJsonSchema(SuccessResponseSchema),
-        400: zodToJsonSchema(ErrorResponseSchema),
       },
     },
   }, async (request, reply) => {
@@ -300,7 +297,6 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
       body: zodToJsonSchema(StyleCopySchema),
       response: {
         201: zodToJsonSchema(SuccessResponseSchema),
-        400: zodToJsonSchema(ErrorResponseSchema),
       },
     },
   }, async (request, reply) => {

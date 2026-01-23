@@ -86,7 +86,6 @@ describe('Generation Routes Integration Tests', () => {
         projectId,
         name: 'Test Character',
         filePath: 'test/character.png',
-        description: 'Test character for integration tests',
       },
     });
     characterId = character.id;

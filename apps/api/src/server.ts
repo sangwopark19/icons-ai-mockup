@@ -30,6 +30,10 @@ export async function build() {
             }
           : undefined,
     },
+    // 스키마 에러 포매터 커스터마이즈 - 표준 응답 형식에 맞춤
+    schemaErrorFormatter: (errors, dataVar) => {
+      return new Error(errors[0]?.message || 'Validation failed');
+    },
   });
 
   // 플러그인 등록
@@ -150,6 +154,17 @@ export async function build() {
           code: 'CORS_FORBIDDEN',
           message: '허용되지 않은 Origin입니다',
           origin: request.headers.origin ?? null,
+        },
+      });
+    }
+
+    // Fastify 스키마 유효성 검증 에러
+    if (err.code === 'FST_ERR_VALIDATION') {
+      return reply.code(400).send({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: err.message || '입력값이 올바르지 않습니다',
         },
       });
     }
