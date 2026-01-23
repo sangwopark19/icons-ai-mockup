@@ -44,6 +44,7 @@ export default function GenerationResultPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [isRegenerating, setIsRegenerating] = useState(false);
 
   /**
    * 생성 상태 조회
@@ -196,9 +197,51 @@ export default function GenerationResultPage() {
   };
 
   /**
-   * 다시 생성
+   * API로 다시 생성 (기존 설정 유지)
    */
-  const handleRegenerate = () => {
+  const handleRegenerateAPI = async () => {
+    if (!accessToken) return;
+
+    setIsRegenerating(true);
+    try {
+      const response = await fetch(`${API_URL}/api/generations/${genId}/regenerate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        // 새 생성 결과 페이지로 이동
+        router.push(`/projects/${projectId}/generations/${data.data.generationId}`);
+      } else {
+        alert(data.error?.message || '다시 생성에 실패했습니다');
+      }
+    } catch (error) {
+      console.error('다시 생성 실패:', error);
+      alert('다시 생성에 실패했습니다');
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
+  /**
+   * Adobe 배경 제거 페이지 열기
+   */
+  const handleRemoveBackground = () => {
+    window.open(
+      'https://www.adobe.com/express/feature/image/remove-background',
+      '_blank',
+      'noopener,noreferrer'
+    );
+  };
+
+  /**
+   * 모드 페이지로 돌아가기
+   */
+  const handleReturnToMode = () => {
     // 모드에 따라 해당 페이지로 이동
     if (generation?.mode === 'ip_change') {
       router.push(`/projects/${projectId}/ip-change`);
@@ -269,6 +312,12 @@ export default function GenerationResultPage() {
             <h1 className="text-lg font-semibold text-[var(--text-primary)]">생성 결과</h1>
           </div>
           <div className="flex gap-2">
+            <Button variant="secondary" onClick={handleRegenerateAPI} isLoading={isRegenerating}>
+              🔄 다시 생성
+            </Button>
+            <Button variant="secondary" onClick={handleRemoveBackground}>
+              ✂️ 배경 제거 (Adobe)
+            </Button>
             <Button onClick={() => handleDownload(selectedImageId!)}>다운로드</Button>
           </div>
         </div>
@@ -336,8 +385,8 @@ export default function GenerationResultPage() {
               {saveMessage && (
                 <p className="text-center text-sm text-[var(--text-secondary)]">{saveMessage}</p>
               )}
-              <Button variant="ghost" className="w-full" onClick={handleRegenerate}>
-                🔄 다시 생성
+              <Button variant="ghost" className="w-full" onClick={handleReturnToMode}>
+                🔄 모드로 돌아가기
               </Button>
             </div>
           </div>
