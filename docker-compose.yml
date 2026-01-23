@@ -9,8 +9,8 @@ services:
       POSTGRES_DB: mockup
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    # ports:
-    #   - "5432:5432"  # 외부 노출 제거 - 내부망에서 postgres 유저로 무단 접속 시도 방지
+    ports:
+      - "5432:5432"  # 외부 노출 제거 - 내부망에서 postgres 유저로 무단 접속 시도 방지
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U user -d mockup"]
       interval: 10s

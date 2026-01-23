@@ -1,4 +1,6 @@
-import { PrismaClient } from '@prisma/client';
+import * as Prisma from '@prisma/client';
+
+const { PrismaClient } = Prisma;
 
 /**
  * Prisma 클라이언트 싱글톤

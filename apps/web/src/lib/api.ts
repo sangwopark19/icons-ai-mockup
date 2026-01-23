@@ -35,14 +35,19 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   const data = await response.json();
 
   if (!response.ok) {
-    // 401 에러 시 토큰 만료 이벤트 발생
-    if (response.status === 401) {
-      // 브라우저 환경에서만 이벤트 발생
+    const isAuthEndpoint =
+      endpoint.startsWith('/api/auth/login') ||
+      endpoint.startsWith('/api/auth/register') ||
+      endpoint.startsWith('/api/auth/refresh');
+
+    // 인증이 필요한 요청에서만 토큰 만료 처리
+    if (response.status === 401 && token && !isAuthEndpoint) {
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('auth:token-expired'));
       }
       throw new Error('인증이 만료되었습니다. 다시 로그인해주세요.');
     }
+
     throw new Error(data.error?.message || '요청에 실패했습니다');
   }
 
