@@ -51,6 +51,15 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+
+  // Webpack 설정
+  webpack: (config) => {
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@icons/shared': path.resolve(__dirname, '../../packages/shared/src'),
+    };
+    return config;
+  },
 };
 
 export default nextConfig;

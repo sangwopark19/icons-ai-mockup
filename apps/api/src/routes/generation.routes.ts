@@ -107,7 +107,7 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : '생성 요청에 실패했습니다';
-      return reply.code(400).send({
+      return reply.code(400 as any).send({
         success: false,
         error: { code: 'GENERATION_FAILED', message },
       });
@@ -202,7 +202,7 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : '이미지 선택에 실패했습니다';
-      return reply.code(400).send({
+      return reply.code(400 as any).send({
         success: false,
         error: { code: 'SELECT_FAILED', message },
       });
@@ -278,7 +278,7 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : '다시 생성에 실패했습니다';
-      return reply.code(400).send({
+      return reply.code(400 as any).send({
         success: false,
         error: { code: 'REGENERATE_FAILED', message },
       });
@@ -319,7 +319,7 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : '스타일 복사에 실패했습니다';
-      return reply.code(400).send({
+      return reply.code(400 as any).send({
         success: false,
         error: { code: 'STYLE_COPY_FAILED', message },
       });

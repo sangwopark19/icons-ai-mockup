@@ -48,6 +48,7 @@ export default function StyleCopyPage() {
   const [generationOptions, setGenerationOptions] = useState<GenerationOptionsV3>({
     viewpointLock: false,
     whiteBackground: false,
+    accessoryPreservation: false,
     userInstructions: '',
   });
   const [isLoading, setIsLoading] = useState(true);

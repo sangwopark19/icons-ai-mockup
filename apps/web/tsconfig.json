@@ -28,6 +28,9 @@
       ],
       "@mockup-ai/shared": [
         "../../packages/shared/src"
+      ],
+      "@icons/shared": [
+        "../../packages/shared/src"
       ]
     }
   },

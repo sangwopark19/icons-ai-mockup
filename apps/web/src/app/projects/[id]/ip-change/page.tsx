@@ -31,6 +31,7 @@ export default function IPChangePage() {
   const [v3Options, setV3Options] = useState<GenerationOptionsV3>({
     viewpointLock: false,
     whiteBackground: false,
+    accessoryPreservation: false,
     userInstructions: '',
   });
 
