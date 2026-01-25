@@ -108,6 +108,15 @@ export default function ProjectDetailPage() {
               </li>
               <li>
                 <Link
+                  href={`/projects/${projectId}/style-copy`}
+                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+                >
+                  <span>🎨</span>
+                  <span>스타일 복사</span>
+                </Link>
+              </li>
+              <li>
+                <Link
                   href={`/projects/${projectId}/history`}
                   className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
                 >
@@ -152,7 +161,7 @@ export default function ProjectDetailPage() {
 
           {/* 작업 선택 */}
           <h2 className="mb-4 text-lg font-medium text-[var(--text-primary)]">작업 선택</h2>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Link
               href={`/projects/${projectId}/ip-change`}
               className="group rounded-xl border border-[var(--border-default)] bg-[var(--bg-secondary)] p-6 transition-all hover:border-brand-500 hover:shadow-lg"
@@ -180,6 +189,21 @@ export default function ProjectDetailPage() {
               </h3>
               <p className="text-sm text-[var(--text-tertiary)]">
                 2D 스케치를 실제 제품처럼 변환합니다
+              </p>
+            </Link>
+
+            <Link
+              href={`/projects/${projectId}/style-copy`}
+              className="group rounded-xl border border-[var(--border-default)] bg-[var(--bg-secondary)] p-6 transition-all hover:border-brand-500 hover:shadow-lg"
+            >
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-purple-500/10 text-2xl">
+                🎨
+              </div>
+              <h3 className="mb-2 text-lg font-medium text-[var(--text-primary)] group-hover:text-brand-500">
+                스타일 복사
+              </h3>
+              <p className="text-sm text-[var(--text-tertiary)]">
+                기존 결과물의 스타일을 유지하며 새 캐릭터로 생성합니다
               </p>
             </Link>
           </div>

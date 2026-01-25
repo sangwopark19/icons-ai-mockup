@@ -45,17 +45,17 @@ function useGenerationOptions(
     userInstructions: defaultOptions?.userInstructions ?? '',
   });
 
+  // 옵션 변경 시 콜백 호출 (렌더링 외부에서)
+  React.useEffect(() => {
+    onOptionsChange?.(options);
+  }, [options, onOptionsChange]);
+
   // 옵션 업데이트 함수
   const updateOptions = React.useCallback(
     (updates: Partial<GenerationOptionsV3>) => {
-      setOptions((prev) => {
-        const newOptions = { ...prev, ...updates };
-        // 콜백 호출
-        onOptionsChange?.(newOptions);
-        return newOptions;
-      });
+      setOptions((prev) => ({ ...prev, ...updates }));
     },
-    [onOptionsChange]
+    []
   );
 
   // 시점 고정 토글
