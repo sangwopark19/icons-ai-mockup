@@ -8,12 +8,20 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
-      include: ['src/lib/prompts.ts'],
+      include: [
+        'src/**/*.ts',
+      ],
+      exclude: [
+        'src/**/*.test.ts',
+        'src/server.ts',
+        'src/worker.ts',
+        'src/config/**',
+      ],
       thresholds: {
-        lines: 90,
-        functions: 90,
-        branches: 90,
-        statements: 90,
+        lines: 85,
+        functions: 85,
+        branches: 85,
+        statements: 85,
       },
     },
   },

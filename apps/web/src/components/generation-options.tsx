@@ -45,8 +45,15 @@ function useGenerationOptions(
     userInstructions: defaultOptions?.userInstructions ?? '',
   });
 
-  // 옵션 변경 시 콜백 호출 (렌더링 외부에서)
+  // 초기 렌더링 추적
+  const isInitialMount = React.useRef(true);
+
+  // 옵션 변경 시 콜백 호출 (렌더링 외부에서, 초기 렌더링 제외)
   React.useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
     onOptionsChange?.(options);
   }, [options, onOptionsChange]);
 
