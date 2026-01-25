@@ -8,7 +8,7 @@ RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 FROM base AS deps
 WORKDIR /app
 
-# Sharp 빌드를 위한 의존성
+# Sharp 및 bcrypt 빌드를 위한 의존성
 RUN apk add --no-cache python3 make g++ vips-dev
 
 # 루트 의존성 파일 복사
@@ -16,7 +16,11 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json ./apps/api/
 COPY packages/shared/package.json ./packages/shared/
 
-RUN pnpm install --frozen-lockfile --ignore-scripts
+# Prisma 스키마 먼저 복사 (postinstall을 위해)
+COPY apps/api/prisma ./apps/api/prisma
+
+# 네이티브 모듈 빌드를 포함하여 설치
+RUN pnpm install --frozen-lockfile
 
 # 빌드 단계
 FROM base AS builder
@@ -37,9 +41,8 @@ COPY apps/api ./apps/api
 WORKDIR /app/packages/shared
 RUN pnpm build || true
 
-# Prisma 클라이언트 생성 및 빌드
+# Prisma 클라이언트는 이미 deps에서 생성됨, 빌드만 수행
 WORKDIR /app/apps/api
-RUN npx prisma generate
 RUN pnpm build
 
 # 프로덕션 실행 단계 - builder를 그대로 사용

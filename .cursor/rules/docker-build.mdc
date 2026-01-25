@@ -5,22 +5,49 @@ alwaysApply: true
 
 ## Docker 빌드 규칙
 
-### 의존성 설치 단계 (deps)
+### 의존성 설치 단계 (deps) - Prisma + 네이티브 모듈
 
-- **Prisma를 사용하는 프로젝트의 Dockerfile에서는 반드시 `--ignore-scripts` 플래그를 사용해야 함**
-  ```dockerfile
-  # ✅ 올바른 예시
-  RUN pnpm install --frozen-lockfile --ignore-scripts
-  
-  # ❌ 잘못된 예시
-  RUN pnpm install --frozen-lockfile
-  ```
+- **Prisma와 네이티브 모듈(bcrypt, sharp 등)을 사용하는 프로젝트의 올바른 전략**
+ ```dockerfile
+ # ✅ 올바른 예시 - Prisma 스키마를 먼저 복사하고 postinstall 허용
+ FROM base AS deps
+ WORKDIR /app
+ 
+ # 네이티브 모듈 빌드 도구 설치
+ RUN apk add --no-cache python3 make g++ vips-dev
+ 
+ # package.json 파일들 복사
+ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+ COPY apps/api/package.json ./apps/api/
+ COPY packages/shared/package.json ./packages/shared/
+ 
+ # Prisma 스키마 먼저 복사 (postinstall을 위해)
+ COPY apps/api/prisma ./apps/api/prisma
+ 
+ # postinstall 스크립트 실행 허용 (prisma generate, bcrypt build 등)
+ RUN pnpm install --frozen-lockfile
+ 
+ # ❌ 잘못된 예시 - Prisma 스키마 없이 --ignore-scripts 사용
+ RUN pnpm install --frozen-lockfile --ignore-scripts
+ # 이 경우 bcrypt 네이티브 모듈이 빌드되지 않아 런타임 에러 발생
+ ```
 
-- **이유**: deps 단계에서는 소스 코드가 복사되기 전이므로, Prisma 스키마 파일이 없어 postinstall 스크립트(`prisma generate`)가 실패함
+- **이유**: 
+ - Prisma 스키마를 먼저 복사하면 `prisma generate`가 성공적으로 실행됨
+ - `--ignore-scripts`를 제거하면 bcrypt, sharp 등의 postinstall 스크립트가 실행되어 네이티브 바인딩이 빌드됨
+ - Alpine Linux에서 네이티브 모듈은 반드시 해당 환경에서 빌드되어야 함
 
-- **해결 방법**: 
-  - deps 단계: `--ignore-scripts`로 의존성만 설치
-  - builder 단계: 소스 복사 후 `npx prisma generate` 수동 실행
+- **흔한 에러 메시지**:
+ ```
+ Error: Cannot find module '/app/node_modules/.pnpm/bcrypt@5.1.1/node_modules/bcrypt/lib/binding/napi-v3/bcrypt_lib.node'
+ ```
+
+- **builder 단계 간소화**:
+ ```dockerfile
+ # deps에서 이미 모든 빌드가 완료되었으므로 TypeScript 빌드만 수행
+ WORKDIR /app/apps/api
+ RUN pnpm build
+ ```
 
 ### TypeScript 빌드 설정
 
