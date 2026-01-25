@@ -7,7 +7,9 @@ import {
   getStyleCopyPrompt,
   buildFinalPrompt,
   buildFinalPromptSafe,
+  buildStyleCopyPrompt,
   type GenerationOptions,
+  type StyleCopyPromptResult,
 } from './prompts.js';
 
 // ============================================================================
@@ -409,5 +411,148 @@ describe('buildFinalPromptSafe', () => {
     });
     expect(result.success).toBe(false);
     expect(result.error).toBeDefined();
+  });
+});
+
+// ============================================================================
+// buildStyleCopyPrompt 테스트 (v3 스타일 복사 전용)
+// ============================================================================
+describe('buildStyleCopyPrompt', () => {
+  it('기본 스타일 복사 프롬프트 구조를 반환한다', () => {
+    const result = buildStyleCopyPrompt();
+    
+    // 시스템 프롬프트 확인
+    expect(result.systemPrompt).toContain('product mockup expert');
+    expect(result.systemPrompt).toContain('CRITICAL TASK');
+    expect(result.systemPrompt).toContain('IMAGE ROLES');
+    expect(result.systemPrompt).toContain('Image 1 (STYLE REFERENCE)');
+    expect(result.systemPrompt).toContain('Image 2 (SOURCE PRODUCT)');
+    expect(result.systemPrompt).toContain('Image 3 (NEW CHARACTER)');
+    
+    // 이미지 라벨 확인
+    expect(result.image1Label).toContain('STYLE REFERENCE');
+    expect(result.image2Label).toContain('SOURCE PRODUCT');
+    expect(result.image3Label).toContain('NEW CHARACTER');
+    
+    // 최종 지시 프롬프트 확인
+    expect(result.finalInstruction).toContain('Generate a new product mockup');
+    expect(result.finalInstruction).toContain('EXACT style from Image 1');
+    expect(result.finalInstruction).toContain('character from Image 3');
+    
+    // 기본 적용 옵션
+    expect(result.appliedOptions).toContain('styleCopy');
+  });
+
+  it('시스템 프롬프트에 보존해야 할 요소가 명시되어 있다', () => {
+    const result = buildStyleCopyPrompt();
+    
+    // 부자재 보존 요소
+    expect(result.systemPrompt).toContain('key rings');
+    expect(result.systemPrompt).toContain('chains');
+    expect(result.systemPrompt).toContain('zippers');
+    expect(result.systemPrompt).toContain('buckles');
+    expect(result.systemPrompt).toContain('buttons');
+    
+    // 재질감 보존 요소
+    expect(result.systemPrompt).toContain('Material texture');
+    expect(result.systemPrompt).toContain('finish quality');
+    expect(result.systemPrompt).toContain('matte');
+    expect(result.systemPrompt).toContain('glossy');
+    
+    // 색조 및 조명 보존
+    expect(result.systemPrompt).toContain('Color tones');
+    expect(result.systemPrompt).toContain('lighting conditions');
+    expect(result.systemPrompt).toContain('Shadow direction');
+  });
+
+  it('시스템 프롬프트에 변경하면 안되는 요소가 명시되어 있다', () => {
+    const result = buildStyleCopyPrompt();
+    
+    expect(result.systemPrompt).toContain('ABSOLUTELY DO NOT MODIFY');
+    expect(result.systemPrompt).toContain('Accessory shapes');
+    expect(result.systemPrompt).toContain('Hardware elements');
+    expect(result.systemPrompt).toContain('Product material texture');
+    expect(result.systemPrompt).toContain('Background or environment');
+  });
+
+  it('viewpointLock 옵션을 적용한다', () => {
+    const result = buildStyleCopyPrompt({ viewpointLock: true });
+    
+    expect(result.appliedOptions).toContain('viewpointLock');
+    expect(result.finalInstruction).toContain('Keep the exact same camera angle');
+  });
+
+  it('whiteBackground 옵션을 적용한다', () => {
+    const result = buildStyleCopyPrompt({ whiteBackground: true });
+    
+    expect(result.appliedOptions).toContain('whiteBackground');
+    expect(result.finalInstruction).toContain('pure white with no shadows');
+  });
+
+  it('accessoryPreservation 옵션을 적용한다', () => {
+    const result = buildStyleCopyPrompt({ accessoryPreservation: true });
+    
+    expect(result.appliedOptions).toContain('accessoryPreservation');
+    expect(result.finalInstruction).toContain('EXTRA EMPHASIS');
+    expect(result.finalInstruction).toContain('accessory details');
+  });
+
+  it('userInstructions를 적용한다', () => {
+    const result = buildStyleCopyPrompt({
+      userInstructions: '키링 체인 색상 유지해주세요',
+    });
+    
+    expect(result.appliedOptions).toContain('userInstructions');
+    expect(result.finalInstruction).toContain('키링 체인 색상 유지해주세요');
+  });
+
+  it('여러 옵션을 조합한다', () => {
+    const result = buildStyleCopyPrompt({
+      viewpointLock: true,
+      whiteBackground: true,
+      accessoryPreservation: true,
+      userInstructions: '추가 지시사항',
+    });
+    
+    expect(result.appliedOptions).toContain('styleCopy');
+    expect(result.appliedOptions).toContain('viewpointLock');
+    expect(result.appliedOptions).toContain('whiteBackground');
+    expect(result.appliedOptions).toContain('accessoryPreservation');
+    expect(result.appliedOptions).toContain('userInstructions');
+    
+    expect(result.finalInstruction).toContain('Keep the exact same camera angle');
+    expect(result.finalInstruction).toContain('pure white');
+    expect(result.finalInstruction).toContain('EXTRA EMPHASIS');
+    expect(result.finalInstruction).toContain('추가 지시사항');
+  });
+
+  it('빈 옵션으로 기본 구조를 반환한다', () => {
+    const result = buildStyleCopyPrompt({});
+    
+    expect(result.systemPrompt).toBeDefined();
+    expect(result.image1Label).toBeDefined();
+    expect(result.image2Label).toBeDefined();
+    expect(result.image3Label).toBeDefined();
+    expect(result.finalInstruction).toBeDefined();
+    expect(result.appliedOptions).toEqual(['styleCopy']);
+  });
+
+  it('출력 요구사항이 명시되어 있다', () => {
+    const result = buildStyleCopyPrompt();
+    
+    expect(result.systemPrompt).toContain('OUTPUT REQUIREMENTS');
+    expect(result.systemPrompt).toContain('visually indistinguishable from Image 1');
+    expect(result.systemPrompt).toContain('ONLY the character should be different');
+    expect(result.systemPrompt).toContain('pixel-perfectly');
+  });
+
+  it('styleCopy가 항상 appliedOptions에 포함된다', () => {
+    const result1 = buildStyleCopyPrompt();
+    const result2 = buildStyleCopyPrompt({ viewpointLock: true });
+    const result3 = buildStyleCopyPrompt({ styleCopy: false }); // 무시됨
+    
+    expect(result1.appliedOptions).toContain('styleCopy');
+    expect(result2.appliedOptions).toContain('styleCopy');
+    expect(result3.appliedOptions).toContain('styleCopy');
   });
 });
