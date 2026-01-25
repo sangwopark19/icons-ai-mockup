@@ -87,6 +87,8 @@ export const GenerationOptionsV3Schema = z.object({
   viewpointLock: z.boolean().default(false),
   /** 백색 배경: 그림자 없는 완전한 백색 배경 */
   whiteBackground: z.boolean().default(false),
+  /** 부자재 보존: 지퍼, 키링 등 부자재 디테일 보존 (스케치 실사화 전용) */
+  accessoryPreservation: z.boolean().default(true),
   /** 사용자 지시사항: IP 변경 시 추가 지시 텍스트 (최대 500자) */
   userInstructions: z.string().max(500).optional(),
 });

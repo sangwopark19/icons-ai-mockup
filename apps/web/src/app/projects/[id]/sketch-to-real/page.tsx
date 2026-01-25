@@ -7,6 +7,8 @@ import { useAuthStore } from '@/stores/auth.store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ImageUploader } from '@/components/ui/image-uploader';
+import { GenerationOptions } from '@/components/generation-options';
+import type { GenerationOptionsV3 } from '@icons/shared';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
@@ -27,6 +29,12 @@ export default function SketchToRealPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [transparentBg, setTransparentBg] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [generationOptions, setGenerationOptions] = useState<GenerationOptionsV3>({
+    viewpointLock: false,
+    whiteBackground: false,
+    accessoryPreservation: true,
+    userInstructions: '',
+  });
 
   // 인증 체크
   useEffect(() => {
@@ -90,6 +98,12 @@ export default function SketchToRealPage() {
           textureImagePath,
           prompt: additionalPrompt || undefined,
           options: {
+            // v3 생성 옵션
+            viewpointLock: generationOptions.viewpointLock,
+            whiteBackground: generationOptions.whiteBackground,
+            accessoryPreservation: generationOptions.accessoryPreservation,
+            userInstructions: generationOptions.userInstructions,
+            // 레거시 옵션
             transparentBackground: transparentBg,
             outputCount: 2,
           },
@@ -194,9 +208,22 @@ export default function SketchToRealPage() {
           />
         </div>
 
-        {/* 옵션 */}
+        {/* v3 생성 옵션 */}
+        <div className="mt-8">
+          <GenerationOptions
+            defaultOptions={{
+              viewpointLock: false,
+              whiteBackground: false,
+              accessoryPreservation: true,
+              userInstructions: '',
+            }}
+            onOptionsChange={setGenerationOptions}
+          />
+        </div>
+
+        {/* 레거시 옵션 */}
         <div className="mt-8 rounded-xl border border-[var(--border-default)] bg-[var(--bg-secondary)] p-6">
-          <h3 className="mb-4 font-medium text-[var(--text-primary)]">생성 옵션</h3>
+          <h3 className="mb-4 font-medium text-[var(--text-primary)]">추가 옵션</h3>
           <div className="space-y-3">
             <label className="flex items-center gap-3">
               <input

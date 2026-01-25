@@ -42,6 +42,7 @@ function useGenerationOptions(
   const [options, setOptions] = React.useState<GenerationOptionsV3>({
     viewpointLock: defaultOptions?.viewpointLock ?? false,
     whiteBackground: defaultOptions?.whiteBackground ?? false,
+    accessoryPreservation: defaultOptions?.accessoryPreservation ?? true,
     userInstructions: defaultOptions?.userInstructions ?? '',
   });
 
@@ -81,6 +82,14 @@ function useGenerationOptions(
     [updateOptions]
   );
 
+  // 부자재 보존 토글
+  const toggleAccessoryPreservation = React.useCallback(
+    (checked: boolean) => {
+      updateOptions({ accessoryPreservation: checked });
+    },
+    [updateOptions]
+  );
+
   // 사용자 지시사항 업데이트
   const updateUserInstructions = React.useCallback(
     (value: string) => {
@@ -93,6 +102,7 @@ function useGenerationOptions(
     options,
     toggleViewpointLock,
     toggleWhiteBackground,
+    toggleAccessoryPreservation,
     updateUserInstructions,
   };
 }
@@ -119,6 +129,7 @@ export const GenerationOptions = React.forwardRef<HTMLDivElement, GenerationOpti
       options,
       toggleViewpointLock,
       toggleWhiteBackground,
+      toggleAccessoryPreservation,
       updateUserInstructions,
     } = useGenerationOptions(defaultOptions, onOptionsChange);
 
@@ -159,6 +170,15 @@ export const GenerationOptions = React.forwardRef<HTMLDivElement, GenerationOpti
             disabled={disabled}
             label="백색 배경"
             description="그림자 없는 완전한 백색 배경으로 생성합니다"
+          />
+
+          {/* 부자재 보존 */}
+          <Checkbox
+            checked={options.accessoryPreservation}
+            onCheckedChange={toggleAccessoryPreservation}
+            disabled={disabled}
+            label="부자재 보존"
+            description="지퍼, 키링, 버튼 등 부자재 디테일을 정확하게 보존합니다 (스케치 실사화 전용)"
           />
         </div>
 
