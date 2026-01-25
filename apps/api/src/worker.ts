@@ -16,6 +16,19 @@ const generationWorker = new Worker<GenerationJobData>(
     console.log(`🚀 생성 작업 시작: ${generationId}`);
 
     try {
+      // Generation 레코드 존재 여부 먼저 확인
+      const generation = await prisma.generation.findUnique({
+        where: { id: generationId },
+        select: { id: true, status: true },
+      });
+
+      if (!generation) {
+        console.error(`❌ Generation 레코드를 찾을 수 없습니다: ${generationId}`);
+        throw new Error(`Generation 레코드를 찾을 수 없습니다: ${generationId}`);
+      }
+
+      console.log(`✅ Generation 레코드 확인: ${generationId} (현재 상태: ${generation.status})`);
+
       // 상태를 processing으로 업데이트
       await generationService.updateStatus(generationId, 'processing');
 

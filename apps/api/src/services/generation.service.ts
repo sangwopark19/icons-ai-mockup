@@ -173,6 +173,17 @@ export class GenerationService {
     status: 'processing' | 'completed' | 'failed',
     errorMessage?: string
   ): Promise<void> {
+    // 레코드 존재 여부 확인
+    const exists = await prisma.generation.findUnique({
+      where: { id: generationId },
+      select: { id: true },
+    });
+
+    if (!exists) {
+      console.warn(`⚠️ Generation 레코드를 찾을 수 없습니다: ${generationId}`);
+      throw new Error(`Generation 레코드를 찾을 수 없습니다: ${generationId}`);
+    }
+
     await prisma.generation.update({
       where: { id: generationId },
       data: {

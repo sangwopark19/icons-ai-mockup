@@ -12,6 +12,7 @@
     "lint": "eslint src/",
     "type-check": "tsc --noEmit",
     "clean": "rm -rf dist .turbo node_modules",
+    "clear-queue": "tsx scripts/clear-queue.ts",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
