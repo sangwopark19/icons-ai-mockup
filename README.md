@@ -108,9 +108,11 @@ REALESRGAN_PATH="/usr/local/bin/realesrgan-ncnn-vulkan"
 # 개발 환경 (DB만)
 docker-compose up -d postgres redis
 
-# 프로덕션 빌드 및 실행
-docker-compose --profile production up -d
+# 프로덕션 빌드 및 실행 (전체 서비스)
+docker-compose up -d --build
 ```
+
+**📖 서버 배포 상세 가이드는 [DEPLOYMENT.md](docs/DEPLOYMENT.md)를 참고하세요.**
 
 ## 📚 개발 문서
 
@@ -121,6 +123,7 @@ docker-compose --profile production up -d
 - [Design Guide (디자인 가이드)](docs/DESIGN_GUIDE.md)
 - [User Journey (사용자 여정)](docs/USER_JOURNEY.md)
 - [Code Guideline (코딩 규칙)](docs/CODE_GUIDELINE.md)
+- [Deployment (서버 배포 가이드)](docs/DEPLOYMENT.md)
 
 ## 🔧 개발 명령어
 
