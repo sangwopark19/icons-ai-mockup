@@ -111,9 +111,10 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
       args:
-        # 서버 배포 시 실제 서버 IP 또는 도메인으로 변경 필요
-        # 예: http://192.168.1.100:4000 또는 http://your-domain.com:4000
-        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://172.30.1.42:4000}
+        # Tailscale VPN IP로 설정
+        # 로컬 개발: http://localhost:4000
+        # Tailscale 접속: http://100.69.75.47:4000
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://100.69.75.47:4000}
     container_name: mockup-web
     ports:
       - "3000:3000"
