@@ -17,6 +17,7 @@ build
 .env
 .env.local
 .env.*.local
+.env*
 
 # 로그
 *.log
@@ -50,4 +51,4 @@ redis_data
 apps/api/data
 
 .cursorignore
-
+.taskmaster/

@@ -51,6 +51,13 @@ async function registerPlugins() {
         return;
       }
 
+      // "*" 와일드카드는 모든 origin 허용 (Tailscale 보안 적용됨)
+      if (config.corsOrigins.includes('*')) {
+        console.log(`[CORS] ✅ ALLOWED (wildcard): ${origin}`);
+        callback(null, true);
+        return;
+      }
+
       if (config.corsOrigins.includes(origin)) {
         console.log(`[CORS] ✅ ALLOWED: ${origin}`);
         callback(null, true);

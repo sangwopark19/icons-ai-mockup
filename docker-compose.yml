@@ -63,8 +63,8 @@ services:
       - JWT_SECRET=${JWT_SECRET:-super-secret-jwt-key-change-in-production}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - UPLOAD_DIR=/app/data
-      # CORS 허용 origin (프론트엔드 URL)
-      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3000,http://127.0.0.1:3000,http://172.30.1.40:3000,http://172.30.1.42:3000,http://100.69.75.47:3000,http://175.193.199.147:3000,http://221.147.112.147:3000}
+      # CORS 허용 origin (프론트엔드 URL) - Tailscale 사용으로 모든 origin 허용
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
     volumes:
       - app_data:/app/data
     depends_on:
