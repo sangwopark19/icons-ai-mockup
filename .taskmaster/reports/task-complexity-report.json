@@ -1,0 +1,117 @@
+{
+	"meta": {
+		"generatedAt": "2026-01-23T06:16:16.612Z",
+		"tasksAnalyzed": 13,
+		"totalTasks": 13,
+		"analysisCount": 13,
+		"thresholdScore": 5,
+		"projectName": "Task Master",
+		"usedResearch": true
+	},
+	"complexityAnalysis": [
+		{
+			"taskId": 1,
+			"taskTitle": "프롬프트 인프라 구축 (prompts.ts 생성)",
+			"complexityScore": 4,
+			"recommendedSubtasks": 0,
+			"expansionPrompt": "이미 5개 세부 작업으로 잘 분해된 태스크입니다. 추가 분해가 필요하지 않습니다.",
+			"reasoning": "TypeScript 타입/Zod 정의, 4개 프롬프트 함수 구현, 조합 로직, 단위 테스트 포함. PRD 텍스트 정확 구현과 옵션 조합 테스트(10개+)가 주요 작업이나 표준적인 문자열 처리와 조건부 로직으로 복잡도 중간 수준. 이미 5개 subtasks로 잘 분해됨."
+		},
+		{
+			"taskId": 2,
+			"taskTitle": "Prisma 스키마 업데이트 (Generation 테이블 옵션 필드 추가)",
+			"complexityScore": 5,
+			"recommendedSubtasks": 0,
+			"expansionPrompt": "이미 5개 세부 작업으로 잘 분해된 태스크입니다. 추가 분해가 필요하지 않습니다.",
+			"reasoning": "스키마 수정, 마이그레이션 생성/적용, 타입 재생성, 기존 데이터 마이그레이션, 검증 테스트. 데이터베이스 마이그레이션의 데이터 손실 위험과 기존 데이터 호환성 검증이 주요 리스크이나 표준 Prisma 워크플로우로 복잡도 중간. 이미 5개 subtasks로 잘 분해됨."
+		},
+		{
+			"taskId": 3,
+			"taskTitle": "gemini.service.ts 개선 (옵션별 프롬프트 적용)",
+			"complexityScore": 7,
+			"recommendedSubtasks": 0,
+			"expansionPrompt": "이미 5개 세부 작업으로 잘 분해된 태스크입니다. 추가 분해가 필요하지 않습니다.",
+			"reasoning": "API 시그니처 변경, 프롬프트 빌더 통합, Multi-turn Chat, Reference Images(최대 14개) 처리, BullMQ 연동. 외부 API(Gemini 3 Pro) 연동, 복수 이미지 base64 처리, chat history 관리가 복잡도 높임. Task 1 의존성 고려. 이미 5개 subtasks로 잘 분해됨."
+		},
+		{
+			"taskId": 4,
+			"taskTitle": "generation.service.ts 개선 (다시 생성 및 스타일 복사 로직)",
+			"complexityScore": 8,
+			"recommendedSubtasks": 0,
+			"expansionPrompt": "이미 5개 세부 작업으로 잘 분해된 태스크입니다. 추가 분해가 필요하지 않습니다.",
+			"reasoning": "regenerate/styleCopy 비즈니스 로직, DB 트랜잭션, 큐 시스템 연동, userInstructions 삽입, 스케치→실사 부자재 보존 자동 적용. Task 2,3 의존성, 복잡한 비즈니스 규칙과 프롬프트 우선순위 관리가 복잡도 높임. 이미 5개 subtasks로 잘 분해됨."
+		},
+		{
+			"taskId": 5,
+			"taskTitle": "generation.routes.ts 개선 (v3 API 엔드포인트 추가)",
+			"complexityScore": 6,
+			"recommendedSubtasks": 0,
+			"expansionPrompt": "이미 5개 세부 작업으로 잘 분해된 태스크입니다. 추가 분해가 필요하지 않습니다.",
+			"reasoning": "2개 신규 엔드포인트 구현, Zod 스키마, Fastify 5.x 베스트 프랙티스, Task 4 서비스 연동. API 계층의 표준 작업이나 기존 라우트 리팩토링과 에러 핸들링 개선이 추가 작업. 이미 5개 subtasks로 잘 분해됨."
+		},
+		{
+			"taskId": 6,
+			"taskTitle": "공통 타입 및 상수 업데이트 (shared 패키지)",
+			"complexityScore": 3,
+			"recommendedSubtasks": 0,
+			"expansionPrompt": "이미 5개 세부 작업으로 잘 분해된 태스크입니다. 추가 분해가 필요하지 않습니다.",
+			"reasoning": "타입 정의, 상수 추가, 컴파일 테스트, 타입 가드, 패키지 빌드. 가장 단순한 태스크로 타입 안전성 확보와 shared 패키지 배포가 주요 작업. 다른 태스크의 기초가 됨. 이미 5개 subtasks로 잘 분해됨."
+		},
+		{
+			"taskId": 7,
+			"taskTitle": "generation-options.tsx 컴포넌트 생성",
+			"complexityScore": 4,
+			"recommendedSubtasks": 0,
+			"expansionPrompt": "이미 5개 세부 작업으로 잘 분해된 태스크입니다. 추가 분해가 필요하지 않습니다.",
+			"reasoning": "React 컴포넌트 + 커스텀 훅 + Tailwind UI, checkbox/textarea 재사용. 표준 UI 컴포넌트 개발이나 Zustand 통합 선택과 상태 관리 로직이 약간의 복잡도 추가. 이미 5개 subtasks로 잘 분해됨."
+		},
+		{
+			"taskId": 8,
+			"taskTitle": "ip-change/page.tsx 개선 (텍스트 입력 및 옵션 추가)",
+			"complexityScore": 5,
+			"recommendedSubtasks": 0,
+			"expansionPrompt": "이미 5개 세부 작업으로 잘 분해된 태스크입니다. 추가 분해가 필요하지 않습니다.",
+			"reasoning": "기존 페이지 수정, textarea/GenerationOptions 통합, API payload 수정, Next.js App Router 유지. Task 5,7 의존성, 클라이언트/서버 컴포넌트 경계 관리 필요. 이미 5개 subtasks로 잘 분해됨."
+		},
+		{
+			"taskId": 9,
+			"taskTitle": "generations/[genId]/page.tsx 개선 (다시 생성 및 Adobe 링크)",
+			"complexityScore": 3,
+			"recommendedSubtasks": 0,
+			"expansionPrompt": "이미 5개 세부 작업으로 잘 분해된 태스크입니다. 추가 분해가 필요하지 않습니다.",
+			"reasoning": "2개 버튼 추가(다시 생성 API 호출, Adobe 외부 링크), Tailwind 레이아웃. 가장 단순한 프론트엔드 작업이나 API 호출과 페이지 리로드 로직 포함. 이미 5개 subtasks로 잘 분해됨."
+		},
+		{
+			"taskId": 10,
+			"taskTitle": "style-copy/page.tsx 신규 생성",
+			"complexityScore": 7,
+			"recommendedSubtasks": 0,
+			"expansionPrompt": "이미 5개 세부 작업으로 잘 분해된 태스크입니다. 추가 분해가 필요하지 않습니다.",
+			"reasoning": "신규 페이지 생성, 히스토리 목록, 이미지 업로드(DnD), GenerationOptions, API 호출. Task 5,7 의존성, 여러 컴포넌트 통합과 파일 업로드 처리가 복잡도 높임. 이미 5개 subtasks로 잘 분해됨."
+		},
+		{
+			"taskId": 11,
+			"taskTitle": "sketch-to-real/page.tsx 개선 (부자재 보존 자동 활성화)",
+			"complexityScore": 4,
+			"recommendedSubtasks": 0,
+			"expansionPrompt": "이미 5개 세부 작업으로 잘 분해된 태스크입니다. 추가 분해가 필요하지 않습니다.",
+			"reasoning": "기존 페이지 수정, accessoryPreservation 기본값 true 설정, 프롬프트 자동 적용. Task 5,7 의존성, 간단한 설정 변경이나 스케치 실사화 도메인 지식 필요. 이미 5개 subtasks로 잘 분해됨."
+		},
+		{
+			"taskId": 12,
+			"taskTitle": "체크박스 및 텍스트에어리어 UI 컴포넌트 생성",
+			"complexityScore": 4,
+			"recommendedSubtasks": 0,
+			"expansionPrompt": "이미 5개 세부 작업으로 잘 분해된 태스크입니다. 추가 분해가 필요하지 않습니다.",
+			"reasoning": "2개 shadcn/ui 스타일 컴포넌트 생성, React 19.x + Tailwind 4.x + ARIA 접근성. 표준 UI 컴포넌트이나 디자인 시스템 일관성과 접근성 요구사항이 추가 작업. 이미 5개 subtasks로 잘 분해됨."
+		},
+		{
+			"taskId": 13,
+			"taskTitle": "통합 테스트 및 커버리지 검증",
+			"complexityScore": 9,
+			"recommendedSubtasks": 1,
+			"expansionPrompt": "API 통합 테스트, E2E 테스트, 커버리지 설정, CI 블로킹, Test Pyramid 최적화 중 E2E 테스트와 커버리지 85% 달성을 위한 추가 세부 테스트 케이스 분해를 고려하세요. Critical path(스타일 복사, 부자재 보존 등)별 테스트 스위트 생성.",
+			"reasoning": "Jest/supertest/Playwright 통합, Test Pyramid 준수, 85% 커버리지, CI 블로킹 설정. 모든 태스크 종합 검증으로 가장 복잡하고 중요. E2E 시각 검증과 커버리지 최적화가 고난도 작업. 1개 추가 subtask 권장."
+		}
+	]
+}
