@@ -52,7 +52,7 @@ const editRoutes: FastifyPluginAsync = async (fastify) => {
       const originalBase64 = originalBuffer.toString('base64');
 
       // Gemini API로 부분 수정
-      const editedImages = await geminiService.generateEdit(originalBase64, body.prompt);
+      const editResult = await geminiService.generateEdit(originalBase64, body.prompt);
 
       // 새 생성 기록 저장
       const newGeneration = await prisma.generation.create({
@@ -73,12 +73,12 @@ const editRoutes: FastifyPluginAsync = async (fastify) => {
       });
 
       // 수정된 이미지 저장 (첫 번째 이미지를 선택 상태로 설정)
-      for (let i = 0; i < editedImages.length; i++) {
+      for (let i = 0; i < editResult.images.length; i++) {
         const result = await uploadService.saveGeneratedImage(
           user.id,
           generation.projectId,
           newGeneration.id,
-          editedImages[i],
+          editResult.images[i],
           i
         );
 

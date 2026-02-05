@@ -137,6 +137,11 @@ IMPORTANT: 위 규칙은 필수입니다. 절대 위반하지 마세요.
         signatures.push(this.extractSignatures(response));
       } catch (error) {
         console.error(`이미지 생성 ${i + 1} 실패:`, error);
+        // 에러 발생 시에도 빈 시그니처를 추가하여 배열 길이 동기화
+        signatures.push({
+          imageSignatures: [],
+          createdAt: new Date(),
+        });
       }
     }
 
@@ -209,6 +214,11 @@ IMPORTANT: 위 규칙은 필수입니다. 절대 위반하지 마세요.
         signatures.push(this.extractSignatures(response));
       } catch (error) {
         console.error(`이미지 생성 ${i + 1} 실패:`, error);
+        // 에러 발생 시에도 빈 시그니처를 추가하여 배열 길이 동기화
+        signatures.push({
+          imageSignatures: [],
+          createdAt: new Date(),
+        });
       }
     }
 
@@ -223,10 +233,7 @@ IMPORTANT: 위 규칙은 필수입니다. 절대 위반하지 마세요.
    * 부분 수정 생성
    * 이미지 편집은 chat 모드 사용 권장 (가이드 참조)
    */
-  async generateEdit(
-    originalImageBase64: string,
-    editPrompt: string
-  ): Promise<Buffer[]> {
+  async generateEdit(originalImageBase64: string, editPrompt: string): Promise<GenerationResult> {
     const systemPrompt = `당신은 이미지 편집 전문가입니다.
 주어진 이미지에서 사용자가 요청한 부분만 수정하고, 나머지는 절대 변경하지 마세요.
 수정 요청: ${editPrompt}
@@ -253,7 +260,13 @@ IMPORTANT: 위 규칙은 필수입니다. 절대 위반하지 마세요.
         throw new Error('이미지 편집에 실패했습니다');
       }
 
-      return images;
+      // 시그니처 추출
+      const signature = this.extractSignatures(response);
+
+      return {
+        images,
+        signatures: [signature],
+      };
     } catch (error) {
       console.error('이미지 편집 실패:', error);
       throw new Error('이미지 편집에 실패했습니다');
@@ -317,11 +330,14 @@ IMPORTANT: 위 규칙은 필수입니다. 절대 위반하지 마세요.
     newParts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }>
   ): Array<{
     role: 'user' | 'model';
-    parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string }; thoughtSignature?: string }>;
+    parts: Array<{
+      text?: string;
+      inlineData?: { mimeType: string; data: string };
+      thoughtSignature?: string;
+    }>;
   }> {
     const textSignature = this.ensureSignature(signatures.textSignature);
-    const imageSignature =
-      signatures.imageSignatures[0] || this.signatureBypass;
+    const imageSignature = signatures.imageSignatures[0] || this.signatureBypass;
 
     return [
       {
@@ -486,9 +502,7 @@ ${lines.join('\n')}
     return { items };
   }
 
-  private parseHardwareSpecLine(
-    line: string
-  ): HardwareSpec['items'][number] | null {
+  private parseHardwareSpecLine(line: string): HardwareSpec['items'][number] | null {
     const type = this.detectHardwareType(line);
     const cleaned = line.replace(/^[^:：]+[:：]\s*/, '').trim();
     const payload = cleaned || line;
