@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/stores/auth.store';
@@ -46,18 +46,42 @@ export default function GenerationResultPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
+  // Interval 관리를 위한 ref
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  // 경쟁 조건 방지를 위한 로딩 플래그
+  const isLoadingRef = useRef(false);
+
   /**
    * 생성 상태 조회
    */
   const fetchGeneration = useCallback(async () => {
-    if (!accessToken) return;
+    // 이미 요청 중이거나 토큰이 없으면 중단
+    if (!accessToken || isLoadingRef.current) return;
 
+    isLoadingRef.current = true;
     try {
       const response = await fetch(`${API_URL}/api/generations/${genId}`, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
       });
+
+      // 401 에러 시 자동 로그아웃 및 로그인 페이지 리다이렉트
+      if (response.status === 401) {
+        console.error('인증 실패: 자동 로그아웃 처리');
+        setIsPolling(false);
+        // 인증 정보 클리어
+        const { logout } = useAuthStore.getState();
+        logout();
+        // 로그인 페이지로 리다이렉트
+        router.push('/login');
+        return;
+      }
+
+      // 기타 HTTP 에러 처리
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
 
       const data = await response.json();
 
@@ -79,23 +103,46 @@ export default function GenerationResultPage() {
       }
     } catch (error) {
       console.error('생성 상태 조회 실패:', error);
-      // 401 에러 또는 네트워크 에러 시 polling 중지
-      if (error instanceof Error && error.message.includes('인증')) {
+
+      // 인증 에러, 네트워크 에러 등 심각한 에러 시 폴링 중지
+      if (
+        error instanceof Error &&
+        (error.message.includes('인증') ||
+          error.message.includes('401') ||
+          error.message.includes('Network'))
+      ) {
         setIsPolling(false);
       }
+    } finally {
+      // 로딩 플래그 해제
+      isLoadingRef.current = false;
     }
-  }, [accessToken, genId, isPolling]);
+  }, [accessToken, genId, router]);
 
   // 폴링
   useEffect(() => {
+    // 기존 interval 정리
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+
     if (!authLoading && isAuthenticated) {
+      // 즉시 한 번 실행
       fetchGeneration();
 
+      // 새 interval 시작
       if (isPolling) {
-        const interval = setInterval(fetchGeneration, 2000);
-        return () => clearInterval(interval);
+        intervalRef.current = setInterval(fetchGeneration, 2000);
       }
     }
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
   }, [authLoading, isAuthenticated, isPolling, fetchGeneration]);
 
   // 인증 체크
