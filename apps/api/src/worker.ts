@@ -5,6 +5,31 @@ import { uploadService } from './services/upload.service.js';
 import { generationService } from './services/generation.service.js';
 import type { GenerationJobData } from './lib/queue.js';
 import type { ThoughtSignatureData } from '@mockup-ai/shared/types';
+import fs from 'fs';
+
+// #region agent log
+const logPath =
+  process.env.NODE_ENV === 'production'
+    ? '/app/data/debug.log'
+    : '/Users/sangwopark19/icons/icons-ai-mockup/.cursor/debug.log';
+const log = (hypothesisId: string, location: string, message: string, data: any) => {
+  try {
+    const entry =
+      JSON.stringify({
+        sessionId: 'debug-session',
+        runId: 'server-runtime',
+        hypothesisId,
+        location,
+        message,
+        data,
+        timestamp: Date.now(),
+      }) + '\n';
+    fs.appendFileSync(logPath, entry);
+  } catch (e) {
+    // 로그 실패는 무시
+  }
+};
+// #endregion agent log
 
 const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every((item) => typeof item === 'string');
@@ -30,7 +55,8 @@ const parseThoughtSignatures = (value: unknown): ThoughtSignatureData[] => {
     if (!isStringArray(record.imageSignatures)) continue;
     const createdAt = parseDate(record.createdAt);
     if (!createdAt) continue;
-    const textSignature = typeof record.textSignature === 'string' ? record.textSignature : undefined;
+    const textSignature =
+      typeof record.textSignature === 'string' ? record.textSignature : undefined;
     parsed.push({
       textSignature,
       imageSignatures: record.imageSignatures,
@@ -49,6 +75,14 @@ const generationWorker = new Worker<GenerationJobData>(
   async (job: Job<GenerationJobData>) => {
     const { generationId, userId, projectId, mode, options } = job.data;
     console.log(`🚀 생성 작업 시작: ${generationId}`);
+
+    // #region agent log
+    log('H4', 'worker.ts:job:start', '작업 시작', {
+      generationId,
+      jobId: job.id,
+      attemptsMade: job.attemptsMade,
+    });
+    // #endregion agent log
 
     try {
       // 상태를 processing으로 업데이트
@@ -215,6 +249,14 @@ const generationWorker = new Worker<GenerationJobData>(
       const message = error instanceof Error ? error.message : '알 수 없는 오류';
       console.error(`❌ 생성 작업 실패: ${generationId}`, error);
 
+      // #region agent log
+      log('H4', 'worker.ts:job:error', '작업 실패', {
+        generationId,
+        errorMessage: message,
+        attemptsMade: job.attemptsMade,
+      });
+      // #endregion agent log
+
       await generationService.updateStatus(generationId, 'failed', message);
       throw error;
     }
@@ -225,14 +267,24 @@ const generationWorker = new Worker<GenerationJobData>(
   }
 );
 
-
 // 이벤트 핸들러
 generationWorker.on('completed', (job) => {
   console.log(`Job ${job.id} completed`);
+  // #region agent log
+  log('H4', 'worker.ts:completed', '작업 완료', {
+    jobId: job.id,
+  });
+  // #endregion agent log
 });
 
 generationWorker.on('failed', (job, err) => {
   console.error(`Job ${job?.id} failed:`, err);
+  // #region agent log
+  log('H4', 'worker.ts:failed', '작업 실패 (이벤트)', {
+    jobId: job?.id,
+    errorMessage: err.message,
+  });
+  // #endregion agent log
 });
 
 console.log('🔧 Worker 프로세스 시작됨');

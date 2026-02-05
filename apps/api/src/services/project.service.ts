@@ -1,5 +1,30 @@
 import { prisma } from '../lib/prisma.js';
 import type { Project } from '@prisma/client';
+import fs from 'fs';
+
+// #region agent log
+const logPath =
+  process.env.NODE_ENV === 'production'
+    ? '/app/data/debug.log'
+    : '/Users/sangwopark19/icons/icons-ai-mockup/.cursor/debug.log';
+const log = (hypothesisId: string, location: string, message: string, data: any) => {
+  try {
+    const entry =
+      JSON.stringify({
+        sessionId: 'debug-session',
+        runId: 'server-runtime',
+        hypothesisId,
+        location,
+        message,
+        data,
+        timestamp: Date.now(),
+      }) + '\n';
+    fs.appendFileSync(logPath, entry);
+  } catch (e) {
+    // 로그 실패는 무시
+  }
+};
+// #endregion agent log
 
 /**
  * 프로젝트 생성 입력 타입
@@ -33,13 +58,38 @@ export class ProjectService {
    * 프로젝트 생성
    */
   async create(userId: string, input: CreateProjectInput): Promise<Project> {
-    return prisma.project.create({
-      data: {
-        userId,
-        name: input.name,
-        description: input.description || null,
-      },
+    // #region agent log
+    log('H3', 'project.service.ts:create:start', '프로젝트 생성 시작', {
+      userId,
+      name: input.name,
     });
+    // #endregion agent log
+
+    try {
+      const project = await prisma.project.create({
+        data: {
+          userId,
+          name: input.name,
+          description: input.description || null,
+        },
+      });
+
+      // #region agent log
+      log('H3', 'project.service.ts:create:success', '프로젝트 생성 성공', {
+        projectId: project.id,
+      });
+      // #endregion agent log
+
+      return project;
+    } catch (error) {
+      // #region agent log
+      log('H3', 'project.service.ts:create:error', '프로젝트 생성 실패', {
+        errorMessage: error instanceof Error ? error.message : 'unknown',
+        errorName: error instanceof Error ? error.name : 'unknown',
+      });
+      // #endregion agent log
+      throw error;
+    }
   }
 
   /**
@@ -117,11 +167,7 @@ export class ProjectService {
   /**
    * 프로젝트 수정
    */
-  async update(
-    id: string,
-    userId: string,
-    input: UpdateProjectInput
-  ): Promise<Project | null> {
+  async update(id: string, userId: string, input: UpdateProjectInput): Promise<Project | null> {
     // 소유권 확인
     const existing = await this.findById(id, userId);
     if (!existing) return null;
