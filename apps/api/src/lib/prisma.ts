@@ -11,16 +11,23 @@ const globalForPrisma = globalThis as unknown as {
 
 /**
  * Prisma 클라이언트 생성
- * 
+ *
  * 장시간 실행 시 연결 문제 방지를 위한 설정:
  * - datasourceUrl에 connection_limit, pool_timeout, connect_timeout 추가
  * - PostgreSQL idle connection timeout 대응
  */
 function createPrismaClient() {
-  // DATABASE_URL에 연결 풀 파라미터 추가
-  const baseUrl = process.env.DATABASE_URL || '';
+  // DATABASE_URL 필수 체크
+  const baseUrl = process.env.DATABASE_URL;
+  if (!baseUrl) {
+    throw new Error(
+      'DATABASE_URL 환경 변수가 설정되지 않았습니다. ' +
+        '.env 파일을 확인하거나 환경 변수를 설정해주세요.'
+    );
+  }
+
   const url = new URL(baseUrl);
-  
+
   // 연결 풀 설정 추가 (기존 파라미터 유지)
   url.searchParams.set('connection_limit', '10'); // API 서버당 최대 10개 연결
   url.searchParams.set('pool_timeout', '20'); // 20초 후 타임아웃
@@ -32,10 +39,7 @@ function createPrismaClient() {
         url: url.toString(),
       },
     },
-    log:
-      process.env.NODE_ENV === 'development'
-        ? ['query', 'error', 'warn']
-        : ['error'],
+    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
   });
 }
 
