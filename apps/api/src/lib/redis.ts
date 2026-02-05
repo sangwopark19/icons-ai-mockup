@@ -1,55 +1,38 @@
 import Redis from 'ioredis';
 import { config } from '../config/index.js';
-import fs from 'fs';
-
-// #region agent log
-const logPath =
-  process.env.NODE_ENV === 'production'
-    ? '/app/data/debug.log'
-    : '/Users/sangwopark19/icons/icons-ai-mockup/.cursor/debug.log';
-const log = (hypothesisId: string, location: string, message: string, data: any) => {
-  try {
-    const entry =
-      JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'server-runtime',
-        hypothesisId,
-        location,
-        message,
-        data,
-        timestamp: Date.now(),
-      }) + '\n';
-    fs.appendFileSync(logPath, entry);
-  } catch (e) {
-    // 로그 실패는 무시
-  }
-};
-// #endregion agent log
 
 /**
  * Redis 클라이언트 싱글톤
+ * 
+ * 장시간 실행 시 연결 안정성을 위한 설정:
+ * - keepAlive: TCP keepalive 활성화
+ * - retryStrategy: 지수 백오프로 재연결
+ * - maxRetriesPerRequest: null (BullMQ 권장)
  */
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const globalForRedis = globalThis as unknown as { redis: any };
-
-// #region agent log
-log('H5', 'redis.ts:init', 'Redis 클라이언트 초기화', {
-  redisUrl: config.redisUrl.replace(/:\/\/[^@]*@/, '://***@'), // 비밀번호 마스킹
-});
-// #endregion agent log
 
 export const redis =
   globalForRedis.redis ??
   new (Redis as any)(config.redisUrl, {
     maxRetriesPerRequest: null, // BullMQ 권장 설정
     enableReadyCheck: false,
-    // #region agent log
+    // 재연결 전략: 지수 백오프 (최대 2초)
     retryStrategy: (times: number) => {
-      log('H5', 'redis.ts:retry', 'Redis 재연결 시도', { times });
-      return Math.min(times * 50, 2000);
+      const delay = Math.min(times * 50, 2000);
+      console.log(`🔄 Redis 재연결 시도 ${times}회 (${delay}ms 후)`);
+      return delay;
     },
-    // #endregion agent log
+    // TCP keepalive 활성화 (idle connection 유지)
+    keepAlive: 30000, // 30초마다 keepalive 패킷 전송
+    // 연결 타임아웃
+    connectTimeout: 10000, // 10초
+    // 명령어 타임아웃
+    commandTimeout: 5000, // 5초
+    // 자동 재연결
+    autoResubscribe: true,
+    autoResendUnfulfilledCommands: true,
   });
 
 if (process.env.NODE_ENV !== 'production') {
@@ -59,24 +42,35 @@ if (process.env.NODE_ENV !== 'production') {
 // 연결 이벤트 로깅
 redis.on('connect', () => {
   console.log('✅ Redis 연결 성공');
-  // #region agent log
-  log('H5', 'redis.ts:connect:success', 'Redis 연결 성공', {});
-  // #endregion agent log
+});
+
+redis.on('ready', () => {
+  console.log('✅ Redis 준비 완료');
 });
 
 redis.on('error', (error: Error) => {
-  console.error('❌ Redis 연결 에러:', error.message);
-  // #region agent log
-  log('H5', 'redis.ts:connect:error', 'Redis 연결 에러', {
-    errorMessage: error.message,
-  });
-  // #endregion agent log
+  console.error('❌ Redis 에러:', error.message);
 });
 
-// #region agent log
-redis.on('reconnecting', () => {
-  log('H5', 'redis.ts:reconnecting', 'Redis 재연결 중', {});
+redis.on('close', () => {
+  console.warn('⚠️ Redis 연결 종료');
 });
-// #endregion agent log
+
+redis.on('reconnecting', (delay: number) => {
+  console.log(`🔄 Redis 재연결 중 (${delay}ms 후)`);
+});
+
+/**
+ * Graceful shutdown 시 연결 정리
+ */
+process.on('SIGINT', async () => {
+  await redis.quit();
+  console.log('Redis 연결 종료');
+});
+
+process.on('SIGTERM', async () => {
+  await redis.quit();
+  console.log('Redis 연결 종료');
+});
 
 export default redis;
