@@ -59,32 +59,14 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           isLoading: false,
         }),
 
-      logout: () => {
-        // #region 에이전트 로그
-        if (typeof window !== 'undefined') {
-          fetch('http://127.0.0.1:7242/ingest/f337c984-557e-42d9-83cb-8dbe96bc791f', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              location: 'auth.store.ts:64',
-              message: 'logout 호출됨',
-              data: {},
-              timestamp: Date.now(),
-              sessionId: 'debug-session',
-              hypothesisId: 'H3,H5',
-              runId: 'debug-1',
-            }),
-          }).catch(() => {});
-        }
-        // #endregion 에이전트 로그
+      logout: () =>
         set({
           user: null,
           accessToken: null,
           refreshToken: null,
           isAuthenticated: false,
           isLoading: false,
-        });
-      },
+        }),
 
       setLoading: (isLoading) => set({ isLoading }),
     }),
