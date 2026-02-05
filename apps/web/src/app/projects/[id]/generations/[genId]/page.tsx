@@ -52,6 +52,22 @@ export default function GenerationResultPage() {
   const fetchGeneration = useCallback(async () => {
     if (!accessToken) return;
 
+    // #region 에이전트 로그
+    fetch('http://127.0.0.1:7242/ingest/f337c984-557e-42d9-83cb-8dbe96bc791f', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        location: 'page.tsx:56',
+        message: 'fetchGeneration 시작',
+        data: { hasToken: Boolean(accessToken), genId },
+        timestamp: Date.now(),
+        sessionId: 'debug-session',
+        hypothesisId: 'H1',
+        runId: 'debug-1',
+      }),
+    }).catch(() => {});
+    // #endregion 에이전트 로그
+
     try {
       const response = await fetch(`${API_URL}/api/generations/${genId}`, {
         headers: {
@@ -59,7 +75,44 @@ export default function GenerationResultPage() {
         },
       });
 
+      // #region 에이전트 로그
+      fetch('http://127.0.0.1:7242/ingest/f337c984-557e-42d9-83cb-8dbe96bc791f', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          location: 'page.tsx:65',
+          message: 'API 응답 수신',
+          data: { status: response.status, ok: response.ok },
+          timestamp: Date.now(),
+          sessionId: 'debug-session',
+          hypothesisId: 'H1,H4',
+          runId: 'debug-1',
+        }),
+      }).catch(() => {});
+      // #endregion 에이전트 로그
+
       const data = await response.json();
+
+      // #region 에이전트 로그
+      fetch('http://127.0.0.1:7242/ingest/f337c984-557e-42d9-83cb-8dbe96bc791f', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          location: 'page.tsx:70',
+          message: 'JSON 파싱 완료',
+          data: {
+            success: data.success,
+            status: data.data?.status,
+            imageCount: data.data?.images?.length,
+          },
+          timestamp: Date.now(),
+          sessionId: 'debug-session',
+          hypothesisId: 'H4',
+          runId: 'debug-1',
+        }),
+      }).catch(() => {});
+      // #endregion 에이전트 로그
+
       if (data.success) {
         setGeneration(data.data);
 
@@ -73,22 +126,138 @@ export default function GenerationResultPage() {
 
         // 완료되면 폴링 중지
         if (data.data.status === 'completed' || data.data.status === 'failed') {
+          // #region 에이전트 로그
+          fetch('http://127.0.0.1:7242/ingest/f337c984-557e-42d9-83cb-8dbe96bc791f', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              location: 'page.tsx:87',
+              message: '완료 상태 감지 - polling 중지',
+              data: { status: data.data.status },
+              timestamp: Date.now(),
+              sessionId: 'debug-session',
+              hypothesisId: 'H1,H4',
+              runId: 'debug-1',
+            }),
+          }).catch(() => {});
+          // #endregion 에이전트 로그
           setIsPolling(false);
         }
+      } else {
+        // #region 에이전트 로그
+        fetch('http://127.0.0.1:7242/ingest/f337c984-557e-42d9-83cb-8dbe96bc791f', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            location: 'page.tsx:93',
+            message: '응답 success=false',
+            data: { error: data.error },
+            timestamp: Date.now(),
+            sessionId: 'debug-session',
+            hypothesisId: 'H1',
+            runId: 'debug-1',
+          }),
+        }).catch(() => {});
+        // #endregion 에이전트 로그
       }
     } catch (error) {
+      // #region 에이전트 로그
+      fetch('http://127.0.0.1:7242/ingest/f337c984-557e-42d9-83cb-8dbe96bc791f', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          location: 'page.tsx:100',
+          message: 'catch 블록 진입 - polling 상태 확인',
+          data: {
+            errorMsg: error instanceof Error ? error.message : 'unknown',
+            isPollingBefore: isPolling,
+          },
+          timestamp: Date.now(),
+          sessionId: 'debug-session',
+          hypothesisId: 'H1',
+          runId: 'debug-1',
+        }),
+      }).catch(() => {});
+      // #endregion 에이전트 로그
       console.error('생성 상태 조회 실패:', error);
+      // 401 에러 또는 네트워크 에러 시 polling 중지
+      if (error instanceof Error && error.message.includes('인증')) {
+        // #region 에이전트 로그
+        fetch('http://127.0.0.1:7242/ingest/f337c984-557e-42d9-83cb-8dbe96bc791f', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            location: 'page.tsx:107',
+            message: '인증 에러 감지 - polling 중지',
+            data: {},
+            timestamp: Date.now(),
+            sessionId: 'debug-session',
+            hypothesisId: 'H1',
+            runId: 'debug-1',
+          }),
+        }).catch(() => {});
+        // #endregion 에이전트 로그
+        setIsPolling(false);
+      }
     }
-  }, [accessToken, genId]);
+  }, [accessToken, genId, isPolling]);
 
   // 폴링
   useEffect(() => {
+    // #region 에이전트 로그
+    fetch('http://127.0.0.1:7242/ingest/f337c984-557e-42d9-83cb-8dbe96bc791f', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        location: 'page.tsx:85',
+        message: 'polling useEffect 실행',
+        data: { authLoading, isAuthenticated, isPolling },
+        timestamp: Date.now(),
+        sessionId: 'debug-session',
+        hypothesisId: 'H3',
+        runId: 'debug-1',
+      }),
+    }).catch(() => {});
+    // #endregion 에이전트 로그
+
     if (!authLoading && isAuthenticated) {
       fetchGeneration();
 
       if (isPolling) {
+        // #region 에이전트 로그
+        fetch('http://127.0.0.1:7242/ingest/f337c984-557e-42d9-83cb-8dbe96bc791f', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            location: 'page.tsx:93',
+            message: 'polling interval 시작 (2초)',
+            data: {},
+            timestamp: Date.now(),
+            sessionId: 'debug-session',
+            hypothesisId: 'H1,H3',
+            runId: 'debug-1',
+          }),
+        }).catch(() => {});
+        // #endregion 에이전트 로그
         const interval = setInterval(fetchGeneration, 2000);
-        return () => clearInterval(interval);
+        return () => {
+          // #region 에이전트 로그
+          fetch('http://127.0.0.1:7242/ingest/f337c984-557e-42d9-83cb-8dbe96bc791f', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              location: 'page.tsx:99',
+              message: 'polling interval 정리',
+              data: {},
+              timestamp: Date.now(),
+              sessionId: 'debug-session',
+              hypothesisId: 'H1,H3',
+              runId: 'debug-1',
+            }),
+          }).catch(() => {});
+          // #endregion 에이전트 로그
+          clearInterval(interval);
+        };
       }
     }
   }, [authLoading, isAuthenticated, isPolling, fetchGeneration]);

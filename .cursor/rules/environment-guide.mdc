@@ -1,0 +1,166 @@
+---
+description: 로컬 개발 환경과 프로덕션 서버 환경 구분 가이드
+alwaysApply: true
+---
+
+# 환경 구분 가이드
+
+이 프로젝트는 **2개의 독립적인 환경**에서 실행됩니다. 반드시 환경을 구분하여 작업하세요.
+
+## 🖥️ 환경 구분
+
+### 1️⃣ 로컬 개발 환경 (현재 컴퓨터)
+
+**위치**: `/Users/sangwopark19/icons/icons-ai-mockup/`  
+**용도**: 코드 작성, 수정, 테스트, 커밋  
+**Docker**: 실행 안 함 (코드만 존재)
+
+#### 가능한 작업
+- ✅ 코드 읽기/수정/저장
+- ✅ Git 커밋/푸시
+- ✅ 파일 탐색
+- ✅ 린트 확인
+
+#### 불가능한 작업
+- ❌ Docker 명령어 (컨테이너 없음)
+- ❌ 서버 로그 확인
+- ❌ 런타임 디버깅
+- ❌ 실제 앱 테스트
+
+### 2️⃣ 프로덕션 서버 (iconsui-MacStudio)
+
+**위치**: 별도의 Mac Studio 서버  
+**용도**: 실제 앱 실행, 사용자 서비스  
+**Docker**: 실행 중 (API, Worker, DB, Redis, Web)
+
+#### 가능한 작업
+- ✅ Docker 명령어 실행
+- ✅ 서버 로그 확인
+- ✅ 컨테이너 재시작
+- ✅ 런타임 디버깅
+- ✅ 실제 앱 테스트
+
+#### 불가능한 작업
+- ❌ 코드 직접 수정 (Git pull로만 코드 업데이트)
+
+---
+
+## 🔄 작업 흐름
+
+### 코드 수정 시
+```
+1. [로컬] 코드 수정
+2. [로컬] 테스트 (가능하면)
+3. [로컬] Git 커밋 & 푸시
+4. [서버] Git pull
+5. [서버] Docker restart
+6. [서버] 로그 확인 & 테스트
+```
+
+### 버그 디버깅 시
+```
+1. [서버] 로그 확인 → 에러 메시지 복사
+2. [로컬] 코드 분석 & 수정
+3. [로컬] Git 커밋 & 푸시
+4. [서버] Git pull & Docker restart
+5. [서버] 수정 확인
+```
+
+---
+
+## 📋 명령어 가이드
+
+### 로컬 개발 환경에서 실행
+
+```bash
+# Git 작업
+git status
+git diff
+git add .
+git commit -m "메시지"
+git push origin v2
+
+# 코드 탐색
+ls -la apps/api/src/
+cat apps/api/src/server.ts
+
+# 린트 확인
+cd apps/api && pnpm lint
+```
+
+### 서버 환경에서 실행 (SSH 접속 후)
+
+```bash
+# 코드 업데이트
+cd icons-ai-mockup
+git pull origin v2
+
+# Docker 관리
+docker compose ps                    # 컨테이너 상태
+docker compose logs api --tail=100   # API 로그
+docker compose logs worker --tail=50 # Worker 로그
+docker compose restart api worker    # 재시작
+
+# 실시간 로그 모니터링
+docker compose logs -f api
+docker compose logs -f worker
+
+# DB 직접 접속
+docker compose exec postgres psql -U user -d mockup
+```
+
+---
+
+## ⚠️ 주의사항
+
+### 1. 로컬에서 Docker 명령어 실행 금지
+로컬에서 `docker compose` 명령어 실행 시:
+```
+❌ permission denied while trying to connect to the Docker daemon socket
+```
+
+**이유**: 로컬에는 Docker가 실행되지 않음  
+**해결**: 서버에 SSH로 접속해서 실행
+
+### 2. 서버에서 코드 직접 수정 금지
+서버에서 `vim`, `nano` 등으로 코드 수정하지 말 것
+
+**이유**: Git 히스토리 관리 안 됨, 충돌 가능  
+**해결**: 로컬에서 수정 → 커밋 → 푸시 → 서버에서 pull
+
+### 3. 환경 확인 필수
+작업 전 반드시 어느 환경인지 확인:
+
+```bash
+# 로컬: workspace path 확인
+pwd  # /Users/sangwopark19/icons/icons-ai-mockup/
+
+# 서버: hostname 확인
+hostname  # iconsui-MacStudio
+```
+
+---
+
+## 🔍 디버깅 체크리스트
+
+에러 발생 시 다음 순서로 확인:
+
+- [ ] **어느 환경에서 발생?** (로컬 vs 서버)
+- [ ] **서버 로그 확인** (`docker compose logs`)
+- [ ] **컨테이너 상태 확인** (`docker compose ps`)
+- [ ] **로컬에서 코드 분석**
+- [ ] **로컬에서 수정 & 커밋**
+- [ ] **서버에 배포** (git pull + restart)
+- [ ] **서버에서 검증**
+
+---
+
+## 💡 빠른 참조
+
+| 작업 | 환경 | 명령어 |
+|------|------|--------|
+| 코드 수정 | 로컬 | 직접 편집 |
+| 커밋/푸시 | 로컬 | `git add . && git commit && git push` |
+| 로그 확인 | 서버 | `docker compose logs {service}` |
+| 재시작 | 서버 | `docker compose restart {service}` |
+| 코드 배포 | 서버 | `git pull && docker compose restart` |
