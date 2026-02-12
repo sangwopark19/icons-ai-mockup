@@ -5,8 +5,9 @@
 
 | 항목 | 내용 |
 |------|------|
-| 문서 버전 | 1.0 |
+| 문서 버전 | 1.1 |
 | 작성일 | 2026-01-07 |
+| 최종 업데이트 | 2026-02-12 |
 | 상태 | Draft |
 
 ---
@@ -38,7 +39,7 @@ flowchart TB
     UploadB --> SetOptions
     
     SetOptions --> Generate[목업 생성]
-    Generate --> Loading[로딩 화면]
+    Generate --> Loading[로딩 화면<br/>2초 간격 폴링]
     Loading --> Result[결과 확인<br/>2장]
     
     Result --> SelectOne[1장 선택]
@@ -49,8 +50,7 @@ flowchart TB
     NeedEdit -->|No| Save[히스토리 저장]
     
     Save --> Download{다운로드?}
-    Download -->|Yes| Upscale[2K 업스케일]
-    Upscale --> DownloadFile[파일 다운로드]
+    Download -->|Yes| DownloadFile[1K 파일 다운로드<br/>🚧 2K 업스케일 구현 예정]
     Download -->|No| Continue{계속 작업?}
     DownloadFile --> Continue
     
@@ -114,7 +114,7 @@ flowchart LR
 | 9 | 수정 | "재질만 매트하게" 입력 | 부분 수정 처리 | 기대 |
 | 10 | 결과 | 수정 결과 확인 | 수정된 이미지 표시 | 만족 |
 | 11 | 저장 | "저장" 버튼 클릭 | 히스토리에 저장 완료 | 안도 |
-| 12 | 다운로드 | "2K 다운로드" 클릭 | 업스케일 후 다운로드 | 완료감 |
+| 12 | 다운로드 | "다운로드" 클릭 | 1K 즉시 다운로드 (🚧 2K 업스케일 구현 예정) | 완료감 |
 
 ---
 
@@ -186,22 +186,29 @@ flowchart LR
 
 ### 2.3 Journey C: 히스토리 관리
 
-**시나리오**: 이전에 생성한 목업을 불러와 IP만 변경하여 재사용
+**시나리오**: 이전에 생성한 목업을 불러와 재사용 또는 수정
 
 ```mermaid
 flowchart TB
     Start[프로젝트 히스토리 열기] --> Browse[저장된 목업 탐색]
     Browse --> Select[마음에 드는 목업 선택]
     Select --> Action{액션 선택}
-    
-    Action -->|수정| Edit[부분 수정]
-    Action -->|재사용| Reuse[IP 변경하여 재생성]
-    Action -->|다운로드| Download[2K 다운로드]
-    Action -->|삭제| Delete[히스토리에서 삭제]
-    
+
+    Action -->|1. 다운로드| Download[1K 다운로드]
+    Action -->|2. ✏️ 부분 수정| Edit[부분 수정]
+    Action -->|3. 📚 히스토리에 저장| AlreadySaved[이미 저장됨]
+    Action -->|4. 🎨 스타일 복사 IP| StyleIP[IP 변경 모드]
+    Action -->|5. 🧩 스타일 복사 새제품| StyleSketch[스케치 실사화 모드]
+    Action -->|6. 🔁 동일 조건 재생성| Regenerate[재생성]
+    Action -->|7. 🛠️ 조건 수정| ModifyRegenerate[조건 수정 후 재생성]
+
     Edit --> Save[저장]
-    Reuse --> NewUpload[새 IP 이미지 업로드]
-    NewUpload --> Generate[생성]
+    StyleIP --> NewUpload[새 이미지 업로드]
+    StyleSketch --> NewUpload
+    NewUpload --> Generate[스타일 적용 생성]
+    Regenerate --> Generate
+    ModifyRegenerate --> ModifyOptions[옵션 수정]
+    ModifyOptions --> Generate
     Generate --> Result[결과 확인]
 ```
 
@@ -276,24 +283,32 @@ flowchart TB
 ```mermaid
 flowchart TB
     Request[생성 요청] --> Queue[작업 큐 등록]
-    Queue --> Process[Gemini API 호출]
-    
-    Process --> Status{처리 상태}
-    Status -->|진행중| Loading[로딩 화면<br/>진행률 표시]
-    Loading --> Status
-    
-    Status -->|성공| Success[결과 이미지 2장]
-    Status -->|실패| Retry{재시도?}
-    
-    Retry -->|Yes - 자동| Process
-    Retry -->|No - 3회 초과| Fail[에러 화면]
-    
+    Queue --> Redirect[결과 페이지 리다이렉트]
+    Redirect --> Poll[2초 간격 폴링 시작]
+
+    Poll --> Status{처리 상태}
+    Status -->|pending| Wait[대기 중...]
+    Wait --> Poll
+    Status -->|processing| Loading[생성 중...<br/>진행 표시]
+    Loading --> Poll
+
+    Status -->|completed| Success[결과 이미지 2장 표시]
+    Status -->|failed| Fail[에러 화면]
+    Status -->|401 Unauthorized| Logout[자동 로그아웃]
+
     Success --> Display[결과 화면]
     Fail --> Recover[다시 시도 버튼]
+    Logout --> LoginPage[로그인 페이지]
     Recover --> Request
 ```
 
 #### 로딩 화면 상태
+
+**폴링 로직**:
+- 생성 요청 후 즉시 결과 페이지로 리다이렉트
+- 2초 간격으로 서버에 상태 조회 (GET /api/generations/:id)
+- 상태 변화: `pending` → `processing` → `completed` / `failed`
+- 401 Unauthorized 에러 시 자동 로그아웃 처리
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -302,7 +317,8 @@ flowchart TB
 │                                                     │
 │           ████████████░░░░░░░░░░░░  45%            │
 │                                                     │
-│              예상 소요 시간: 약 20초                  │
+│              상태: processing                        │
+│              2초마다 자동 갱신 중...                  │
 │                                                     │
 │         ─────────────────────────────               │
 │                                                     │
@@ -318,27 +334,35 @@ flowchart TB
 
 ```mermaid
 flowchart TB
-    Selected[선택된 이미지] --> EditRequest[부분 수정 요청]
-    EditRequest --> Input[수정 프롬프트 입력]
-    
+    Selected[선택된 이미지] --> EditBtn[✏️ 부분 수정 버튼]
+    EditBtn --> Input[수정 프롬프트 입력]
+
     Input --> Examples{예시}
     Examples --> Ex1["재질만 매트하게"]
     Examples --> Ex2["색상을 빨간색으로"]
     Examples --> Ex3["캐릭터 크기 10% 축소"]
-    
-    Ex1 --> Process
-    Ex2 --> Process
-    Ex3 --> Process
-    Input --> Process[수정 처리]
-    
-    Process --> Compare[원본과 비교 표시]
+
+    Ex1 --> Submit
+    Ex2 --> Submit
+    Ex3 --> Submit
+    Input --> Submit[수정 요청 제출]
+
+    Submit --> Queue[작업 큐 등록]
+    Queue --> Poll[2초 간격 폴링]
+    Poll --> Status{상태}
+    Status -->|processing| Poll
+    Status -->|completed| Compare[원본과 비교 표시]
+    Status -->|failed| Error[에러 메시지]
+
     Compare --> Confirm{만족?}
-    
+
     Confirm -->|Yes| Save[저장]
     Confirm -->|No| Revert{되돌리기?}
-    
+
     Revert -->|원본으로| Selected
     Revert -->|재수정| Input
+    Error --> Retry[다시 시도]
+    Retry --> Input
 ```
 
 #### 부분 수정 UI
@@ -378,18 +402,48 @@ flowchart TB
 ```mermaid
 flowchart TB
     Image[선택된 이미지] --> DownloadBtn[다운로드 버튼]
-    DownloadBtn --> Options{해상도 선택}
-    
-    Options -->|원본 1K| Direct[즉시 다운로드]
-    Options -->|2K 업스케일| Upscale[업스케일 처리]
-    
-    Upscale --> Loading[업스케일 중...<br/>약 10초]
-    Loading --> Ready[완료]
-    Ready --> Download[다운로드 시작]
-    
-    Direct --> Download
-    Download --> Complete[다운로드 완료 알림]
+    DownloadBtn --> Direct[1K 즉시 다운로드]
+    Direct --> Complete[다운로드 완료 알림]
+
+    Note[🚧 2K 업스케일 다운로드<br/>구현 예정]
+
+    style Note fill:#fff3cd,stroke:#856404
 ```
+
+---
+
+### 3.5 스타일 복사 플로우
+
+```mermaid
+flowchart TB
+    Result[기존 생성 결과] --> StyleBtn[스타일 복사 버튼 클릭]
+    StyleBtn --> ModeSelect{모드 선택}
+
+    ModeSelect -->|🎨 IP 변경| IPMode[IP 변경 작업 시작]
+    ModeSelect -->|🧩 새 제품| SketchMode[스케치 실사화 시작]
+
+    IPMode --> UploadIP[원본+캐릭터 업로드]
+    SketchMode --> UploadSketch[스케치 업로드]
+
+    UploadIP --> ApplyStyle[thoughtSignature 적용]
+    UploadSketch --> ApplyStyle
+
+    ApplyStyle --> Generate[스타일 기반 생성]
+    Generate --> Poll[2초 간격 폴링]
+    Poll --> NewResult[새 결과 (동일 스타일)]
+```
+
+#### 스타일 복사 동작 방식
+
+**스타일 복사는 기존 생성 결과의 "느낌"을 새로운 작업에 적용합니다:**
+
+1. **thoughtSignature 저장**: Gemini API가 이미지 생성 시 만든 내부 메타데이터
+2. **스타일 적용**: 새 작업에 동일한 thoughtSignature를 참조하여 생성
+3. **결과**: 색감, 분위기, 표현 방식이 유사한 새 이미지
+
+**예시**:
+- A 제품에서 생성한 "파스텔 톤, 귀여운 느낌" → B 제품에 동일 스타일 적용
+- 마음에 드는 배경 분위기 → 다른 제품에도 동일한 배경 스타일 사용
 
 ---
 
@@ -400,13 +454,15 @@ flowchart TB
 ```mermaid
 flowchart TB
     Error[에러 발생] --> Type{에러 유형}
-    
+
+    Type -->|401 Unauthorized| AuthFail[세션 만료<br/>자동 로그아웃]
     Type -->|네트워크| Network[연결 확인 메시지<br/>+ 재시도 버튼]
     Type -->|API 한도| RateLimit[잠시 후 재시도 안내<br/>+ 남은 시간 표시]
     Type -->|생성 실패| GenFail[자동 재시도 3회<br/>→ 수동 재시도 안내]
     Type -->|파일 오류| FileFail[파일 형식/크기<br/>오류 안내]
     Type -->|서버 오류| ServerFail[고객센터 문의 안내<br/>+ 에러 코드]
-    
+
+    AuthFail --> Login[로그인 페이지]
     Network --> Retry[재시도]
     RateLimit --> Wait[대기]
     GenFail --> Retry
@@ -418,6 +474,7 @@ flowchart TB
 
 | 에러 코드 | 사용자 메시지 | 액션 버튼 |
 |-----------|---------------|-----------|
+| AUTH_401 | 세션이 만료되었습니다. 다시 로그인해주세요 | [로그인 페이지로] |
 | NET_001 | 인터넷 연결을 확인해주세요 | [다시 시도] |
 | API_429 | 요청이 많아요. 30초 후 다시 시도해주세요 | [자동 재시도: 30s] |
 | GEN_001 | 이미지 생성에 실패했어요. 다시 시도할까요? | [다시 생성] |
@@ -527,12 +584,15 @@ stateDiagram-v2
 6. "투명 배경" 옵션 체크
 7. "생성하기" 클릭 → 25초 대기
 8. 2장 결과물 중 왼쪽 이미지 선택
-9. "손잡이 색상만 검정으로" 부분 수정 요청
-10. 수정된 결과 확인 후 저장
-11. 2K 해상도로 다운로드
-12. 선임에게 결과물 공유
+9. "✏️ 부분 수정" 클릭 → "손잡이 색상만 검정으로" 입력
+10. 수정 완료 대기 (2초 간격 폴링)
+11. 수정된 결과 확인 후 "📚 히스토리에 저장"
+12. "다운로드" 버튼으로 1K 이미지 다운로드
+13. 선임에게 결과물 공유
 
 소요시간: 약 3분
+
+**참고**: 🚧 2K 업스케일 다운로드는 구현 예정
 ```
 
 ### 시나리오 2: 경력 디자이너의 배치 작업
@@ -542,11 +602,12 @@ stateDiagram-v2
 
 1. 기존 프로젝트 "2026 봄 텀블러 라인업" 선택
 2. 히스토리에서 잘 나온 "미니언즈 텀블러" 목업 선택
-3. "이 형식으로 IP만 변경" 클릭
+3. "🎨 스타일 복사 (IP 변경)" 클릭
 4. 새 캐릭터 IP (스폰지밥) 업로드
-5. 동일 옵션으로 빠르게 생성
-6. 결과 확인 후 바로 저장
-7. 다른 IP (뽀로로)로 반복...
+5. thoughtSignature 기반으로 동일 스타일 적용 생성
+6. 2초 간격 폴링으로 결과 대기
+7. 결과 확인 후 "📚 히스토리에 저장"
+8. 다른 IP (뽀로로)로 "🔁 동일 조건 재생성" 반복...
 
 1개 IP당 소요시간: 약 1분
 ```

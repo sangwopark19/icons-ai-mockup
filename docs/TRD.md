@@ -7,7 +7,8 @@
 |------|------|
 | 문서 버전 | 1.0 |
 | 작성일 | 2026-01-07 |
-| 상태 | Draft |
+| 최종 업데이트 | 2026-02-12 |
+| 상태 | Final |
 
 ---
 
@@ -21,34 +22,37 @@ flowchart TB
         Browser[웹 브라우저]
         NextJS[Next.js Frontend]
     end
-    
+
     subgraph server [Application Layer - Mac Local Server]
-        API[Node.js/Fastify API Server]
+        API[API Server<br/>server.ts<br/>REST API]
+        Worker[Worker Process<br/>worker.ts<br/>작업 처리]
         Queue[BullMQ Job Queue]
         Redis[(Redis)]
         Sharp[Sharp - 리사이징/썸네일]
-        ESRGAN[Real-ESRGAN ncnn<br/>로컬 업스케일러]
+        ESRGAN[🚧 Real-ESRGAN ncnn<br/>구현 예정]
     end
-    
+
     subgraph external [External Services]
-        Gemini[Gemini 3 Pro Image API]
+        Gemini[Gemini 3 Pro Image API<br/>gemini-3-pro-image-preview]
     end
-    
+
     subgraph storage [Data Layer]
         DB[(PostgreSQL)]
         FS[Local Filesystem<br/>이미지 저장소]
     end
-    
+
     Browser --> NextJS
     NextJS -->|REST API| API
-    API --> Queue
+    API -->|작업 등록| Queue
     Queue --> Redis
-    Queue -->|이미지 생성 요청| Gemini
-    Queue -->|업스케일 요청| ESRGAN
+    Worker -->|작업 수신| Queue
+    Worker -->|이미지 생성 요청| Gemini
+    Worker -->|🚧 업스케일 요청| ESRGAN
     Gemini -->|생성된 이미지| FS
     ESRGAN -->|업스케일 이미지| FS
     API --> DB
-    API --> Sharp
+    Worker --> DB
+    Worker --> Sharp
     Sharp --> FS
     API --> FS
 ```
@@ -59,27 +63,28 @@ flowchart TB
 flowchart LR
     subgraph docker [Docker Compose]
         Web[web<br/>Next.js:3000]
-        Api[api<br/>Node.js:4000]
-        Worker[worker<br/>Job Processor + Sharp]
+        Api[api<br/>server.ts:4000]
+        Worker[worker<br/>worker.ts<br/>BullMQ + Sharp]
         PG[(postgres<br/>:5432)]
         RD[(redis<br/>:6379)]
     end
-    
+
     Web --> Api
     Api --> PG
     Api --> RD
     Worker --> RD
+    Worker --> PG
 ```
 
 ---
 
 ## 2. 기술 스택
 
-> **Note**: 2026-01-07 기준 Context7 공식문서 확인 완료
-> 
+> **Note**: 2026-02-12 기준 Context7 공식문서 확인 완료
+>
 > **호환성 매트릭스**:
 > - Next.js 16 → Node.js 20.9+ 필수, TypeScript 5.1+
-> - Prisma 7 → Node.js 20.19+ 필수, TypeScript 5.4+
+> - Prisma 6.2.0 → Node.js 18.x+ 필수, TypeScript 5.0+
 > - Fastify 5 → Node.js 20+ 필수
 > - Tailwind CSS 4 → Node.js 20+ 필수
 > - BullMQ → Redis 6.2+ 권장
@@ -91,7 +96,7 @@ flowchart LR
 |----------|------|------|------|
 | Framework | Next.js | 16.x | React 기반 풀스택 프레임워크 (App Router) |
 | Runtime | React | 19.x | UI 라이브러리 (Next.js 16 기본 포함) |
-| Language | TypeScript | 5.9.x | 타입 안정성 (Prisma 7 요구: 5.4+) |
+| Language | TypeScript | 5.9.x | 타입 안정성 (Prisma 6 요구: 5.0+) |
 | Styling | Tailwind CSS | 4.x | 유틸리티 기반 스타일링 (@tailwindcss/vite) |
 | UI Components | shadcn/ui | latest | 재사용 가능한 UI 컴포넌트 (OKLCH 색상) |
 | State Management | Zustand | 5.x | 경량 상태 관리 (useShallow 훅 사용) |
@@ -104,14 +109,15 @@ flowchart LR
 
 | 카테고리 | 기술 | 버전 | 용도 |
 |----------|------|------|------|
-| Runtime | Node.js | 22.x LTS | JavaScript 런타임 (Prisma 7: 20.19+ 필수) |
-| Framework | Fastify | 5.x | 고성능 웹 프레임워크 (listen 옵션 객체 필수) |
+| Runtime | Node.js | 22.x LTS | JavaScript 런타임 |
+| Framework | Fastify | 5.1.0 | 고성능 웹 프레임워크 (listen 옵션 객체 필수) |
 | Language | TypeScript | 5.9.x | 타입 안정성 |
-| ORM | Prisma | 7.x | 데이터베이스 ORM |
+| ORM | Prisma | 6.2.0 | 데이터베이스 ORM |
 | Validation | Zod | 4.x | 요청/응답 유효성 검사 |
-| Job Queue | BullMQ | 5.x | 비동기 작업 처리 |
+| Job Queue | BullMQ | 5.31.0 | 비동기 작업 처리 (Worker 프로세스, 동시성: 2) |
 | Auth | JWT + bcrypt | - | 인증/인가 |
 | File Upload | @fastify/multipart | - | 멀티파트 파일 업로드 |
+| AI SDK | @google/genai | 1.0.0 | Gemini API 클라이언트 |
 
 ### 2.3 데이터베이스 및 캐시
 
@@ -122,13 +128,13 @@ flowchart LR
 
 ### 2.4 AI 및 이미지 처리
 
-| 카테고리 | 기술 | 용도 |
-|----------|------|------|
-| Image Generation | Gemini 3 Pro Image Preview API | 목업 이미지 생성 |
-| Upscaling | Real-ESRGAN ncnn (로컬) | AI 기반 이미지 업스케일링 (1K → 2K+) |
-| Image Processing | Sharp | 이미지 리사이징, 포맷 변환, 썸네일 생성 |
+| 카테고리 | 기술 | 버전 | 용도 | 상태 |
+|----------|------|------|------|------|
+| Image Generation | Gemini 3 Pro Image Preview API | gemini-3-pro-image-preview | 목업 이미지 생성 (2K, 2개 출력, thoughtSignature 저장) | ✅ 구현 |
+| Image Processing | Sharp | 0.33.5 | 이미지 리사이징, 포맷 변환, 썸네일 생성 | ✅ 구현 |
+| Upscaling | Real-ESRGAN ncnn (로컬) | latest | AI 기반 이미지 업스케일링 (1K → 2K+) | 🚧 구현 예정 |
 
-> **Note**: Real-ESRGAN ncnn은 Vulkan/Metal 백엔드를 통해 M1/M2 Mac에서 GPU 가속을 지원합니다.
+> **Note**: Real-ESRGAN ncnn은 Vulkan/Metal 백엔드를 통해 M1/M2 Mac에서 GPU 가속을 지원합니다. (구현 예정)
 
 ### 2.5 인프라
 
@@ -214,13 +220,21 @@ interface GeminiConfig {
 
 // 생성 요청 타입
 interface GenerationRequest {
-  mode: 'ip-change' | 'sketch-to-real';
-  sourceImage: Buffer;           // 원본 제품 이미지 또는 스케치
-  characterImage?: Buffer;       // IP 캐릭터 이미지 (mode: ip-change)
-  referenceTexture?: Buffer;     // 참조 질감 이미지 (선택)
-  prompt: string;                // 추가 프롬프트
-  preserveStructure: boolean;    // 구조 우선 여부
-  transparentBackground: boolean; // 투명 배경 여부
+  mode: 'ip_change' | 'sketch_to_real';
+  sourceImage: Buffer;                // 원본 제품 이미지 또는 스케치
+  characterImage?: Buffer;            // IP 캐릭터 이미지 (mode: ip_change)
+  referenceTexture?: Buffer;          // 참조 질감 이미지 (선택)
+  options: {
+    // ✅ 실제 구현된 옵션
+    preserveStructure?: boolean;      // 구조 우선 여부
+    transparentBackground?: boolean;  // 투명 배경 여부
+    preserveHardware?: boolean;       // 하드웨어 구조 유지
+    fixedBackground?: boolean;        // 배경 고정
+    fixedViewpoint?: boolean;         // 시점 고정
+    removeShadows?: boolean;          // 그림자 제거
+    userInstructions?: string;        // 사용자 추가 지시사항
+    hardwareSpecs?: string;           // 하드웨어 스펙 설명
+  };
 }
 
 // 생성 응답 타입
@@ -229,9 +243,12 @@ interface GenerationResponse {
     data: Buffer;
     mimeType: string;
   }>;
+  thoughtSignatures: string[];        // 스타일 참조용 메타데이터 (저장 필수)
   metadata: {
     processingTime: number;
-    model: string;
+    model: 'gemini-3-pro-image-preview';
+    imageSize: '2K';
+    outputCount: 2;
   };
 }
 ```
@@ -343,9 +360,11 @@ flowchart LR
         └── {characterId}.png
 ```
 
-### 5.3 Real-ESRGAN ncnn 업스케일러
+### 5.3 🚧 Real-ESRGAN ncnn 업스케일러 (구현 예정)
 
 > Real-ESRGAN ncnn은 Vulkan/Metal 백엔드를 통해 M1/M2 Mac에서 GPU 가속을 지원하는 고성능 업스케일러입니다.
+>
+> **현재 상태**: 구현 예정. 아래는 향후 구현 계획입니다.
 
 #### 설치 (macOS)
 
@@ -544,19 +563,44 @@ const QUEUE_PRIORITY = {
 ### 6.2 작업 처리 워커
 
 ```typescript
-// 워커 설정
-const worker = new Worker('mockup-queue', async (job) => {
-  switch (job.data.type) {
-    case JobType.GENERATE_MOCKUP:
-      return await processGeneration(job.data);
-    case JobType.UPSCALE_IMAGE:
-      return await processUpscale(job.data);
-    case JobType.REMOVE_BACKGROUND:
-      return await processRemoveBackground(job.data);
+// 워커 설정 (worker.ts)
+const worker = new Worker('generation', async (job) => {
+  const { generationId, userId, mode } = job.data;
+
+  // 1. 상태 업데이트 (processing)
+  await prisma.generation.update({
+    where: { id: generationId },
+    data: { status: 'processing' },
+  });
+
+  try {
+    // 2. Gemini API 호출
+    const response = await generateImage(mode, job.data);
+
+    // 3. thoughtSignature 저장 (중요!)
+    await prisma.generation.update({
+      where: { id: generationId },
+      data: {
+        thoughtSignatures: response.thoughtSignatures,
+        status: 'completed',
+      },
+    });
+
+    // 4. 생성 이미지 저장
+    await saveGeneratedImages(generationId, response.images);
+  } catch (error) {
+    // 에러 처리
+    await prisma.generation.update({
+      where: { id: generationId },
+      data: {
+        status: 'failed',
+        errorMessage: error.message,
+      },
+    });
   }
 }, {
   connection: redisConnection,
-  concurrency: 3,  // 동시 처리 수
+  concurrency: 2,  // 동시 처리 수
   limiter: {
     max: 10,       // 분당 최대 요청
     duration: 60000,
@@ -829,7 +873,7 @@ const BCRYPT_ROUNDS = 12;
 ### 10.2 동시성
 
 - 동시 사용자: 5~20명
-- 동시 생성 작업: 최대 3개
+- 동시 생성 작업: 최대 2개 (Worker concurrency: 2)
 - 큐 대기 작업: 최대 100개
 
 ### 10.3 저장소

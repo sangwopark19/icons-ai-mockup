@@ -5,8 +5,9 @@
 
 | 항목 | 내용 |
 |------|------|
-| 문서 버전 | 1.0 |
+| 문서 버전 | 1.1 |
 | 작성일 | 2026-01-07 |
+| 최종 업데이트 | 2026-02-12 |
 | 상태 | Draft |
 
 ---
@@ -219,9 +220,154 @@ if (!result.success) {
 
 ---
 
-## 4. React / Next.js 패턴
+## 4. Worker 프로세스 실행
 
-### 4.1 컴포넌트 구조
+### 4.1 개발 환경에서 Worker 실행
+
+API 서버와 Worker는 별도의 프로세스로 실행됩니다:
+
+```bash
+# API 서버 실행 (터미널 1)
+cd apps/api && pnpm dev
+
+# Worker 별도 실행 (터미널 2)
+pnpm dev:worker
+# 또는
+cd apps/api && pnpm dev:worker
+```
+
+Worker는 BullMQ를 사용하여 이미지 생성 작업을 비동기로 처리합니다.
+
+---
+
+## 5. Gemini API 사용 규칙
+
+### 5.1 필수 패키지
+
+**반드시 `@google/genai` 패키지를 사용합니다:**
+
+```typescript
+// ✅ 올바른 사용
+import { GoogleGenAI } from '@google/genai';
+
+// ❌ 사용 금지 (deprecated)
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleAIFileManager } from '@google/generative-ai';
+```
+
+### 5.2 모델 선택
+
+```typescript
+// 이미지 생성 (IP 변경, 스케치 실사화)
+const model = 'gemini-3-pro-image-preview';
+
+// 복잡한 추론이 필요한 경우
+const model = 'gemini-3-pro-preview';
+
+// 간단한 작업
+const model = 'gemini-3-flash-preview';
+```
+
+### 5.3 thoughtSignature 저장
+
+**중요**: Gemini API 응답의 `thoughtSignature`는 반드시 데이터베이스에 저장해야 합니다.
+
+```typescript
+const response = await ai.models.generateContent({
+  model: 'gemini-3-pro-image-preview',
+  contents: [...],
+});
+
+// thoughtSignature 추출 및 저장
+const thoughtSignatures = response.candidates?.map(c => c.thoughtSignature).filter(Boolean);
+
+await prisma.generation.update({
+  where: { id: generationId },
+  data: {
+    thoughtSignatures: thoughtSignatures, // JSON 필드에 저장
+  },
+});
+```
+
+이 데이터는 스타일 참조(Style Copy) 기능에서 재사용됩니다.
+
+---
+
+## 6. BullMQ 작업 큐 패턴
+
+### 6.1 작업 추가 (API 서버)
+
+```typescript
+// API 라우트에서 작업 추가
+import { generationQueue } from '@/lib/queue';
+
+// 작업 큐에 추가
+await generationQueue.add('generation', {
+  generationId: generation.id,
+  userId: request.user.id,
+  mode: generation.mode,
+  // ...기타 작업 데이터
+});
+
+// 즉시 응답 반환 (비동기 처리)
+return reply.code(201).send({
+  success: true,
+  data: generation,
+});
+```
+
+### 6.2 작업 처리 (Worker)
+
+```typescript
+// worker.ts
+import { Worker } from 'bullmq';
+import { redisConnection } from '@/lib/redis';
+
+const worker = new Worker('generation', async (job) => {
+  const { generationId, mode } = job.data;
+
+  // 1. 상태 업데이트 (processing)
+  await prisma.generation.update({
+    where: { id: generationId },
+    data: { status: 'processing' },
+  });
+
+  try {
+    // 2. 이미지 로드 및 Base64 변환
+    const images = await loadImages(job.data);
+
+    // 3. Gemini API 호출
+    const response = await generateImage(mode, images);
+
+    // 4. 생성 이미지 저장
+    await saveGeneratedImages(generationId, response);
+
+    // 5. 상태 업데이트 (completed)
+    await prisma.generation.update({
+      where: { id: generationId },
+      data: { status: 'completed' },
+    });
+  } catch (error) {
+    // 에러 처리 및 상태 업데이트 (failed)
+    await prisma.generation.update({
+      where: { id: generationId },
+      data: {
+        status: 'failed',
+        errorMessage: error.message,
+      },
+    });
+  }
+}, {
+  connection: redisConnection,
+  concurrency: 2, // 동시 처리 작업 수
+});
+```
+
+---
+
+## 7. React / Next.js 패턴
+
+### 7.1 컴포넌트 구조
 
 ```typescript
 // 권장 컴포넌트 구조
@@ -263,7 +409,7 @@ export function ProjectCard({ project, onSelect }: ProjectCardProps) {
 }
 ```
 
-### 4.2 커스텀 훅
+### 7.2 커스텀 훅
 
 ```typescript
 // hooks/useProjects.ts
@@ -289,7 +435,7 @@ export function useCreateProject() {
 }
 ```
 
-### 4.3 Server Components vs Client Components
+### 7.3 Server Components vs Client Components
 
 ```typescript
 // 기본: Server Component (데이터 페칭)
@@ -311,9 +457,9 @@ export function ProjectList({ projects }: Props) {
 
 ---
 
-## 5. API 설계 규칙
+## 8. API 설계 규칙
 
-### 5.1 RESTful 엔드포인트
+### 8.1 RESTful 엔드포인트
 
 ```typescript
 // 리소스 기반 URL
@@ -332,7 +478,7 @@ POST   /api/generations/:id/select
 POST   /api/images/:id/upscale
 ```
 
-### 5.2 응답 형식
+### 8.2 응답 형식
 
 ```typescript
 // 성공 응답
@@ -364,7 +510,105 @@ interface PaginatedResponse<T> {
 }
 ```
 
-### 5.3 Fastify 라우트 예시
+### 8.3 실제 API 응답 예시
+
+#### 프로젝트 생성
+```typescript
+POST /api/projects
+Response:
+{
+  "success": true,
+  "data": {
+    "id": "cm123abc",
+    "name": "새 프로젝트",
+    "description": "테스트 프로젝트",
+    "userId": "user123",
+    "createdAt": "2026-02-12T10:00:00.000Z",
+    "updatedAt": "2026-02-12T10:00:00.000Z"
+  }
+}
+```
+
+#### 이미지 생성 (IP 변경)
+```typescript
+POST /api/projects/:projectId/generations
+Body:
+{
+  "mode": "ip_change",
+  "originalImageId": "img123",
+  "ipCharacterId": "char456"
+}
+
+Response:
+{
+  "success": true,
+  "data": {
+    "id": "gen789",
+    "projectId": "cm123abc",
+    "mode": "ip_change",
+    "status": "pending",
+    "createdAt": "2026-02-12T10:01:00.000Z"
+  }
+}
+```
+
+#### 생성 결과 조회 (Polling)
+```typescript
+GET /api/generations/:generationId
+
+// 처리 중
+{
+  "success": true,
+  "data": {
+    "id": "gen789",
+    "status": "processing",
+    "generatedImages": []
+  }
+}
+
+// 완료
+{
+  "success": true,
+  "data": {
+    "id": "gen789",
+    "status": "completed",
+    "generatedImages": [
+      {
+        "id": "result1",
+        "imageUrl": "/uploads/generations/gen789/result1.png",
+        "isSelected": false
+      },
+      {
+        "id": "result2",
+        "imageUrl": "/uploads/generations/gen789/result2.png",
+        "isSelected": false
+      }
+    ]
+  }
+}
+```
+
+#### 이미지 업스케일 (🚧 구현 예정)
+```typescript
+POST /api/images/:imageId/upscale
+Body:
+{
+  "scale": 2
+}
+
+Response:
+{
+  "success": true,
+  "data": {
+    "id": "upscaled123",
+    "originalImageId": "result1",
+    "scale": 2,
+    "status": "pending"
+  }
+}
+```
+
+### 8.4 Fastify 라우트 예시
 
 ```typescript
 // routes/projects.ts
@@ -406,9 +650,9 @@ export default projectRoutes;
 
 ---
 
-## 6. 에러 처리
+## 9. 에러 처리
 
-### 6.1 에러 클래스
+### 9.1 에러 클래스
 
 ```typescript
 // errors/AppError.ts
@@ -444,7 +688,7 @@ export class UnauthorizedError extends AppError {
 }
 ```
 
-### 6.2 에러 핸들링 미들웨어
+### 9.2 에러 핸들링 미들웨어
 
 ```typescript
 // middlewares/errorHandler.ts
@@ -496,9 +740,9 @@ export function errorHandler(
 
 ---
 
-## 7. 테스트 전략
+## 10. 테스트 전략
 
-### 7.1 테스트 구조
+### 10.1 테스트 구조
 
 ```
 __tests__/
@@ -511,7 +755,7 @@ __tests__/
     └── flows/
 ```
 
-### 7.2 테스트 네이밍
+### 10.2 테스트 네이밍
 
 ```typescript
 // 단위 테스트
@@ -539,9 +783,9 @@ describe('POST /api/projects', () => {
 
 ---
 
-## 8. Git 컨벤션
+## 11. Git 컨벤션
 
-### 8.1 브랜치 전략
+### 11.1 브랜치 전략
 
 ```
 main           # 프로덕션 브랜치
@@ -553,7 +797,7 @@ main           # 프로덕션 브랜치
 └── hotfix/critical-bug         # 긴급 수정
 ```
 
-### 8.2 커밋 메시지
+### 11.2 커밋 메시지
 
 ```
 <type>(<scope>): <subject>
@@ -585,9 +829,9 @@ Closes #123
 
 ---
 
-## 9. ESLint / Prettier 설정
+## 12. ESLint / Prettier 설정
 
-### 9.1 ESLint
+### 12.1 ESLint
 
 ```javascript
 // .eslintrc.js
@@ -613,7 +857,7 @@ module.exports = {
 };
 ```
 
-### 9.2 Prettier
+### 12.2 Prettier
 
 ```json
 {
@@ -628,9 +872,9 @@ module.exports = {
 
 ---
 
-## 10. 주석 규칙
+## 13. 주석 규칙
 
-### 10.1 주석 언어
+### 13.1 주석 언어
 
 **모든 주석은 한글로 작성합니다.**
 
@@ -652,7 +896,7 @@ async function upscaleImage(imageId: string, scale: number) { }
 function checkAuth() { }
 ```
 
-### 10.2 TODO / FIXME
+### 13.2 TODO / FIXME
 
 ```typescript
 // TODO: 추후 배치 처리 기능 추가 필요

@@ -7,7 +7,8 @@
 |------|------|
 | 문서 버전 | 1.0 |
 | 작성일 | 2026-01-07 |
-| 상태 | Draft |
+| 최종 업데이트 | 2026-02-12 |
+| 상태 | Final |
 | 데이터베이스 | PostgreSQL 16.x |
 | ORM | Prisma 7.x |
 
@@ -19,16 +20,16 @@
 erDiagram
     User ||--o{ Project : "owns"
     User ||--o{ Session : "has"
-    
+
     Project ||--o{ IPCharacter : "contains"
     Project ||--o{ Generation : "contains"
-    
+
     Generation ||--o{ GeneratedImage : "produces"
     Generation }o--o| IPCharacter : "uses"
     Generation }o--o| GeneratedImage : "sourceImage"
-    
+    Generation }o--o| Generation : "styleReference"
+
     GeneratedImage ||--o{ ImageHistory : "tracks"
-    GeneratedImage ||--o| UpscaledImage : "upscales_to"
     
     User {
         uuid id PK
@@ -79,6 +80,9 @@ erDiagram
         text error_message
         timestamp created_at
         timestamp completed_at
+        jsonb thought_signatures
+        uuid style_reference_id FK
+        string user_instructions
     }
     
     GeneratedImage {
@@ -102,17 +106,6 @@ erDiagram
         string action
         jsonb changes
         string file_path
-        timestamp created_at
-    }
-    
-    UpscaledImage {
-        uuid id PK
-        uuid original_image_id FK
-        string file_path
-        integer scale
-        integer width
-        integer height
-        integer file_size
         timestamp created_at
     }
 ```
@@ -204,6 +197,9 @@ erDiagram
 | error_message | TEXT | | 에러 메시지 |
 | created_at | TIMESTAMP | NOT NULL, DEFAULT NOW() | 요청일시 |
 | completed_at | TIMESTAMP | | 완료일시 |
+| thought_signatures | JSONB | | Gemini 스타일 복제용 메타데이터 |
+| style_reference_id | UUID | FK → Generation.id (자기 참조) | 스타일 참조 생성 ID |
+| user_instructions | TEXT | | 사용자 지정 규칙 |
 
 **ENUM 정의:**
 
@@ -237,6 +233,7 @@ interface GenerationOptions {
 - `idx_generation_project` - project_id, created_at DESC
 - `idx_generation_status` - status (대기 중 작업 조회)
 - `idx_generation_character` - ip_character_id
+- `idx_generation_style_ref` - style_reference_id
 
 ---
 
@@ -295,24 +292,6 @@ CREATE TYPE image_type AS ENUM (
 **인덱스:**
 - `idx_history_image` - image_id, created_at DESC
 - `idx_history_parent` - parent_history_id
-
----
-
-### 2.8 UpscaledImage (업스케일 이미지)
-
-| 컬럼 | 타입 | 제약조건 | 설명 |
-|------|------|----------|------|
-| id | UUID | PK | 고유 식별자 |
-| original_image_id | UUID | FK → GeneratedImage.id, NOT NULL, UNIQUE | 원본 이미지 참조 |
-| file_path | VARCHAR(500) | NOT NULL | 업스케일 이미지 경로 |
-| scale | INTEGER | NOT NULL | 업스케일 배율 (2 = 2x) |
-| width | INTEGER | NOT NULL | 업스케일 후 너비 |
-| height | INTEGER | NOT NULL | 업스케일 후 높이 |
-| file_size | INTEGER | NOT NULL | 파일 크기 (bytes) |
-| created_at | TIMESTAMP | NOT NULL, DEFAULT NOW() | 생성일시 |
-
-**인덱스:**
-- `idx_upscaled_original` - original_image_id (UNIQUE)
 
 ---
 
@@ -427,14 +406,21 @@ model Generation {
   createdAt       DateTime         @default(now()) @map("created_at")
   completedAt     DateTime?        @map("completed_at")
 
-  project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  ipCharacter IPCharacter?     @relation(fields: [ipCharacterId], references: [id], onDelete: SetNull)
-  sourceImage GeneratedImage?  @relation("SourceImage", fields: [sourceImageId], references: [id], onDelete: SetNull)
-  images      GeneratedImage[] @relation("GenerationImages")
+  thoughtSignatures Json?   @map("thought_signatures")
+  styleReferenceId  String? @map("style_reference_id")
+  userInstructions  String? @map("user_instructions")
+
+  project        Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  ipCharacter    IPCharacter?     @relation(fields: [ipCharacterId], references: [id], onDelete: SetNull)
+  sourceImage    GeneratedImage?  @relation("SourceImage", fields: [sourceImageId], references: [id], onDelete: SetNull)
+  images         GeneratedImage[] @relation("GenerationImages")
+  styleReference Generation?      @relation("StyleReference", fields: [styleReferenceId], references: [id])
+  styleFollowers Generation[]     @relation("StyleReference")
 
   @@index([projectId, createdAt(sort: Desc)])
   @@index([status])
   @@index([ipCharacterId])
+  @@index([styleReferenceId])
   @@map("generations")
 }
 
@@ -463,10 +449,9 @@ model GeneratedImage {
   fileSize        Int       @map("file_size")
   createdAt       DateTime  @default(now()) @map("created_at")
 
-  generation           Generation      @relation("GenerationImages", fields: [generationId], references: [id], onDelete: Cascade)
-  usedAsSourceIn       Generation[]    @relation("SourceImage")
-  history              ImageHistory[]
-  upscaledImage        UpscaledImage?
+  generation     Generation      @relation("GenerationImages", fields: [generationId], references: [id], onDelete: Cascade)
+  usedAsSourceIn Generation[]    @relation("SourceImage")
+  history        ImageHistory[]
 
   @@index([generationId])
   @@index([generationId, isSelected])
@@ -490,22 +475,6 @@ model ImageHistory {
   @@index([imageId, createdAt(sort: Desc)])
   @@index([parentHistoryId])
   @@map("image_history")
-}
-
-// 업스케일 이미지
-model UpscaledImage {
-  id              String   @id @default(uuid())
-  originalImageId String   @unique @map("original_image_id")
-  filePath        String   @map("file_path")
-  scale           Int
-  width           Int
-  height          Int
-  fileSize        Int      @map("file_size")
-  createdAt       DateTime @default(now()) @map("created_at")
-
-  originalImage GeneratedImage @relation(fields: [originalImageId], references: [id], onDelete: Cascade)
-
-  @@map("upscaled_images")
 }
 ```
 
@@ -605,12 +574,16 @@ CREATE TABLE generations (
     retry_count INTEGER NOT NULL DEFAULT 0,
     error_message TEXT,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    completed_at TIMESTAMP
+    completed_at TIMESTAMP,
+    thought_signatures JSONB,
+    style_reference_id UUID REFERENCES generations(id),
+    user_instructions TEXT
 );
 
 CREATE INDEX idx_generation_project ON generations(project_id, created_at DESC);
 CREATE INDEX idx_generation_status ON generations(status);
 CREATE INDEX idx_generation_character ON generations(ip_character_id);
+CREATE INDEX idx_generation_style_ref ON generations(style_reference_id);
 
 -- Generated Images FK 추가
 ALTER TABLE generated_images 
@@ -633,20 +606,6 @@ CREATE TABLE image_history (
 
 CREATE INDEX idx_history_image ON image_history(image_id, created_at DESC);
 CREATE INDEX idx_history_parent ON image_history(parent_history_id);
-
--- Upscaled Images 테이블
-CREATE TABLE upscaled_images (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    original_image_id UUID NOT NULL UNIQUE REFERENCES generated_images(id) ON DELETE CASCADE,
-    file_path VARCHAR(500) NOT NULL,
-    scale INTEGER NOT NULL,
-    width INTEGER NOT NULL,
-    height INTEGER NOT NULL,
-    file_size INTEGER NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX idx_upscaled_original ON upscaled_images(original_image_id);
 
 -- Updated_at 자동 갱신 트리거
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -745,10 +704,10 @@ User (사용자)
       └── Generation (생성 기록) [1:N]
            ├── uses → IPCharacter [N:1, optional]
            ├── sourceImage → GeneratedImage [N:1, optional]
+           ├── styleReference → Generation [N:1, optional, self-reference]
            └── GeneratedImage (생성된 이미지) [1:N]
-                ├── ImageHistory (히스토리) [1:N]
-                │    └── parentHistory [self-reference]
-                └── UpscaledImage (업스케일) [1:1, optional]
+                └── ImageHistory (히스토리) [1:N]
+                     └── parentHistory [self-reference]
 ```
 
 ---
@@ -763,14 +722,12 @@ User (사용자)
 | sessions | 1,000 | 200B | 200KB |
 | projects | 200 | 500B | 100KB |
 | ip_characters | 500 | 300B | 150KB |
-| generations | 10,000 | 1KB | 10MB |
+| generations | 10,000 | 1.5KB | 15MB |
 | generated_images | 20,000 | 500B | 10MB |
 | image_history | 5,000 | 500B | 2.5MB |
-| upscaled_images | 2,000 | 300B | 600KB |
 
-**총 데이터베이스 크기**: 약 25MB
+**총 데이터베이스 크기**: 약 30MB
 
 **이미지 파일 저장소**:
 - 생성 이미지 (1K): 20,000 × 1.5MB = 30GB
-- 업스케일 이미지 (2K): 2,000 × 6MB = 12GB
-- **총 파일 저장소**: 약 50GB
+- **총 파일 저장소**: 약 30GB
