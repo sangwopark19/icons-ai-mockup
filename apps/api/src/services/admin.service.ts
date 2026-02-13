@@ -30,11 +30,8 @@ export class AdminService {
       processing: 0,
       completed: 0,
       failed: 0,
+      ...Object.fromEntries(statusGroups.map((g) => [g.status, g._count])),
     };
-
-    statusGroups.forEach((group) => {
-      generationsByStatus[group.status] = group._count;
-    });
 
     return {
       totalUsers,
@@ -82,7 +79,15 @@ export class AdminService {
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
-        include: {
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
+          lastLoginAt: true,
           _count: {
             select: {
               projects: true,
@@ -112,17 +117,30 @@ export class AdminService {
       throw new Error('자기 자신의 역할을 변경할 수 없습니다');
     }
 
-    // 마지막 관리자 제거 방지
-    if (role === 'user') {
-      const adminCount = await prisma.user.count({ where: { role: 'admin' } });
-      if (adminCount <= 1) {
-        throw new Error('최소 1명의 관리자가 필요합니다');
+    // 트랜잭션으로 race condition 방지
+    return prisma.$transaction(async (tx) => {
+      // 마지막 관리자 제거 방지
+      if (role === 'user') {
+        const adminCount = await tx.user.count({ where: { role: 'admin' } });
+        if (adminCount <= 1) {
+          throw new Error('최소 1명의 관리자가 필요합니다');
+        }
       }
-    }
 
-    return prisma.user.update({
-      where: { id: userId },
-      data: { role },
+      return tx.user.update({
+        where: { id: userId },
+        data: { role },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
+          lastLoginAt: true,
+        },
+      });
     });
   }
 
@@ -138,6 +156,16 @@ export class AdminService {
     return prisma.user.update({
       where: { id: userId },
       data: { isActive },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+        lastLoginAt: true,
+      },
     });
   }
 
@@ -150,25 +178,28 @@ export class AdminService {
       throw new Error('자기 자신을 삭제할 수 없습니다');
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
+    // 트랜잭션으로 race condition 방지
+    await prisma.$transaction(async (tx) => {
+      const user = await tx.user.findUnique({
+        where: { id: userId },
+      });
 
-    if (!user) {
-      throw new Error('사용자를 찾을 수 없습니다');
-    }
-
-    // 관리자 삭제 시 마지막 관리자 체크
-    if (user.role === 'admin') {
-      const adminCount = await prisma.user.count({ where: { role: 'admin' } });
-      if (adminCount <= 1) {
-        throw new Error('마지막 관리자는 삭제할 수 없습니다');
+      if (!user) {
+        throw new Error('사용자를 찾을 수 없습니다');
       }
-    }
 
-    // Cascade 삭제: Session, Project -> Generation -> GeneratedImage
-    await prisma.user.delete({
-      where: { id: userId },
+      // 관리자 삭제 시 마지막 관리자 체크
+      if (user.role === 'admin') {
+        const adminCount = await tx.user.count({ where: { role: 'admin' } });
+        if (adminCount <= 1) {
+          throw new Error('마지막 관리자는 삭제할 수 없습니다');
+        }
+      }
+
+      // Cascade 삭제: Session, Project -> Generation -> GeneratedImage
+      await tx.user.delete({
+        where: { id: userId },
+      });
     });
   }
 
