@@ -302,12 +302,12 @@ export default function UsersPage() {
         <div className="flex items-center gap-4 rounded-xl border border-[var(--border-default)] bg-[var(--bg-secondary)] px-6 py-4">
           <div className="flex items-center gap-2">
             <span className="text-sm text-[var(--text-tertiary)]">총</span>
-            <span className="text-2xl font-bold text-brand-500">{data.pagination.total}</span>
+            <span className="text-2xl font-bold text-brand-500">{data.data.total}</span>
             <span className="text-sm text-[var(--text-tertiary)]">명</span>
           </div>
           <div className="h-8 w-px bg-[var(--border-default)]" />
           <div className="text-sm text-[var(--text-secondary)]">
-            페이지 {data.pagination.page} / {data.pagination.totalPages}
+            페이지 {data.data.page} / {data.data.totalPages}
           </div>
         </div>
       )}
@@ -331,12 +331,12 @@ export default function UsersPage() {
         <>
           <DataTable
             columns={columns}
-            data={data.data}
+            data={data.data.users}
             emptyMessage="사용자가 없습니다"
           />
 
           {/* 페이지네이션 */}
-          {data.pagination.totalPages > 1 && (
+          {data.data.totalPages > 1 && (
             <div className="flex items-center justify-center gap-2">
               <Button
                 variant="secondary"
@@ -347,11 +347,11 @@ export default function UsersPage() {
                 이전
               </Button>
               <div className="flex items-center gap-1">
-                {Array.from({ length: data.pagination.totalPages }, (_, i) => i + 1)
+                {Array.from({ length: data.data.totalPages }, (_, i) => i + 1)
                   .filter(
                     (p) =>
                       p === 1 ||
-                      p === data.pagination.totalPages ||
+                      p === data.data.totalPages ||
                       Math.abs(p - page) <= 2
                   )
                   .map((p, idx, arr) => (
@@ -376,8 +376,8 @@ export default function UsersPage() {
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => setPage((p) => Math.min(data.pagination.totalPages, p + 1))}
-                disabled={page === data.pagination.totalPages}
+                onClick={() => setPage((p) => Math.min(data.data.totalPages, p + 1))}
+                disabled={page === data.data.totalPages}
               >
                 다음
               </Button>

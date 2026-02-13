@@ -442,7 +442,7 @@ export default function GenerationsPage() {
             onChange: setUserFilter,
             options: [
               { label: '전체 사용자', value: 'all' },
-              ...(usersData?.data || []).map((user) => ({
+              ...(usersData?.data.users || []).map((user) => ({
                 label: user.name,
                 value: user.id,
               })),

@@ -199,8 +199,13 @@ export const adminApi = {
 
     return request<{
       success: true;
-      data: AdminUser[];
-      pagination: { page: number; limit: number; total: number; totalPages: number };
+      data: {
+        users: AdminUser[];
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+      };
     }>(`/api/admin/users?${query}`, { token });
   },
 
@@ -266,19 +271,21 @@ export const adminApi = {
 
     return request<{
       success: true;
-      projects: Array<{
-        id: string;
-        name: string;
-        description: string | null;
-        createdAt: string;
-        updatedAt: string;
-        user: { id: string; email: string; name: string };
-        _count: { generations: number; characters: number };
-      }>;
-      total: number;
-      page: number;
-      limit: number;
-      totalPages: number;
+      data: {
+        projects: Array<{
+          id: string;
+          name: string;
+          description: string | null;
+          createdAt: string;
+          updatedAt: string;
+          user: { id: string; email: string; name: string };
+          _count: { generations: number; characters: number };
+        }>;
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+      };
     }>(`/api/admin/projects?${query}`, { token });
   },
 

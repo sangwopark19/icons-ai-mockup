@@ -261,7 +261,7 @@ export default function ProjectsPage() {
             onChange: setUserFilter,
             options: [
               { label: '전체 사용자', value: 'all' },
-              ...(usersData?.data || []).map((user) => ({
+              ...(usersData?.data.users || []).map((user) => ({
                 label: `${user.name} (${user.email})`,
                 value: user.id,
               })),
@@ -281,7 +281,7 @@ export default function ProjectsPage() {
                   총 프로젝트
                 </span>
                 <span className="text-3xl font-bold text-brand-500 tabular-nums">
-                  {formatNumber(data.total)}
+                  {formatNumber(data.data.total)}
                 </span>
               </div>
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-500/10">
@@ -298,7 +298,7 @@ export default function ProjectsPage() {
                   현재 페이지
                 </span>
                 <span className="text-3xl font-bold text-[var(--text-primary)] tabular-nums">
-                  {data.page} <span className="text-xl text-[var(--text-tertiary)]">/ {data.totalPages}</span>
+                  {data.data.page} <span className="text-xl text-[var(--text-tertiary)]">/ {data.data.totalPages}</span>
                 </span>
               </div>
             </div>
@@ -312,7 +312,7 @@ export default function ProjectsPage() {
                   표시 중
                 </span>
                 <span className="text-3xl font-bold text-[var(--text-primary)] tabular-nums">
-                  {data.projects.length}
+                  {data.data.projects.length}
                   <span className="text-xl text-[var(--text-tertiary)]"> / {limit}</span>
                 </span>
               </div>
@@ -343,12 +343,12 @@ export default function ProjectsPage() {
         <>
           <DataTable
             columns={columns}
-            data={data.projects}
+            data={data.data.projects}
             emptyMessage="프로젝트가 없습니다"
           />
 
           {/* 페이지네이션 */}
-          {data.totalPages > 1 && (
+          {data.data.totalPages > 1 && (
             <div className="flex items-center justify-center gap-2">
               <Button
                 variant="secondary"
@@ -359,11 +359,11 @@ export default function ProjectsPage() {
                 이전
               </Button>
               <div className="flex items-center gap-1">
-                {Array.from({ length: data.totalPages }, (_, i) => i + 1)
+                {Array.from({ length: data.data.totalPages }, (_, i) => i + 1)
                   .filter(
                     (p) =>
                       p === 1 ||
-                      p === data.totalPages ||
+                      p === data.data.totalPages ||
                       Math.abs(p - page) <= 2
                   )
                   .map((p, idx, arr) => (
@@ -388,8 +388,8 @@ export default function ProjectsPage() {
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
-                disabled={page === data.totalPages}
+                onClick={() => setPage((p) => Math.min(data.data.totalPages, p + 1))}
+                disabled={page === data.data.totalPages}
               >
                 다음
               </Button>
