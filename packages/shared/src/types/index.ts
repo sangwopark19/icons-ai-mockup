@@ -4,6 +4,9 @@ import { z } from 'zod';
 // 사용자 관련 타입
 // ===================
 
+export const UserRoleEnum = z.enum(['user', 'admin']);
+export type UserRole = z.infer<typeof UserRoleEnum>;
+
 export const UserSchema = z.object({
   id: z.string().uuid(),
   email: z.string().email(),
@@ -14,6 +17,33 @@ export const UserSchema = z.object({
 });
 
 export type User = z.infer<typeof UserSchema>;
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  isActive: boolean;
+  createdAt: Date;
+  lastLoginAt: Date | null;
+  _count?: {
+    projects: number;
+    sessions: number;
+  };
+}
+
+export interface AdminStats {
+  totalUsers: number;
+  totalProjects: number;
+  totalGenerations: number;
+  generationsByStatus: {
+    pending: number;
+    processing: number;
+    completed: number;
+    failed: number;
+  };
+  storageUsageBytes: number;
+}
 
 export const LoginRequestSchema = z.object({
   email: z.string().email('올바른 이메일 형식이 아닙니다'),

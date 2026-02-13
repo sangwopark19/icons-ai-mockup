@@ -55,7 +55,7 @@ services:
       dockerfile: apps/api/Dockerfile
     container_name: mockup-api
     ports:
-      - "100.69.75.47:4000:4000"  # 🔒 Tailscale VPN IP로만 바인딩
+      - "4000:4000"  # 로컬: localhost로 변경
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://user:password@postgres:5432/mockup?schema=public
@@ -117,7 +117,7 @@ services:
         - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://100.69.75.47:4000}
     container_name: mockup-web
     ports:
-      - "100.69.75.47:3000:3000"  # 🔒 Tailscale VPN IP로만 바인딩
+      - "3000:3000"  # 로컬: localhost로 변경
     depends_on:
       api:
         condition: service_healthy

@@ -38,6 +38,17 @@ async function authPlugin(fastify: FastifyInstance) {
           throw new Error('유효하지 않은 토큰입니다');
         }
 
+        // 비활성 사용자 체크
+        if (!user.isActive) {
+          return reply.code(403).send({
+            success: false,
+            error: {
+              code: 'ACCOUNT_DISABLED',
+              message: '비활성화된 계정입니다',
+            },
+          });
+        }
+
         // request에 사용자 정보 첨부
         (request as any).user = user;
       } catch (error) {

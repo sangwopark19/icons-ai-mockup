@@ -2,6 +2,8 @@
  * API 클라이언트
  */
 
+import type { AdminStats, AdminUser } from '@mockup-ai/shared';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 interface RequestOptions extends RequestInit {
@@ -57,7 +59,7 @@ export const authApi = {
   register: async (email: string, password: string, name: string) => {
     return request<{
       success: true;
-      data: { user: { id: string; email: string; name: string } };
+      data: { user: { id: string; email: string; name: string; role: 'user' | 'admin' } };
       message: string;
     }>('/api/auth/register', {
       method: 'POST',
@@ -69,7 +71,7 @@ export const authApi = {
     return request<{
       success: true;
       data: {
-        user: { id: string; email: string; name: string };
+        user: { id: string; email: string; name: string; role: 'user' | 'admin' };
         accessToken: string;
         refreshToken: string;
       };
@@ -89,7 +91,7 @@ export const authApi = {
   me: async (token: string) => {
     return request<{
       success: true;
-      data: { user: { id: string; email: string; name: string } };
+      data: { user: { id: string; email: string; name: string; role: 'user' | 'admin' } };
     }>('/api/auth/me', { token });
   },
 
@@ -170,4 +172,122 @@ export const imageApi = {
   },
 };
 
-export default { authApi, projectApi, imageApi };
+/**
+ * 관리자 관련 API
+ */
+export const adminApi = {
+  getStats: async (token: string) => {
+    return request<{ success: true; data: AdminStats }>('/api/admin/stats', { token });
+  },
+
+  getUsers: async (
+    token: string,
+    params?: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      role?: string;
+      isActive?: boolean;
+    }
+  ) => {
+    const query = new URLSearchParams();
+    if (params?.page) query.append('page', params.page.toString());
+    if (params?.limit) query.append('limit', params.limit.toString());
+    if (params?.search) query.append('search', params.search);
+    if (params?.role) query.append('role', params.role);
+    if (params?.isActive !== undefined) query.append('isActive', params.isActive.toString());
+
+    return request<{
+      success: true;
+      data: AdminUser[];
+      pagination: { page: number; limit: number; total: number; totalPages: number };
+    }>(`/api/admin/users?${query}`, { token });
+  },
+
+  updateUserRole: async (token: string, userId: string, role: 'user' | 'admin') => {
+    return request(`/api/admin/users/${userId}/role`, {
+      method: 'PATCH',
+      body: JSON.stringify({ role }),
+      token,
+    });
+  },
+
+  toggleUserActive: async (token: string, userId: string, isActive: boolean) => {
+    return request(`/api/admin/users/${userId}/active`, {
+      method: 'PATCH',
+      body: JSON.stringify({ isActive }),
+      token,
+    });
+  },
+
+  deleteUser: async (token: string, userId: string) => {
+    return request(`/api/admin/users/${userId}`, {
+      method: 'DELETE',
+      token,
+    });
+  },
+
+  getGenerations: async (
+    token: string,
+    params?: {
+      page?: number;
+      limit?: number;
+      status?: string;
+      userId?: string;
+      dateFrom?: string;
+      dateTo?: string;
+    }
+  ) => {
+    const query = new URLSearchParams();
+    if (params?.page) query.append('page', params.page.toString());
+    if (params?.limit) query.append('limit', params.limit.toString());
+    if (params?.status) query.append('status', params.status);
+    if (params?.userId) query.append('userId', params.userId);
+    if (params?.dateFrom) query.append('dateFrom', params.dateFrom);
+    if (params?.dateTo) query.append('dateTo', params.dateTo);
+
+    return request(`/api/admin/generations?${query}`, { token });
+  },
+
+  getProjects: async (
+    token: string,
+    params?: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      userId?: string;
+    }
+  ) => {
+    const query = new URLSearchParams();
+    if (params?.page) query.append('page', params.page.toString());
+    if (params?.limit) query.append('limit', params.limit.toString());
+    if (params?.search) query.append('search', params.search);
+    if (params?.userId) query.append('userId', params.userId);
+
+    return request<{
+      success: true;
+      projects: Array<{
+        id: string;
+        name: string;
+        description: string | null;
+        createdAt: string;
+        updatedAt: string;
+        user: { id: string; email: string; name: string };
+        _count: { generations: number; characters: number };
+      }>;
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+    }>(`/api/admin/projects?${query}`, { token });
+  },
+
+  deleteProject: async (token: string, projectId: string) => {
+    return request(`/api/admin/projects/${projectId}`, {
+      method: 'DELETE',
+      token,
+    });
+  },
+};
+
+export default { authApi, projectApi, imageApi, adminApi };

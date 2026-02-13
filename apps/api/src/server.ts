@@ -3,7 +3,9 @@ import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import { config } from './config/index.js';
 import authPlugin from './plugins/auth.plugin.js';
+import adminPlugin from './plugins/admin.plugin.js';
 import authRoutes from './routes/auth.routes.js';
+import adminRoutes from './routes/admin.routes.js';
 import projectRoutes from './routes/project.routes.js';
 import uploadRoutes from './routes/upload.routes.js';
 import characterRoutes from './routes/character.routes.js';
@@ -81,6 +83,9 @@ async function registerPlugins() {
 
   // JWT 인증 플러그인
   await server.register(authPlugin);
+
+  // 관리자 플러그인
+  await server.register(adminPlugin);
 }
 
 /**
@@ -107,6 +112,9 @@ async function registerRoutes() {
 
   // 인증 라우트
   await server.register(authRoutes, { prefix: '/api/auth' });
+
+  // 관리자 라우트
+  await server.register(adminRoutes, { prefix: '/api/admin' });
 
   // 프로젝트 라우트
   await server.register(projectRoutes, { prefix: '/api/projects' });

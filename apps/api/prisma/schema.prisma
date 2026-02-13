@@ -14,18 +14,31 @@ datasource db {
 // 사용자 관련
 // ===================
 
+/// 사용자 역할 열거형
+enum UserRole {
+  user
+  admin
+
+  @@map("user_role")
+}
+
 /// 사용자 테이블
 model User {
   id           String    @id @default(uuid())
   email        String    @unique
   passwordHash String    @map("password_hash")
   name         String
+  role         UserRole  @default(user)
+  isActive     Boolean   @default(true) @map("is_active")
+  deletedAt    DateTime? @map("deleted_at")
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
   lastLoginAt  DateTime? @map("last_login_at")
 
-  sessions Session[]
-  projects Project[]
+  sessions  Session[]
+  projects  Project[]
+  auditLogs AdminAuditLog[] @relation("AdminAudits")
+  auditedBy AdminAuditLog[] @relation("AuditedUser")
 
   @@map("users")
 }
@@ -166,8 +179,8 @@ model GeneratedImage {
   fileSize        Int       @map("file_size")
   createdAt       DateTime  @default(now()) @map("created_at")
 
-  generation     Generation      @relation("GenerationImages", fields: [generationId], references: [id], onDelete: Cascade)
-  usedAsSourceIn Generation[]    @relation("SourceImage")
+  generation     Generation     @relation("GenerationImages", fields: [generationId], references: [id], onDelete: Cascade)
+  usedAsSourceIn Generation[]   @relation("SourceImage")
   history        ImageHistory[]
 
   @@index([generationId])
@@ -192,4 +205,28 @@ model ImageHistory {
   @@index([imageId, createdAt(sort: Desc)])
   @@index([parentHistoryId])
   @@map("image_history")
+}
+
+// ===================
+// 관리자 관련
+// ===================
+
+/// 관리자 감사 로그 테이블
+model AdminAuditLog {
+  id          String   @id @default(uuid())
+  adminId     String?  @map("admin_id")
+  action      String
+  targetType  String?  @map("target_type")
+  targetId    String?  @map("target_id")
+  targetEmail String?  @map("target_email")
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  admin      User? @relation("AdminAudits", fields: [adminId], references: [id], onDelete: SetNull)
+  targetUser User? @relation("AuditedUser", fields: [targetId], references: [id], onDelete: SetNull)
+
+  @@index([adminId, createdAt(sort: Desc)])
+  @@index([action])
+  @@index([targetType, targetId])
+  @@map("admin_audit_logs")
 }

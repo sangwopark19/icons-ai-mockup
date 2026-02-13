@@ -10,6 +10,7 @@ import type { User } from '@prisma/client';
 interface JWTPayload {
   userId: string;
   email: string;
+  role: string;
   iat?: number;
   exp?: number;
 }
@@ -36,12 +37,17 @@ export class AuthService {
     // 비밀번호 해싱
     const passwordHash = await bcrypt.hash(password, AuthService.BCRYPT_ROUNDS);
 
+    // 첫 번째 사용자인지 확인
+    const userCount = await prisma.user.count();
+    const role = userCount === 0 ? 'admin' : 'user';
+
     // 사용자 생성
     const user = await prisma.user.create({
       data: {
         email,
         passwordHash,
         name,
+        role,
       },
     });
 
@@ -62,6 +68,11 @@ export class AuthService {
 
     if (!user) {
       throw new Error('이메일 또는 비밀번호가 올바르지 않습니다');
+    }
+
+    // 비활성 사용자 차단
+    if (!user.isActive) {
+      throw new Error('비활성화된 계정입니다');
     }
 
     // 비밀번호 검증
@@ -155,6 +166,7 @@ export class AuthService {
     const payload: JWTPayload = {
       userId: user.id,
       email: user.email,
+      role: user.role,
     };
 
     return jwt.sign(payload, config.jwtSecret, {
@@ -169,6 +181,7 @@ export class AuthService {
     const payload: JWTPayload = {
       userId: user.id,
       email: user.email,
+      role: user.role,
     };
 
     return jwt.sign(payload, config.jwtSecret, {

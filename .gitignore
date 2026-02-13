@@ -1,51 +1,68 @@
-# 의존성
-node_modules
-.pnpm-store
+# Dependencies
+node_modules/
+.pnpm-store/
 
-# 빌드 결과물
-dist
-.next
-out
-build
+# Build outputs
+dist/
+.next/
+out/
+build/
 
-# 캐시
-.turbo
-.cache
+# Cache
+.turbo/
+.cache/
 *.tsbuildinfo
 
-# 환경 변수
-.env*
+# Environment variables
+.env
+.env.*
+!.env.example
 
-# 로그
+# Logs
 *.log
 npm-debug.log*
 pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# 에디터
+# Editor
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
-.idea
+.idea/
+*.swp
+*.swo
+*~
 
 # OS
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
 Thumbs.db
+ehthumbs.db
+Desktop.ini
 
-# 테스트
-coverage
+# Testing
+coverage/
+.nyc_output/
 
-# 데이터
-data/uploads
-data/generations
-data/upscaled
-data/characters
+# Data files (uploaded/generated images)
+data/uploads/
+data/generations/
+data/upscaled/
+data/characters/
+apps/api/data/
 
-# Docker 볼륨
-postgres_data
-redis_data
+# Docker volumes
+postgres_data/
+redis_data/
 
-## 실제 사진 저장 데이터
-apps/api/data
+# oh-my-claudecode
+.omc/
 
-.cursorignore
-# .taskmaster/
+# Temporary files
+*.tmp
+*.temp
+.tmp/

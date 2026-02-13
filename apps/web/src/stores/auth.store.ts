@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { StateCreator } from 'zustand';
 
 /**
  * 사용자 타입
@@ -8,6 +9,7 @@ interface User {
   id: string;
   email: string;
   name: string;
+  role: 'user' | 'admin';
 }
 
 /**
@@ -30,6 +32,7 @@ interface AuthActions {
   login: (user: User, accessToken: string, refreshToken: string) => void;
   logout: () => void;
   setLoading: (isLoading: boolean) => void;
+  isAdmin: () => boolean;
 }
 
 /**
@@ -37,7 +40,7 @@ interface AuthActions {
  */
 export const useAuthStore = create<AuthState & AuthActions>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       // 초기 상태
       user: null,
       accessToken: null,
@@ -69,6 +72,11 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         }),
 
       setLoading: (isLoading) => set({ isLoading }),
+
+      isAdmin: () => {
+        const { user } = get();
+        return user?.role === 'admin';
+      },
     }),
     {
       name: 'auth-storage',

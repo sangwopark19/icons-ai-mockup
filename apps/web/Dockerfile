@@ -26,9 +26,8 @@ WORKDIR /app
 # Sharp 빌드 의존성
 RUN apk add --no-cache python3 make g++ vips-dev vips
 
+# shamefully-hoist 사용 시 루트 node_modules만 필요
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
-COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules
 
 # 소스 복사
 COPY packages/shared ./packages/shared
@@ -46,6 +45,8 @@ ENV DOCKER_BUILD=1
 
 # Turbo를 사용하여 web 빌드 (shared 의존성 자동 처리)
 WORKDIR /app
+# PATH에 루트 node_modules/.bin 추가하여 호이스팅된 패키지 참조
+ENV PATH="/app/node_modules/.bin:$PATH"
 RUN pnpm turbo build --filter=@mockup-ai/web
 
 # 프로덕션 실행 단계
