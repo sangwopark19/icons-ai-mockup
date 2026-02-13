@@ -12,27 +12,22 @@ WORKDIR /app
 RUN apk add --no-cache python3 make g++ vips-dev
 
 # 루트 의존성 파일 복사
-COPY .npmrc ./
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json ./apps/web/
 COPY packages/shared/package.json ./packages/shared/
 
-RUN pnpm install --frozen-lockfile --shamefully-hoist
+RUN pnpm install --frozen-lockfile
 
 # 빌드 단계
-FROM base AS builder
+FROM deps AS builder
 WORKDIR /app
 
-# Sharp 빌드 의존성
-RUN apk add --no-cache python3 make g++ vips-dev vips
+# Sharp 빌드 의존성 (vips 런타임 추가)
+RUN apk add --no-cache vips
 
-# shamefully-hoist 사용 시 루트 node_modules만 필요
-COPY --from=deps /app/node_modules ./node_modules
-
-# 소스 복사
+# 소스 복사 (node_modules는 deps에서 이미 존재하므로 복사 불필요)
 COPY packages/shared ./packages/shared
 COPY apps/web ./apps/web
-COPY turbo.json ./
 
 # 빌드 시 API URL을 ARG로 받음 (NEXT_PUBLIC_* 변수는 빌드 타임에 번들에 포함됨)
 ARG NEXT_PUBLIC_API_URL=http://localhost:4000
@@ -43,11 +38,13 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 ENV DOCKER_BUILD=1
 
-# Turbo를 사용하여 web 빌드 (shared 의존성 자동 처리)
-WORKDIR /app
-# PATH에 루트 node_modules/.bin 추가하여 호이스팅된 패키지 참조
-ENV PATH="/app/node_modules/.bin:$PATH"
-RUN pnpm turbo build --filter=@mockup-ai/web
+# shared 빌드
+WORKDIR /app/packages/shared
+RUN pnpm build || true
+
+# web 빌드
+WORKDIR /app/apps/web
+RUN pnpm build
 
 # 프로덕션 실행 단계
 FROM node:22-alpine AS runner
