@@ -8,16 +8,23 @@ RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 FROM base AS deps
 WORKDIR /app
 
+# Sharp 빌드를 위한 의존성
+RUN apk add --no-cache python3 make g++ vips-dev
+
 # 루트 의존성 파일 복사
+COPY .npmrc ./
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json ./apps/web/
 COPY packages/shared/package.json ./packages/shared/
 
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --shamefully-hoist
 
 # 빌드 단계
 FROM base AS builder
 WORKDIR /app
+
+# Sharp 빌드 의존성
+RUN apk add --no-cache python3 make g++ vips-dev vips
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
@@ -37,13 +44,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 ENV DOCKER_BUILD=1
 
-# shared 빌드 후 web 빌드
-WORKDIR /app/packages/shared
-RUN pnpm build || true
-
-# 루트에서 빌드 실행 (Turbopack이 올바른 루트를 찾을 수 있도록)
+# Turbo를 사용하여 web 빌드 (shared 의존성 자동 처리)
 WORKDIR /app
-RUN cd apps/web && pnpm build
+RUN pnpm turbo build --filter=@mockup-ai/web
 
 # 프로덕션 실행 단계
 FROM node:22-alpine AS runner
