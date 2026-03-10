@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 01-auth-foundation/01-02-PLAN.md (awaiting checkpoint Task 3 human-verify)
-last_updated: "2026-03-10T08:10:26.288Z"
+stopped_at: Completed 01-auth-foundation/01-02-PLAN.md
+last_updated: "2026-03-10T08:23:06.704Z"
 last_activity: 2026-03-10 — Roadmap created, 28 requirements mapped to 4 phases
 progress:
   total_phases: 4
@@ -52,6 +52,7 @@ Progress: [░░░░░░░░░░] 0%
 *Updated after each plan completion*
 | Phase 01-auth-foundation P01 | 20 | 2 tasks | 11 files |
 | Phase 01-auth-foundation P02 | 5 | 2 tasks | 9 files |
+| Phase 01-auth-foundation P02 | 5 | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -66,6 +67,9 @@ Progress: [░░░░░░░░░░] 0%
 - [Phase 01-auth-foundation]: getUserFromToken fetches full User from DB so role is always current without re-issuing tokens
 - [Phase 01-auth-foundation]: AdminGuard uses null-render anti-flash pattern (return null) not loading spinner to prevent admin UI flash
 - [Phase 01-auth-foundation]: Admin layout is server component wrapping client component guard — standard Next.js App Router pattern
+- [Phase 01-auth-foundation]: AdminGuard uses null-render (not loading spinner) to prevent admin UI flash before redirect
+- [Phase 01-auth-foundation]: Admin layout is server component; guard and sidebar are client components for useState/useEffect
+- [Phase 01-auth-foundation]: Stub pages have no coming soon text — just title heading per plan spec
 
 ### Pending Todos
 
@@ -79,6 +83,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-10T08:10:16.473Z
-Stopped at: Completed 01-auth-foundation/01-02-PLAN.md (awaiting checkpoint Task 3 human-verify)
+Last session: 2026-03-10T08:22:58.380Z
+Stopped at: Completed 01-auth-foundation/01-02-PLAN.md
 Resume file: None
