@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 01-auth-foundation/01-01-PLAN.md
-last_updated: "2026-03-10T08:06:27.396Z"
+stopped_at: Completed 01-auth-foundation/01-02-PLAN.md (awaiting checkpoint Task 3 human-verify)
+last_updated: "2026-03-10T08:10:26.288Z"
 last_activity: 2026-03-10 — Roadmap created, 28 requirements mapped to 4 phases
 progress:
   total_phases: 4
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -51,6 +51,7 @@ Progress: [░░░░░░░░░░] 0%
 
 *Updated after each plan completion*
 | Phase 01-auth-foundation P01 | 20 | 2 tasks | 11 files |
+| Phase 01-auth-foundation P02 | 5 | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -63,6 +64,8 @@ Progress: [░░░░░░░░░░] 0%
 - [Phase 01-auth-foundation]: requireAdmin calls fastify.authenticate first then checks user.role === 'admin' for single responsibility
 - [Phase 01-auth-foundation]: Named export authPlugin added alongside fp-wrapped default for test registration
 - [Phase 01-auth-foundation]: getUserFromToken fetches full User from DB so role is always current without re-issuing tokens
+- [Phase 01-auth-foundation]: AdminGuard uses null-render anti-flash pattern (return null) not loading spinner to prevent admin UI flash
+- [Phase 01-auth-foundation]: Admin layout is server component wrapping client component guard — standard Next.js App Router pattern
 
 ### Pending Todos
 
@@ -76,6 +79,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-10T08:06:27.394Z
-Stopped at: Completed 01-auth-foundation/01-01-PLAN.md
+Last session: 2026-03-10T08:10:16.473Z
+Stopped at: Completed 01-auth-foundation/01-02-PLAN.md (awaiting checkpoint Task 3 human-verify)
 Resume file: None

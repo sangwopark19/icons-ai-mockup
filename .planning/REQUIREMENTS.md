@@ -12,8 +12,8 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **AUTH-01**: User 모델에 role 필드(admin/user) 추가 — Prisma 마이그레이션
 - [x] **AUTH-02**: Fastify requireAdmin 미들웨어 — /api/admin/* 엔드포인트에 admin 권한 체크
 - [x] **AUTH-03**: JWT 토큰 payload에 role 포함 — 로그인 시 role 정보 반환
-- [ ] **AUTH-04**: Next.js /admin 라우트 가드 — 비관리자 접근 시 리다이렉트
-- [ ] **AUTH-05**: Admin 레이아웃 — /admin 전용 사이드바/네비게이션
+- [x] **AUTH-04**: Next.js /admin 라우트 가드 — 비관리자 접근 시 리다이렉트
+- [x] **AUTH-05**: Admin 레이아웃 — /admin 전용 사이드바/네비게이션
 
 ### Dashboard
 
@@ -91,8 +91,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AUTH-01 | Phase 1 | Complete |
 | AUTH-02 | Phase 1 | Complete |
 | AUTH-03 | Phase 1 | Complete |
-| AUTH-04 | Phase 1 | Pending |
-| AUTH-05 | Phase 1 | Pending |
+| AUTH-04 | Phase 1 | Complete |
+| AUTH-05 | Phase 1 | Complete |
 | DASH-01 | Phase 2 | Pending |
 | DASH-02 | Phase 2 | Pending |
 | DASH-03 | Phase 2 | Pending |

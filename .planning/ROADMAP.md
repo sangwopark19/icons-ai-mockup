@@ -10,7 +10,7 @@ This milestone adds a secure admin panel to an existing AI mockup generation Saa
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 1: Auth Foundation** - Role system, requireAdmin middleware, and /admin route guards
+- [x] **Phase 1: Auth Foundation** - Role system, requireAdmin middleware, and /admin route guards (completed 2026-03-10)
 - [ ] **Phase 2: Dashboard and User Management** - System health overview and full user CRUD
 - [ ] **Phase 3: Generation and Content Monitoring** - Job monitoring, queue visibility, and content browsing/deletion
 - [ ] **Phase 4: API Key Management** - Multi-key Gemini management with GeminiService refactor
@@ -27,7 +27,7 @@ This milestone adds a secure admin panel to an existing AI mockup generation Saa
   3. An admin user can log in and see the /admin layout with sidebar navigation
   4. The JWT token returned on login includes the user's role
   5. Setting a DB account to role=admin immediately grants that account access on next login
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 Plans:
 - [ ] 01-01-PLAN.md — Backend: Prisma schema migration (role+status), JWT role extension, requireAdmin middleware, admin routes, test infrastructure
 - [ ] 01-02-PLAN.md — Frontend: Zustand role field, AdminGuard route protection, AdminSidebar navigation, admin layout, stub pages
@@ -75,7 +75,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Auth Foundation | 1/2 | In Progress|  |
+| 1. Auth Foundation | 2/2 | Complete   | 2026-03-10 |
 | 2. Dashboard and User Management | 0/TBD | Not started | - |
 | 3. Generation and Content Monitoring | 0/TBD | Not started | - |
 | 4. API Key Management | 0/TBD | Not started | - |
