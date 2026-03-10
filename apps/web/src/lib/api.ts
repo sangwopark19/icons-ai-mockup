@@ -69,7 +69,7 @@ export const authApi = {
     return request<{
       success: true;
       data: {
-        user: { id: string; email: string; name: string };
+        user: { id: string; email: string; name: string; role?: string };
         accessToken: string;
         refreshToken: string;
       };
@@ -89,7 +89,7 @@ export const authApi = {
   me: async (token: string) => {
     return request<{
       success: true;
-      data: { user: { id: string; email: string; name: string } };
+      data: { user: { id: string; email: string; name: string; role?: string } };
     }>('/api/auth/me', { token });
   },
 
