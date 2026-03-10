@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Phase 1 context gathered
-last_updated: "2026-03-10T07:42:21.416Z"
+stopped_at: Completed 01-auth-foundation/01-01-PLAN.md
+last_updated: "2026-03-10T08:06:27.396Z"
 last_activity: 2026-03-10 — Roadmap created, 28 requirements mapped to 4 phases
 progress:
   total_phases: 4
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 2
+  completed_plans: 1
   percent: 0
 ---
 
@@ -50,6 +50,7 @@ Progress: [░░░░░░░░░░] 0%
 - Trend: —
 
 *Updated after each plan completion*
+| Phase 01-auth-foundation P01 | 20 | 2 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -59,6 +60,9 @@ Progress: [░░░░░░░░░░] 0%
 - [Init]: Admin role granted by direct DB update, no invite flow
 - [Init]: API keys stored encrypted in DB (AES-256-GCM), manual rotation only in v1
 - [Init]: Next.js middleware is UX-only redirect; Fastify requireAdmin is the authoritative security boundary (CVE-2025-29927 mitigation)
+- [Phase 01-auth-foundation]: requireAdmin calls fastify.authenticate first then checks user.role === 'admin' for single responsibility
+- [Phase 01-auth-foundation]: Named export authPlugin added alongside fp-wrapped default for test registration
+- [Phase 01-auth-foundation]: getUserFromToken fetches full User from DB so role is always current without re-issuing tokens
 
 ### Pending Todos
 
@@ -72,6 +76,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-10T07:42:21.415Z
-Stopped at: Phase 1 context gathered
-Resume file: .planning/phases/01-auth-foundation/01-CONTEXT.md
+Last session: 2026-03-10T08:06:27.394Z
+Stopped at: Completed 01-auth-foundation/01-01-PLAN.md
+Resume file: None
