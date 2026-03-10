@@ -27,7 +27,10 @@ This milestone adds a secure admin panel to an existing AI mockup generation Saa
   3. An admin user can log in and see the /admin layout with sidebar navigation
   4. The JWT token returned on login includes the user's role
   5. Setting a DB account to role=admin immediately grants that account access on next login
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 01-01-PLAN.md — Backend: Prisma schema migration (role+status), JWT role extension, requireAdmin middleware, admin routes, test infrastructure
+- [ ] 01-02-PLAN.md — Frontend: Zustand role field, AdminGuard route protection, AdminSidebar navigation, admin layout, stub pages
 
 ### Phase 2: Dashboard and User Management
 **Goal**: Admin can see system-wide health at a glance and take all user lifecycle actions from one place
@@ -72,7 +75,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Auth Foundation | 0/TBD | Not started | - |
+| 1. Auth Foundation | 0/2 | Planning complete | - |
 | 2. Dashboard and User Management | 0/TBD | Not started | - |
 | 3. Generation and Content Monitoring | 0/TBD | Not started | - |
 | 4. API Key Management | 0/TBD | Not started | - |
