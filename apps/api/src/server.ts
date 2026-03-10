@@ -10,6 +10,7 @@ import characterRoutes from './routes/character.routes.js';
 import generationRoutes from './routes/generation.routes.js';
 import imageRoutes from './routes/image.routes.js';
 import editRoutes from './routes/edit.routes.js';
+import adminRoutes from './routes/admin/index.routes.js';
 
 /**
  * Fastify 서버 인스턴스 생성
@@ -125,6 +126,9 @@ async function registerRoutes() {
 
   // 부분 수정 라우트
   await server.register(editRoutes, { prefix: '/api/generations' });
+
+  // 관리자 라우트
+  await server.register(adminRoutes, { prefix: '/api/admin' });
 
   // 정적 파일 서빙 (업로드된 이미지)
   server.get('/uploads/*', async (request, reply) => {

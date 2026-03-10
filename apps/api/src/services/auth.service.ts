@@ -10,6 +10,7 @@ import type { User } from '@prisma/client';
 interface JWTPayload {
   userId: string;
   email: string;
+  role?: string;
   iat?: number;
   exp?: number;
 }
@@ -155,6 +156,7 @@ export class AuthService {
     const payload: JWTPayload = {
       userId: user.id,
       email: user.email,
+      role: user.role,
     };
 
     return jwt.sign(payload, config.jwtSecret, {

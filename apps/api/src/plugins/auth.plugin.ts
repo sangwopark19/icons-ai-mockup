@@ -52,15 +52,39 @@ async function authPlugin(fastify: FastifyInstance) {
       }
     }
   );
+
+  /**
+   * 관리자 인증 데코레이터
+   * authenticate 후 admin 역할 확인
+   */
+  fastify.decorate(
+    'requireAdmin',
+    async function (request: FastifyRequest, reply: FastifyReply) {
+      await fastify.authenticate(request, reply);
+      if (reply.sent) return;
+      const user = (request as any).user;
+      if (!user || user.role !== 'admin') {
+        return reply.code(403).send({
+          success: false,
+          error: {
+            code: 'FORBIDDEN',
+            message: '관리자 권한이 필요합니다',
+          },
+        });
+      }
+    }
+  );
 }
 
 // Fastify 타입 확장
 declare module 'fastify' {
   interface FastifyInstance {
     authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    requireAdmin: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   }
 }
 
+export { authPlugin };
 export default fp(authPlugin, {
   name: 'auth-plugin',
 });
