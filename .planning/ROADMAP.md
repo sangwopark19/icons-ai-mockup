@@ -1,0 +1,78 @@
+# Roadmap: AI Mockup Admin Panel
+
+## Overview
+
+This milestone adds a secure admin panel to an existing AI mockup generation SaaS app. Starting from zero admin infrastructure, each phase builds on the previous: the role system comes first (because nothing else can be secured without it), then operational visibility (dashboard and user management), then generation and content oversight, and finally the highest-risk integration — Gemini API key management which refactors the live generation pipeline.
+
+## Phases
+
+**Phase Numbering:**
+- Integer phases (1, 2, 3): Planned milestone work
+- Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
+
+- [ ] **Phase 1: Auth Foundation** - Role system, requireAdmin middleware, and /admin route guards
+- [ ] **Phase 2: Dashboard and User Management** - System health overview and full user CRUD
+- [ ] **Phase 3: Generation and Content Monitoring** - Job monitoring, queue visibility, and content browsing/deletion
+- [ ] **Phase 4: API Key Management** - Multi-key Gemini management with GeminiService refactor
+
+## Phase Details
+
+### Phase 1: Auth Foundation
+**Goal**: Admin access is secured at both the backend and frontend — only accounts with role=admin can reach any /admin route or /api/admin endpoint
+**Depends on**: Nothing (first phase)
+**Requirements**: AUTH-01, AUTH-02, AUTH-03, AUTH-04, AUTH-05
+**Success Criteria** (what must be TRUE):
+  1. A non-admin user who navigates to /admin is redirected away without seeing any admin UI
+  2. An authenticated non-admin calling any /api/admin/* endpoint receives 403 Forbidden
+  3. An admin user can log in and see the /admin layout with sidebar navigation
+  4. The JWT token returned on login includes the user's role
+  5. Setting a DB account to role=admin immediately grants that account access on next login
+**Plans**: TBD
+
+### Phase 2: Dashboard and User Management
+**Goal**: Admin can see system-wide health at a glance and take all user lifecycle actions from one place
+**Depends on**: Phase 1
+**Requirements**: DASH-01, DASH-02, DASH-03, DASH-04, DASH-05, USER-01, USER-02, USER-03, USER-04, USER-05
+**Success Criteria** (what must be TRUE):
+  1. Admin can view a dashboard showing total users, total generations, failed job count, queue depth, storage usage, and active API key info — all auto-refreshing every 30 seconds
+  2. Admin can browse all users with pagination and filter/search by email or account status
+  3. Admin can suspend a user account, after which that user's API calls are rejected with a clear error
+  4. Admin can soft-delete a user account, which anonymizes PII while retaining generation records
+  5. Admin can change a user's role between admin and user
+**Plans**: TBD
+
+### Phase 3: Generation and Content Monitoring
+**Goal**: Admin can monitor all generation jobs across users, diagnose failures, retry jobs, and browse or delete generated content
+**Depends on**: Phase 2
+**Requirements**: GEN-01, GEN-02, GEN-03, CONT-01, CONT-02, CONT-03, CONT-04
+**Success Criteria** (what must be TRUE):
+  1. Admin can view all generation jobs across all users with status filtering (pending, processing, completed, failed)
+  2. Admin can open a failed job and see its full error reason, then trigger a retry from the admin UI
+  3. Admin can browse all generated images searchable by user, date range, and project
+  4. Admin can delete an individual image (removes both DB record and file from storage)
+  5. Admin can view a specific user's complete generation history and execute a bulk delete by date/user/project filter
+**Plans**: TBD
+
+### Phase 4: API Key Management
+**Goal**: Admin can manage multiple Gemini API keys in the DB and activate one at a time; GeminiService reads the active key from DB instead of the environment variable
+**Depends on**: Phase 3
+**Requirements**: KEY-01, KEY-02, KEY-03, KEY-04, KEY-05, KEY-06
+**Success Criteria** (what must be TRUE):
+  1. Admin can view all registered API keys showing alias, masked value (last 4 chars only), status, and call count
+  2. Admin can add a new API key with an alias; the key is stored encrypted and never returned in full via API
+  3. Admin can delete an API key (only if it is not currently active)
+  4. Admin can activate a different key; only one key is active at a time and new generation jobs immediately use the newly active key
+  5. Image generation continues to work end-to-end after switching the active key (no env var fallback)
+**Plans**: TBD
+
+## Progress
+
+**Execution Order:**
+Phases execute in numeric order: 1 → 2 → 3 → 4
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 1. Auth Foundation | 0/TBD | Not started | - |
+| 2. Dashboard and User Management | 0/TBD | Not started | - |
+| 3. Generation and Content Monitoring | 0/TBD | Not started | - |
+| 4. API Key Management | 0/TBD | Not started | - |
