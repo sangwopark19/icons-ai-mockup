@@ -40,7 +40,8 @@ data/generations
 data/upscaled
 data/characters
 
-# Docker 볼륨
+# Docker
+docker-compose.override.yml
 postgres_data
 redis_data
 
