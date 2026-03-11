@@ -59,7 +59,14 @@ Plans:
   3. Admin can browse all generated images searchable by user, date range, and project
   4. Admin can delete an individual image (removes both DB record and file from storage)
   5. Admin can view a specific user's complete generation history and execute a bulk delete by date/user/project filter
-**Plans**: TBD
+**Plans:** 6 plans
+Plans:
+- [ ] 03-01-PLAN.md — TDD Wave 0: RED tests for all AdminService generation/content methods
+- [ ] 03-02-PLAN.md — Backend: AdminService generation methods + routes (GREEN tests for GEN-01/02/03)
+- [ ] 03-03-PLAN.md — Backend: AdminService content methods + routes + adminApi client (GREEN tests for CONT-01/02/03/04)
+- [ ] 03-04-PLAN.md — Frontend: Generation monitoring UI (tabbed page, table, detail modal, retry)
+- [ ] 03-05-PLAN.md — Frontend: Content browsing/delete UI (image grid, lightbox, bulk delete)
+- [ ] 03-06-PLAN.md — Visual and functional verification checkpoint
 
 ### Phase 4: API Key Management
 **Goal**: Admin can manage multiple Gemini API keys in the DB and activate one at a time; GeminiService reads the active key from DB instead of the environment variable
@@ -82,5 +89,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Auth Foundation | 2/2 | Complete   | 2026-03-10 |
 | 2. Dashboard and User Management | 0/4 | Planning complete | - |
-| 3. Generation and Content Monitoring | 0/TBD | Not started | - |
+| 3. Generation and Content Monitoring | 0/6 | Planning complete | - |
 | 4. API Key Management | 0/TBD | Not started | - |
