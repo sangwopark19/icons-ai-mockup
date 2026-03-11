@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import dashboardRoutes from './dashboard.routes.js';
 import usersRoutes from './users.routes.js';
 import generationsRoutes from './generations.routes.js';
+import contentRoutes from './content.routes.js';
 
 /**
  * 관리자 라우트
@@ -26,6 +27,9 @@ const adminRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
 
   // 생성 작업 모니터링 라우트 등록
   fastify.register(generationsRoutes, { prefix: '/generations' });
+
+  // 콘텐츠 관리 라우트 등록
+  fastify.register(contentRoutes, { prefix: '/content' });
 };
 
 export default adminRoutes;

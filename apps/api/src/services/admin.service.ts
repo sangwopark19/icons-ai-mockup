@@ -434,8 +434,8 @@ export class AdminService {
         height: img.height,
         fileSize: img.fileSize,
         createdAt: img.createdAt,
-        userEmail: img.generation.project.user.email,
-        projectName: img.generation.project.name,
+        userEmail: img.generation?.project?.user?.email ?? '',
+        projectName: img.generation?.project?.name ?? '',
       })),
       pagination: {
         page,

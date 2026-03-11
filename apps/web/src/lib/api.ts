@@ -208,6 +208,39 @@ export interface Pagination {
   totalPages: number;
 }
 
+export interface AdminGeneration {
+  id: string;
+  mode: string;
+  status: string;
+  errorMessage: string | null;
+  retryCount: number;
+  promptData: unknown;
+  options: unknown;
+  createdAt: string;
+  userEmail: string;
+}
+
+export interface AdminImage {
+  id: string;
+  generationId: string;
+  filePath: string;
+  thumbnailPath: string | null;
+  type: string;
+  width: number;
+  height: number;
+  fileSize: number;
+  createdAt: string;
+  userEmail: string;
+  projectName: string;
+}
+
+export interface StatusCounts {
+  pending: number;
+  processing: number;
+  completed: number;
+  failed: number;
+}
+
 /**
  * 관리자 관련 API
  */
@@ -253,6 +286,98 @@ export const adminApi = {
     request<{ success: true; message: string }>(`/api/admin/users/${id}`, {
       method: 'DELETE',
       token,
+    }),
+
+  listGenerations: (
+    token: string,
+    params?: { page?: number; limit?: number; status?: string; email?: string }
+  ) => {
+    const searchParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined) searchParams.set(k, String(v));
+      });
+    }
+    const qs = searchParams.toString();
+    return request<{
+      success: true;
+      data: AdminGeneration[];
+      pagination: Pagination;
+      statusCounts: Record<string, number>;
+    }>(`/api/admin/generations${qs ? '?' + qs : ''}`, { token });
+  },
+
+  retryGeneration: (token: string, id: string) =>
+    request<{ success: true; data: AdminGeneration }>(`/api/admin/generations/${id}/retry`, {
+      method: 'POST',
+      token,
+    }),
+
+  listImages: (
+    token: string,
+    params?: {
+      page?: number;
+      limit?: number;
+      email?: string;
+      projectId?: string;
+      startDate?: string;
+      endDate?: string;
+    }
+  ) => {
+    const searchParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined) searchParams.set(k, String(v));
+      });
+    }
+    const qs = searchParams.toString();
+    return request<{ success: true; data: AdminImage[]; pagination: Pagination }>(
+      `/api/admin/content/images${qs ? '?' + qs : ''}`,
+      { token }
+    );
+  },
+
+  countImages: (
+    token: string,
+    params?: {
+      email?: string;
+      projectId?: string;
+      startDate?: string;
+      endDate?: string;
+    }
+  ) => {
+    const searchParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined) searchParams.set(k, String(v));
+      });
+    }
+    const qs = searchParams.toString();
+    return request<{ success: true; data: { count: number } }>(
+      `/api/admin/content/images/count${qs ? '?' + qs : ''}`,
+      { token }
+    );
+  },
+
+  deleteImage: (token: string, id: string) =>
+    request<{ success: true; message: string }>(`/api/admin/content/images/${id}`, {
+      method: 'DELETE',
+      token,
+    }),
+
+  bulkDeleteImages: (
+    token: string,
+    params: {
+      email?: string;
+      projectId?: string;
+      startDate?: string;
+      endDate?: string;
+    }
+  ) =>
+    request<{ success: true; data: { deletedCount: number } }>('/api/admin/content/images', {
+      method: 'DELETE',
+      token,
+      body: JSON.stringify(params),
     }),
 };
 
