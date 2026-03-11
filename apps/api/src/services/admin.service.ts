@@ -474,6 +474,15 @@ export class AdminService {
     return prisma.generatedImage.count({ where });
   }
 
+  async listContentProjects(): Promise<Array<{ id: string; name: string }>> {
+    return prisma.project.findMany({
+      where: { generations: { some: { images: { some: {} } } } },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+      take: 200,
+    });
+  }
+
   async bulkDeleteImages(params: Omit<ListImagesParams, 'page' | 'limit'>): Promise<{ deletedCount: number }> {
     const where = buildImageWhere(params);
 

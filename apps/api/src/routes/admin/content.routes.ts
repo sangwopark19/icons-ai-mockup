@@ -30,6 +30,15 @@ const bulkDeleteBodySchema = z.object({
  */
 const contentRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   /**
+   * GET /api/admin/content/projects
+   * 이미지가 있는 프로젝트 목록 조회 (필터 드롭다운용)
+   */
+  fastify.get('/projects', async (_request, reply) => {
+    const projects = await adminService.listContentProjects();
+    return reply.code(200).send({ success: true, data: projects });
+  });
+
+  /**
    * GET /api/admin/content/images
    * 생성된 이미지 목록 조회 (페이지네이션, 이메일/프로젝트/날짜 필터링)
    */

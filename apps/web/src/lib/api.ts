@@ -379,6 +379,12 @@ export const adminApi = {
       token,
       body: JSON.stringify(params),
     }),
+
+  listContentProjects: (token: string) =>
+    request<{ success: true; data: Array<{ id: string; name: string }> }>(
+      '/api/admin/content/projects',
+      { token }
+    ),
 };
 
 export default { authApi, projectApi, imageApi, adminApi };
