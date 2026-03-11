@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 03-02-PLAN.md
-last_updated: "2026-03-11T05:08:30.855Z"
+stopped_at: Completed 03-generation-and-content-monitoring/03-03-PLAN.md
+last_updated: "2026-03-11T05:09:11.309Z"
 last_activity: 2026-03-10 — Roadmap created, 28 requirements mapped to 4 phases
 progress:
   total_phases: 4
   completed_phases: 2
   total_plans: 12
-  completed_plans: 8
+  completed_plans: 9
   percent: 0
 ---
 
@@ -59,6 +59,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 02-dashboard-and-user-management P04 | 5 | 1 tasks | 0 files |
 | Phase 03-generation-and-content-monitoring P01 | 8 | 1 tasks | 1 files |
 | Phase 03-generation-and-content-monitoring P02 | 4 | 2 tasks | 5 files |
+| Phase 03-generation-and-content-monitoring P03 | 6 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -87,6 +88,9 @@ Progress: [░░░░░░░░░░] 0%
 - [Phase 03-generation-and-content-monitoring]: Upload mock uses '../../services/upload.service.js' path to match how admin.service.ts will import it
 - [Phase 03-generation-and-content-monitoring]: bulkDeleteImages filter shape uses { ids: string[] } — consistent with deleteMany id-in-array pattern
 - [Phase 03-02]: listGenerations uses groupBy for statusCounts tab badges; retryGeneration casts Json fields as Record<string,unknown>; content.routes.ts and adminApi helpers added early by linter
+- [Phase 03-generation-and-content-monitoring]: buildImageWhere merges email (nested generation.is.project.is.user.is.email) and projectId into single generation.is clause
+- [Phase 03-generation-and-content-monitoring]: listGeneratedImages uses include (not select) to surface userEmail and projectName from generation/project/user join
+- [Phase 03-generation-and-content-monitoring]: bulkDeleteImages returns { deletedCount } not void — deleteGeneratedImage never touches Generation table
 
 ### Pending Todos
 
@@ -100,6 +104,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-11T05:08:30.854Z
-Stopped at: Completed 03-02-PLAN.md
+Last session: 2026-03-11T05:09:11.307Z
+Stopped at: Completed 03-generation-and-content-monitoring/03-03-PLAN.md
 Resume file: None

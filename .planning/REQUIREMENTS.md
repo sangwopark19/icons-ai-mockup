@@ -41,7 +41,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **CONT-01**: 관리자가 전체 생성 이미지를 사용자/날짜/프로젝트별로 검색할 수 있다
 - [x] **CONT-02**: 관리자가 개별 이미지를 삭제할 수 있다 (DB + 파일시스템)
-- [ ] **CONT-03**: 관리자가 특정 사용자의 전체 생성 이력을 조회할 수 있다
+- [x] **CONT-03**: 관리자가 특정 사용자의 전체 생성 이력을 조회할 수 있다
 - [x] **CONT-04**: 관리자가 조건별(날짜/사용자/프로젝트) 대량 삭제를 실행할 수 있다
 
 ### API Key Management
@@ -108,7 +108,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | GEN-03 | Phase 3 | Complete |
 | CONT-01 | Phase 3 | Complete |
 | CONT-02 | Phase 3 | Complete |
-| CONT-03 | Phase 3 | Pending |
+| CONT-03 | Phase 3 | Complete |
 | CONT-04 | Phase 3 | Complete |
 | KEY-01 | Phase 4 | Pending |
 | KEY-02 | Phase 4 | Pending |
