@@ -347,10 +347,19 @@ const mockGeneratedImage = {
   filePath: 'generations/u1/proj1/gen1/output_1.jpg',
   thumbnailPath: 'generations/u1/proj1/gen1/thumb_output_1.jpg',
   type: 'output',
+  isSelected: false,
+  hasTransparency: false,
   width: 1024,
   height: 1024,
   fileSize: 512000,
   createdAt: new Date(),
+  generation: {
+    id: 'gen1',
+    project: {
+      name: 'Test Project',
+      user: { email: 'test@example.com' },
+    },
+  },
 };
 
 describe('AdminService - listGenerations', () => {

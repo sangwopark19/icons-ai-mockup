@@ -75,8 +75,8 @@ export interface ListImagesParams {
   limit?: number;
   email?: string;
   projectId?: string;
-  startDate?: Date;
-  endDate?: Date;
+  startDate?: Date | string;
+  endDate?: Date | string;
   ids?: string[];
 }
 
@@ -91,8 +91,47 @@ export interface ListImagesResult {
     height: number;
     fileSize: number;
     createdAt: Date;
+    userEmail: string;
+    projectName: string;
   }>;
   pagination: { page: number; limit: number; total: number; totalPages: number };
+}
+
+function buildImageWhere(params: Omit<ListImagesParams, 'page' | 'limit'>) {
+  const where: Record<string, unknown> = {};
+
+  const generationIs: Record<string, unknown> = {};
+
+  if (params.email) {
+    generationIs.project = {
+      is: {
+        user: {
+          is: {
+            email: { contains: params.email, mode: 'insensitive' },
+          },
+        },
+      },
+    };
+  }
+  if (params.projectId) {
+    generationIs.projectId = params.projectId;
+  }
+  if (Object.keys(generationIs).length > 0) {
+    where.generation = { is: generationIs };
+  }
+
+  if (params.startDate || params.endDate) {
+    const createdAt: Record<string, unknown> = {};
+    if (params.startDate) createdAt.gte = params.startDate;
+    if (params.endDate) createdAt.lte = params.endDate;
+    where.createdAt = createdAt;
+  }
+
+  if (params.ids) {
+    where.id = { in: params.ids };
+  }
+
+  return where;
 }
 
 export class AdminService {
@@ -360,38 +399,7 @@ export class AdminService {
     const limit = params.limit ?? 20;
     const skip = (page - 1) * limit;
 
-    const where: Record<string, unknown> = {};
-
-    if (params.email) {
-      where.generation = {
-        is: {
-          project: {
-            is: {
-              user: {
-                is: {
-                  email: { contains: params.email, mode: 'insensitive' },
-                },
-              },
-            },
-          },
-        },
-      };
-    }
-    if (params.projectId) {
-      where.generation = {
-        ...(where.generation as object | undefined),
-        is: {
-          ...((where.generation as Record<string, unknown> | undefined)?.is as object | undefined),
-          projectId: params.projectId,
-        },
-      };
-    }
-    if (params.startDate || params.endDate) {
-      const createdAt: Record<string, unknown> = {};
-      if (params.startDate) createdAt.gte = params.startDate;
-      if (params.endDate) createdAt.lte = params.endDate;
-      where.createdAt = createdAt;
-    }
+    const where = buildImageWhere(params);
 
     const [images, total] = await Promise.all([
       prisma.generatedImage.findMany({
@@ -399,23 +407,36 @@ export class AdminService {
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
-        select: {
-          id: true,
-          generationId: true,
-          filePath: true,
-          thumbnailPath: true,
-          type: true,
-          width: true,
-          height: true,
-          fileSize: true,
-          createdAt: true,
+        include: {
+          generation: {
+            include: {
+              project: {
+                select: {
+                  name: true,
+                  user: { select: { email: true } },
+                },
+              },
+            },
+          },
         },
       }),
       prisma.generatedImage.count({ where }),
     ]);
 
     return {
-      images,
+      images: images.map((img) => ({
+        id: img.id,
+        generationId: img.generationId,
+        filePath: img.filePath,
+        thumbnailPath: img.thumbnailPath,
+        type: img.type,
+        width: img.width,
+        height: img.height,
+        fileSize: img.fileSize,
+        createdAt: img.createdAt,
+        userEmail: img.generation.project.user.email,
+        projectName: img.generation.project.name,
+      })),
       pagination: {
         page,
         limit,
@@ -449,77 +470,12 @@ export class AdminService {
   }
 
   async countImages(params: Omit<ListImagesParams, 'page' | 'limit'>): Promise<number> {
-    const where: Record<string, unknown> = {};
-
-    if (params.email) {
-      where.generation = {
-        is: {
-          project: {
-            is: {
-              user: {
-                is: {
-                  email: { contains: params.email, mode: 'insensitive' },
-                },
-              },
-            },
-          },
-        },
-      };
-    }
-    if (params.projectId) {
-      where.generation = {
-        is: {
-          projectId: params.projectId,
-        },
-      };
-    }
-    if (params.startDate || params.endDate) {
-      const createdAt: Record<string, unknown> = {};
-      if (params.startDate) createdAt.gte = params.startDate;
-      if (params.endDate) createdAt.lte = params.endDate;
-      where.createdAt = createdAt;
-    }
-    if (params.ids) {
-      where.id = { in: params.ids };
-    }
-
+    const where = buildImageWhere(params);
     return prisma.generatedImage.count({ where });
   }
 
-  async bulkDeleteImages(params: Omit<ListImagesParams, 'page' | 'limit'>): Promise<void> {
-    const where: Record<string, unknown> = {};
-
-    if (params.email) {
-      where.generation = {
-        is: {
-          project: {
-            is: {
-              user: {
-                is: {
-                  email: { contains: params.email, mode: 'insensitive' },
-                },
-              },
-            },
-          },
-        },
-      };
-    }
-    if (params.projectId) {
-      where.generation = {
-        is: {
-          projectId: params.projectId,
-        },
-      };
-    }
-    if (params.startDate || params.endDate) {
-      const createdAt: Record<string, unknown> = {};
-      if (params.startDate) createdAt.gte = params.startDate;
-      if (params.endDate) createdAt.lte = params.endDate;
-      where.createdAt = createdAt;
-    }
-    if (params.ids) {
-      where.id = { in: params.ids };
-    }
+  async bulkDeleteImages(params: Omit<ListImagesParams, 'page' | 'limit'>): Promise<{ deletedCount: number }> {
+    const where = buildImageWhere(params);
 
     const images = await prisma.generatedImage.findMany({
       where,
@@ -542,6 +498,8 @@ export class AdminService {
     }
 
     await prisma.generatedImage.deleteMany({ where });
+
+    return { deletedCount: images.length };
   }
 }
 
