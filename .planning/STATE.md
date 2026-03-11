@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 03-01-PLAN.md
-last_updated: "2026-03-11T05:04:28.698Z"
+stopped_at: Completed 03-02-PLAN.md
+last_updated: "2026-03-11T05:08:30.855Z"
 last_activity: 2026-03-10 — Roadmap created, 28 requirements mapped to 4 phases
 progress:
   total_phases: 4
   completed_phases: 2
   total_plans: 12
-  completed_plans: 7
+  completed_plans: 8
   percent: 0
 ---
 
@@ -58,6 +58,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 02-dashboard-and-user-management P02 | 12 | 2 tasks | 5 files |
 | Phase 02-dashboard-and-user-management P04 | 5 | 1 tasks | 0 files |
 | Phase 03-generation-and-content-monitoring P01 | 8 | 1 tasks | 1 files |
+| Phase 03-generation-and-content-monitoring P02 | 4 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -85,6 +86,7 @@ Progress: [░░░░░░░░░░] 0%
 - [Phase 02-04]: Steps 5/7 had no failure data (expected in fresh system), step 10 pagination hidden below 20-user threshold (expected) — all other 22 steps verified
 - [Phase 03-generation-and-content-monitoring]: Upload mock uses '../../services/upload.service.js' path to match how admin.service.ts will import it
 - [Phase 03-generation-and-content-monitoring]: bulkDeleteImages filter shape uses { ids: string[] } — consistent with deleteMany id-in-array pattern
+- [Phase 03-02]: listGenerations uses groupBy for statusCounts tab badges; retryGeneration casts Json fields as Record<string,unknown>; content.routes.ts and adminApi helpers added early by linter
 
 ### Pending Todos
 
@@ -98,6 +100,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-11T05:04:28.697Z
-Stopped at: Completed 03-01-PLAN.md
+Last session: 2026-03-11T05:08:30.854Z
+Stopped at: Completed 03-02-PLAN.md
 Resume file: None
