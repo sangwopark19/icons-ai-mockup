@@ -42,7 +42,12 @@ Plans:
   3. Admin can suspend a user account, after which that user's API calls are rejected with a clear error
   4. Admin can soft-delete a user account, which anonymizes PII while retaining generation records
   5. Admin can change a user's role between admin and user
-**Plans**: TBD
+**Plans:** 4 plans
+Plans:
+- [ ] 02-01-PLAN.md — Backend: AdminService, dashboard/user routes, auth suspend check, adminApi client
+- [ ] 02-02-PLAN.md — Dashboard frontend: KPI cards, failure chart, Recharts setup, 30s polling
+- [ ] 02-03-PLAN.md — User management frontend: table, search/filter, action menu, confirm dialogs
+- [ ] 02-04-PLAN.md — Visual and functional verification checkpoint
 
 ### Phase 3: Generation and Content Monitoring
 **Goal**: Admin can monitor all generation jobs across users, diagnose failures, retry jobs, and browse or delete generated content
@@ -76,6 +81,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Auth Foundation | 2/2 | Complete   | 2026-03-10 |
-| 2. Dashboard and User Management | 0/TBD | Not started | - |
+| 2. Dashboard and User Management | 0/4 | Planning complete | - |
 | 3. Generation and Content Monitoring | 0/TBD | Not started | - |
 | 4. API Key Management | 0/TBD | Not started | - |
