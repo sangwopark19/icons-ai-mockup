@@ -10,18 +10,35 @@ vi.mock('../../lib/prisma.js', () => ({
     },
     generation: {
       count: vi.fn(),
+      findMany: vi.fn(),
+      findUnique: vi.fn(),
+      update: vi.fn(),
+      groupBy: vi.fn(),
     },
     generatedImage: {
       aggregate: vi.fn(),
+      findMany: vi.fn(),
+      findUnique: vi.fn(),
+      delete: vi.fn(),
+      deleteMany: vi.fn(),
+      count: vi.fn(),
     },
     $queryRaw: vi.fn(),
   },
 }));
 
-// Mock generationQueue
+// Mock generationQueue and addGenerationJob
 vi.mock('../../lib/queue.js', () => ({
   generationQueue: {
     getJobCounts: vi.fn(),
+  },
+  addGenerationJob: vi.fn(),
+}));
+
+// Mock uploadService
+vi.mock('../../services/upload.service.js', () => ({
+  uploadService: {
+    deleteFile: vi.fn(),
   },
 }));
 
@@ -305,5 +322,390 @@ describe('AdminService - softDeleteUser', () => {
     // prisma.user has no delete mock - if it were called the test would detect it
     // We verify update was called instead
     expect(vi.mocked(prisma.user.update)).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ─── Phase 3: Generation Monitoring Tests ───────────────────────────────────
+
+const mockGeneration = {
+  id: 'gen1',
+  projectId: 'proj1',
+  mode: 'ip_change',
+  status: 'failed',
+  errorMessage: 'timeout',
+  retryCount: 1,
+  promptData: { sourceImagePath: '/path/to/img.png' },
+  options: { preserveStructure: true, transparentBackground: false, outputCount: 2 },
+  createdAt: new Date(),
+  completedAt: null,
+  project: { id: 'proj1', userId: 'u1', user: { email: 'test@example.com' } },
+};
+
+const mockGeneratedImage = {
+  id: 'img1',
+  generationId: 'gen1',
+  filePath: 'generations/u1/proj1/gen1/output_1.jpg',
+  thumbnailPath: 'generations/u1/proj1/gen1/thumb_output_1.jpg',
+  type: 'output',
+  width: 1024,
+  height: 1024,
+  fileSize: 512000,
+  createdAt: new Date(),
+};
+
+describe('AdminService - listGenerations', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should return paginated generation list with userEmail from project.user join', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.generation.findMany).mockResolvedValue([mockGeneration] as any);
+    vi.mocked(prisma.generation.count).mockResolvedValue(1);
+    vi.mocked(prisma.generation.groupBy).mockResolvedValue([] as any);
+
+    const result = await adminService.listGenerations({});
+
+    expect(result.generations).toHaveLength(1);
+    expect(result.generations[0]).toMatchObject({ id: 'gen1' });
+    expect(result.pagination).toMatchObject({ page: 1, limit: 20, total: 1 });
+  });
+
+  it('should apply status filter when provided', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.generation.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.generation.count).mockResolvedValue(0);
+    vi.mocked(prisma.generation.groupBy).mockResolvedValue([] as any);
+
+    await adminService.listGenerations({ status: 'failed' as any });
+
+    expect(vi.mocked(prisma.generation.findMany).mock.calls[0][0]).toMatchObject({
+      where: expect.objectContaining({ status: 'failed' }),
+    });
+  });
+
+  it('should apply email filter (case-insensitive) when provided', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.generation.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.generation.count).mockResolvedValue(0);
+    vi.mocked(prisma.generation.groupBy).mockResolvedValue([] as any);
+
+    await adminService.listGenerations({ email: 'test@example.com' });
+
+    const callArg = vi.mocked(prisma.generation.findMany).mock.calls[0][0] as any;
+    const whereClause = JSON.stringify(callArg?.where ?? {});
+    expect(whereClause).toContain('test@example.com');
+  });
+
+  it('should return statusCounts from prisma.generation.groupBy', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.generation.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.generation.count).mockResolvedValue(0);
+    vi.mocked(prisma.generation.groupBy).mockResolvedValue([
+      { status: 'completed', _count: { id: 10 } },
+      { status: 'failed', _count: { id: 3 } },
+    ] as any);
+
+    const result = await adminService.listGenerations({});
+
+    expect(result.statusCounts).toBeDefined();
+    expect(vi.mocked(prisma.generation.groupBy)).toHaveBeenCalled();
+  });
+
+  it('should default to page=1, limit=20 when not provided', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.generation.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.generation.count).mockResolvedValue(0);
+    vi.mocked(prisma.generation.groupBy).mockResolvedValue([] as any);
+
+    const result = await adminService.listGenerations({});
+
+    expect(result.pagination.page).toBe(1);
+    expect(result.pagination.limit).toBe(20);
+  });
+});
+
+describe('AdminService - retryGeneration', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should update status to pending, clear errorMessage, increment retryCount', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.generation.findUnique).mockResolvedValue(mockGeneration as any);
+    vi.mocked(prisma.generation.update).mockResolvedValue({
+      ...mockGeneration,
+      status: 'pending',
+      errorMessage: null,
+      retryCount: 2,
+    } as any);
+
+    await adminService.retryGeneration('gen1');
+
+    expect(vi.mocked(prisma.generation.update)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'gen1' },
+        data: expect.objectContaining({
+          status: 'pending',
+          errorMessage: null,
+          retryCount: { increment: 1 },
+        }),
+      })
+    );
+  });
+
+  it('should call addGenerationJob with correct GenerationJobData', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { addGenerationJob } = await import('../../lib/queue.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.generation.findUnique).mockResolvedValue(mockGeneration as any);
+    vi.mocked(prisma.generation.update).mockResolvedValue({
+      ...mockGeneration,
+      status: 'pending',
+    } as any);
+    vi.mocked(addGenerationJob).mockResolvedValue({} as any);
+
+    await adminService.retryGeneration('gen1');
+
+    expect(vi.mocked(addGenerationJob)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        generationId: 'gen1',
+        userId: 'u1',
+        projectId: 'proj1',
+        mode: 'ip_change',
+      })
+    );
+  });
+
+  it('should throw error if generation not found', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.generation.findUnique).mockResolvedValue(null);
+
+    await expect(adminService.retryGeneration('nonexistent')).rejects.toThrow();
+  });
+
+  it('should throw error if generation status is not failed', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.generation.findUnique).mockResolvedValue({
+      ...mockGeneration,
+      status: 'completed',
+    } as any);
+
+    await expect(adminService.retryGeneration('gen1')).rejects.toThrow();
+  });
+});
+
+// ─── Phase 3: Content Management Tests ──────────────────────────────────────
+
+describe('AdminService - listGeneratedImages', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should return paginated image list with generation.project.user.email join', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.generatedImage.findMany).mockResolvedValue([mockGeneratedImage] as any);
+    vi.mocked(prisma.generatedImage.count).mockResolvedValue(1);
+
+    const result = await adminService.listGeneratedImages({});
+
+    expect(result.images).toHaveLength(1);
+    expect(result.pagination).toMatchObject({ page: 1, limit: 20, total: 1 });
+  });
+
+  it('should apply email filter through nested project.user relation', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.generatedImage.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.generatedImage.count).mockResolvedValue(0);
+
+    await adminService.listGeneratedImages({ email: 'filter@example.com' });
+
+    const callArg = vi.mocked(prisma.generatedImage.findMany).mock.calls[0][0] as any;
+    const whereStr = JSON.stringify(callArg?.where ?? {});
+    expect(whereStr).toContain('filter@example.com');
+  });
+
+  it('should apply date range filter (startDate, endDate)', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.generatedImage.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.generatedImage.count).mockResolvedValue(0);
+
+    const startDate = new Date('2026-01-01');
+    const endDate = new Date('2026-03-01');
+    await adminService.listGeneratedImages({ startDate, endDate });
+
+    const callArg = vi.mocked(prisma.generatedImage.findMany).mock.calls[0][0] as any;
+    expect(callArg?.where).toBeDefined();
+  });
+
+  it('should apply projectId filter', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.generatedImage.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.generatedImage.count).mockResolvedValue(0);
+
+    await adminService.listGeneratedImages({ projectId: 'proj1' });
+
+    const callArg = vi.mocked(prisma.generatedImage.findMany).mock.calls[0][0] as any;
+    const whereStr = JSON.stringify(callArg?.where ?? {});
+    expect(whereStr).toContain('proj1');
+  });
+});
+
+describe('AdminService - deleteGeneratedImage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should delete DB record via prisma.generatedImage.delete', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { uploadService } = await import('../../services/upload.service.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.generatedImage.findUnique).mockResolvedValue(mockGeneratedImage as any);
+    vi.mocked(prisma.generatedImage.delete).mockResolvedValue(mockGeneratedImage as any);
+    vi.mocked(uploadService.deleteFile).mockResolvedValue(undefined);
+
+    await adminService.deleteGeneratedImage('img1');
+
+    expect(vi.mocked(prisma.generatedImage.delete)).toHaveBeenCalledWith({
+      where: { id: 'img1' },
+    });
+  });
+
+  it('should call uploadService.deleteFile for filePath and thumbnailPath', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { uploadService } = await import('../../services/upload.service.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.generatedImage.findUnique).mockResolvedValue(mockGeneratedImage as any);
+    vi.mocked(prisma.generatedImage.delete).mockResolvedValue(mockGeneratedImage as any);
+    vi.mocked(uploadService.deleteFile).mockResolvedValue(undefined);
+
+    await adminService.deleteGeneratedImage('img1');
+
+    expect(vi.mocked(uploadService.deleteFile)).toHaveBeenCalledWith(
+      mockGeneratedImage.filePath
+    );
+    expect(vi.mocked(uploadService.deleteFile)).toHaveBeenCalledWith(
+      mockGeneratedImage.thumbnailPath
+    );
+  });
+
+  it('should NOT call prisma.generation.delete (Generation preserved)', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { uploadService } = await import('../../services/upload.service.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.generatedImage.findUnique).mockResolvedValue(mockGeneratedImage as any);
+    vi.mocked(prisma.generatedImage.delete).mockResolvedValue(mockGeneratedImage as any);
+    vi.mocked(uploadService.deleteFile).mockResolvedValue(undefined);
+
+    await adminService.deleteGeneratedImage('img1');
+
+    // prisma.generation.delete is not in the mock — we verify it wasn't called
+    // by checking only generatedImage.delete was called (not generation.delete)
+    expect(vi.mocked(prisma.generatedImage.delete)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(prisma.generatedImage.delete)).toHaveBeenCalledWith({
+      where: { id: 'img1' },
+    });
+  });
+
+  it('should throw error if image not found', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.generatedImage.findUnique).mockResolvedValue(null);
+
+    await expect(adminService.deleteGeneratedImage('nonexistent')).rejects.toThrow();
+  });
+});
+
+describe('AdminService - countImages', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should return count matching filter params', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.generatedImage.count).mockResolvedValue(42);
+
+    const result = await adminService.countImages({});
+
+    expect(result).toBe(42);
+    expect(vi.mocked(prisma.generatedImage.count)).toHaveBeenCalled();
+  });
+});
+
+describe('AdminService - bulkDeleteImages', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should delete all matching GeneratedImage records via deleteMany', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { uploadService } = await import('../../services/upload.service.js');
+    const { adminService } = await import('../admin.service.js');
+
+    const images = [
+      mockGeneratedImage,
+      { ...mockGeneratedImage, id: 'img2', filePath: 'path2.jpg', thumbnailPath: null },
+    ];
+    vi.mocked(prisma.generatedImage.findMany).mockResolvedValue(images as any);
+    vi.mocked(prisma.generatedImage.deleteMany).mockResolvedValue({ count: 2 });
+    vi.mocked(uploadService.deleteFile).mockResolvedValue(undefined);
+
+    await adminService.bulkDeleteImages({ ids: ['img1', 'img2'] });
+
+    expect(vi.mocked(prisma.generatedImage.deleteMany)).toHaveBeenCalled();
+  });
+
+  it('should call uploadService.deleteFile for each image filePath and thumbnailPath', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { uploadService } = await import('../../services/upload.service.js');
+    const { adminService } = await import('../admin.service.js');
+
+    const images = [
+      mockGeneratedImage,
+      { ...mockGeneratedImage, id: 'img2', filePath: 'path2.jpg', thumbnailPath: 'thumb2.jpg' },
+    ];
+    vi.mocked(prisma.generatedImage.findMany).mockResolvedValue(images as any);
+    vi.mocked(prisma.generatedImage.deleteMany).mockResolvedValue({ count: 2 });
+    vi.mocked(uploadService.deleteFile).mockResolvedValue(undefined);
+
+    await adminService.bulkDeleteImages({ ids: ['img1', 'img2'] });
+
+    // Each image should have its filePath deleted
+    expect(vi.mocked(uploadService.deleteFile)).toHaveBeenCalledWith(mockGeneratedImage.filePath);
+    expect(vi.mocked(uploadService.deleteFile)).toHaveBeenCalledWith('path2.jpg');
+    // thumbnailPaths should also be deleted
+    expect(vi.mocked(uploadService.deleteFile)).toHaveBeenCalledWith(mockGeneratedImage.thumbnailPath);
+    expect(vi.mocked(uploadService.deleteFile)).toHaveBeenCalledWith('thumb2.jpg');
   });
 });
