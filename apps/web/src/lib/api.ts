@@ -170,4 +170,90 @@ export const imageApi = {
   },
 };
 
-export default { authApi, projectApi, imageApi };
+/**
+ * 관리자 API 타입
+ */
+export interface DashboardStats {
+  userCount: number;
+  generationCount: number;
+  failedJobCount: number;
+  queueDepth: number;
+  storageBytes: number;
+  activeApiKeys: null;
+  userCountYesterday: number;
+  generationCountYesterday: number;
+  failedJobCountYesterday: number;
+}
+
+export interface HourlyChartPoint {
+  hour: string;
+  count: number;
+}
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  lastLoginAt: string | null;
+}
+
+export interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+/**
+ * 관리자 관련 API
+ */
+export const adminApi = {
+  getDashboardStats: (token: string) =>
+    request<{ success: true; data: DashboardStats }>('/api/admin/dashboard/stats', { token }),
+
+  getFailureChart: (token: string) =>
+    request<{ success: true; data: HourlyChartPoint[] }>('/api/admin/dashboard/chart', { token }),
+
+  listUsers: (
+    token: string,
+    params?: { page?: number; email?: string; role?: string; status?: string }
+  ) => {
+    const searchParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined) searchParams.set(k, String(v));
+      });
+    }
+    const qs = searchParams.toString();
+    return request<{ success: true; data: AdminUser[]; pagination: Pagination }>(
+      `/api/admin/users${qs ? '?' + qs : ''}`,
+      { token }
+    );
+  },
+
+  updateUserStatus: (token: string, id: string, status: 'active' | 'suspended') =>
+    request<{ success: true; data: AdminUser }>(`/api/admin/users/${id}/status`, {
+      method: 'PATCH',
+      token,
+      body: JSON.stringify({ status }),
+    }),
+
+  updateUserRole: (token: string, id: string, role: 'admin' | 'user') =>
+    request<{ success: true; data: AdminUser }>(`/api/admin/users/${id}/role`, {
+      method: 'PATCH',
+      token,
+      body: JSON.stringify({ role }),
+    }),
+
+  softDeleteUser: (token: string, id: string) =>
+    request<{ success: true; message: string }>(`/api/admin/users/${id}`, {
+      method: 'DELETE',
+      token,
+    }),
+};
+
+export default { authApi, projectApi, imageApi, adminApi };

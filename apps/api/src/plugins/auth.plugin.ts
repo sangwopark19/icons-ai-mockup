@@ -38,6 +38,20 @@ async function authPlugin(fastify: FastifyInstance) {
           throw new Error('유효하지 않은 토큰입니다');
         }
 
+        // 정지/삭제된 계정 차단 (모든 인증된 요청에서 적용)
+        if (user.status === 'suspended') {
+          return reply.code(403).send({
+            success: false,
+            error: { code: 'ACCOUNT_SUSPENDED', message: '계정이 정지되었습니다' },
+          });
+        }
+        if (user.status === 'deleted') {
+          return reply.code(403).send({
+            success: false,
+            error: { code: 'ACCOUNT_DELETED', message: '삭제된 계정입니다' },
+          });
+        }
+
         // request에 사용자 정보 첨부
         (request as any).user = user;
       } catch (error) {
