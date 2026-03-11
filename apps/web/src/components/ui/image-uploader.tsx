@@ -12,6 +12,7 @@ interface ImageUploaderProps {
   accept?: string;
   maxSize?: number; // bytes
   onUpload: (file: File) => void;
+  onRemove?: () => void;
   onError?: (error: string) => void;
   preview?: string | null;
   isLoading?: boolean;
@@ -27,6 +28,7 @@ export function ImageUploader({
   accept = 'image/png,image/jpeg,image/webp',
   maxSize = 10 * 1024 * 1024, // 10MB
   onUpload,
+  onRemove,
   onError,
   preview,
   isLoading,
@@ -123,6 +125,7 @@ export function ImageUploader({
     if (inputRef.current) {
       inputRef.current.value = '';
     }
+    onRemove?.();
   };
 
   return (

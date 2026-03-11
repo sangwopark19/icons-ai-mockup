@@ -151,6 +151,16 @@ export default function IPChangePage() {
     reader.readAsDataURL(file);
   };
 
+  const handleSourceRemove = () => {
+    setSourceImage(null);
+    setSourcePreview(null);
+  };
+
+  const handleCharacterRemove = () => {
+    setCharacterImage(null);
+    setCharacterPreview(null);
+  };
+
   const handleUserInstructionsChange = (value: string) => {
     if (value.length > maxUserInstructionsLength) return;
     setUserInstructions(value);
@@ -203,6 +213,7 @@ export default function IPChangePage() {
             label="원본 제품 이미지"
             description="변경할 제품 사진을 업로드하세요"
             onUpload={handleSourceUpload}
+            onRemove={handleSourceRemove}
             onError={setError}
             preview={sourcePreview}
           />
@@ -212,6 +223,7 @@ export default function IPChangePage() {
             label="새 캐릭터 이미지"
             description="적용할 캐릭터 이미지를 업로드하세요"
             onUpload={handleCharacterUpload}
+            onRemove={handleCharacterRemove}
             onError={setError}
             preview={characterPreview}
           />

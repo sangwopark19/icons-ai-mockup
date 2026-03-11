@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev",
+    "dev": "turbo run dev dev:worker",
     "dev:worker": "cd apps/api && pnpm dev:worker",
     "lint": "turbo run lint",
     "type-check": "turbo run type-check",
@@ -16,6 +16,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
+    "concurrently": "^9.2.1",
     "eslint": "^9.18.0",
     "prettier": "^3.4.2",
     "prettier-plugin-tailwindcss": "^0.6.9",

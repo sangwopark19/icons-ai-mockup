@@ -128,6 +128,16 @@ export default function SketchToRealPage() {
     reader.readAsDataURL(file);
   };
 
+  const handleSketchRemove = () => {
+    setSketchImage(null);
+    setSketchPreview(null);
+  };
+
+  const handleTextureRemove = () => {
+    setTextureImage(null);
+    setTexturePreview(null);
+  };
+
   if (authLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--bg-primary)]">
@@ -170,6 +180,7 @@ export default function SketchToRealPage() {
             label="스케치 이미지"
             description="2D 스케치/드로잉을 업로드하세요"
             onUpload={handleSketchUpload}
+            onRemove={handleSketchRemove}
             onError={setError}
             preview={sketchPreview}
           />
@@ -179,6 +190,7 @@ export default function SketchToRealPage() {
             label="참조 질감 이미지 (선택)"
             description="원하는 질감/재질 참조 이미지"
             onUpload={handleTextureUpload}
+            onRemove={handleTextureRemove}
             onError={setError}
             preview={texturePreview}
           />
