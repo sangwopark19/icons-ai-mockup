@@ -17,19 +17,19 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Dashboard
 
-- [ ] **DASH-01**: 전체 사용자 수, 전체 생성 건수 KPI 카드 표시
-- [ ] **DASH-02**: 최근 24시간 실패 작업 수, 현재 큐 깊이 표시
-- [ ] **DASH-03**: 전체 이미지 스토리지 사용량 표시
-- [ ] **DASH-04**: 활성 Gemini API 키 정보 및 호출 횟수 표시
-- [ ] **DASH-05**: 시간대별 생성 실패율 차트 표시
+- [x] **DASH-01**: 전체 사용자 수, 전체 생성 건수 KPI 카드 표시
+- [x] **DASH-02**: 최근 24시간 실패 작업 수, 현재 큐 깊이 표시
+- [x] **DASH-03**: 전체 이미지 스토리지 사용량 표시
+- [x] **DASH-04**: 활성 Gemini API 키 정보 및 호출 횟수 표시
+- [x] **DASH-05**: 시간대별 생성 실패율 차트 표시
 
 ### User Management
 
-- [ ] **USER-01**: 관리자가 전체 사용자 목록을 페이지네이션으로 조회할 수 있다
-- [ ] **USER-02**: 관리자가 이메일로 사용자를 검색하고 상태별 필터링할 수 있다
-- [ ] **USER-03**: 관리자가 사용자 계정을 정지/해제할 수 있다 (soft suspend)
-- [ ] **USER-04**: 관리자가 사용자 계정을 삭제할 수 있다 (soft delete, PII 익명화)
-- [ ] **USER-05**: 관리자가 사용자의 역할을 admin/user로 변경할 수 있다
+- [x] **USER-01**: 관리자가 전체 사용자 목록을 페이지네이션으로 조회할 수 있다
+- [x] **USER-02**: 관리자가 이메일로 사용자를 검색하고 상태별 필터링할 수 있다
+- [x] **USER-03**: 관리자가 사용자 계정을 정지/해제할 수 있다 (soft suspend)
+- [x] **USER-04**: 관리자가 사용자 계정을 삭제할 수 있다 (soft delete, PII 익명화)
+- [x] **USER-05**: 관리자가 사용자의 역할을 admin/user로 변경할 수 있다
 
 ### Generation Monitoring
 
@@ -93,16 +93,16 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AUTH-03 | Phase 1 | Complete |
 | AUTH-04 | Phase 1 | Complete |
 | AUTH-05 | Phase 1 | Complete |
-| DASH-01 | Phase 2 | Pending |
-| DASH-02 | Phase 2 | Pending |
-| DASH-03 | Phase 2 | Pending |
-| DASH-04 | Phase 2 | Pending |
-| DASH-05 | Phase 2 | Pending |
-| USER-01 | Phase 2 | Pending |
-| USER-02 | Phase 2 | Pending |
-| USER-03 | Phase 2 | Pending |
-| USER-04 | Phase 2 | Pending |
-| USER-05 | Phase 2 | Pending |
+| DASH-01 | Phase 2 | Complete |
+| DASH-02 | Phase 2 | Complete |
+| DASH-03 | Phase 2 | Complete |
+| DASH-04 | Phase 2 | Complete |
+| DASH-05 | Phase 2 | Complete |
+| USER-01 | Phase 2 | Complete |
+| USER-02 | Phase 2 | Complete |
+| USER-03 | Phase 2 | Complete |
+| USER-04 | Phase 2 | Complete |
+| USER-05 | Phase 2 | Complete |
 | GEN-01 | Phase 3 | Pending |
 | GEN-02 | Phase 3 | Pending |
 | GEN-03 | Phase 3 | Pending |
