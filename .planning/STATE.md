@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 03-generation-and-content-monitoring/03-05-PLAN.md
-last_updated: "2026-03-11T05:14:14.281Z"
+stopped_at: Completed 03-generation-and-content-monitoring/03-04-PLAN.md
+last_updated: "2026-03-11T05:14:38.824Z"
 last_activity: 2026-03-10 — Roadmap created, 28 requirements mapped to 4 phases
 progress:
   total_phases: 4
   completed_phases: 2
   total_plans: 12
-  completed_plans: 10
+  completed_plans: 11
   percent: 0
 ---
 
@@ -61,6 +61,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 03-generation-and-content-monitoring P02 | 4 | 2 tasks | 5 files |
 | Phase 03-generation-and-content-monitoring P03 | 6 | 2 tasks | 5 files |
 | Phase 03-generation-and-content-monitoring P05 | 3 | 2 tasks | 6 files |
+| Phase 03-generation-and-content-monitoring P04 | 3 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -94,6 +95,9 @@ Progress: [░░░░░░░░░░] 0%
 - [Phase 03-generation-and-content-monitoring]: bulkDeleteImages returns { deletedCount } not void — deleteGeneratedImage never touches Generation table
 - [Phase 03-generation-and-content-monitoring]: Staged filter pattern in ContentGrid: UI inputs separate from applied states, filters applied on 검색 click only
 - [Phase 03-generation-and-content-monitoring]: Bulk delete button conditionally rendered (hasActiveFilter) to prevent accidental global deletion
+- [Phase 03-04]: Direct retry on table row (no confirmation dialog) per CONTEXT.md — GEN-03 retry is low-risk
+- [Phase 03-04]: Optimistic pending status update on retry then re-fetch for immediate UI feedback
+- [Phase 03-04]: listContentProjects filters to projects with at least one generatedImage to reduce dropdown noise
 
 ### Pending Todos
 
@@ -107,6 +111,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-11T05:14:14.280Z
-Stopped at: Completed 03-generation-and-content-monitoring/03-05-PLAN.md
+Last session: 2026-03-11T05:14:38.822Z
+Stopped at: Completed 03-generation-and-content-monitoring/03-04-PLAN.md
 Resume file: None
