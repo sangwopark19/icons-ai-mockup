@@ -1,6 +1,7 @@
 import { UserRole, UserStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
-import { generationQueue } from '../lib/queue.js';
+import { generationQueue, addGenerationJob } from '../lib/queue.js';
+import { uploadService } from './upload.service.js';
 
 export interface DashboardStats {
   userCount: number;
@@ -44,6 +45,54 @@ export interface ListUsersResult {
     total: number;
     totalPages: number;
   };
+}
+
+export interface ListGenerationsParams {
+  page?: number;
+  limit?: number;
+  status?: 'pending' | 'processing' | 'completed' | 'failed';
+  email?: string;
+}
+
+export interface ListGenerationsResult {
+  generations: Array<{
+    id: string;
+    mode: string;
+    status: string;
+    errorMessage: string | null;
+    retryCount: number;
+    promptData: unknown;
+    options: unknown;
+    createdAt: Date;
+    userEmail: string;
+  }>;
+  pagination: { page: number; limit: number; total: number; totalPages: number };
+  statusCounts: Record<string, number>;
+}
+
+export interface ListImagesParams {
+  page?: number;
+  limit?: number;
+  email?: string;
+  projectId?: string;
+  startDate?: Date;
+  endDate?: Date;
+  ids?: string[];
+}
+
+export interface ListImagesResult {
+  images: Array<{
+    id: string;
+    generationId: string;
+    filePath: string;
+    thumbnailPath: string | null;
+    type: string;
+    width: number;
+    height: number;
+    fileSize: number;
+    createdAt: Date;
+  }>;
+  pagination: { page: number; limit: number; total: number; totalPages: number };
 }
 
 export class AdminService {
@@ -192,6 +241,307 @@ export class AdminService {
         passwordHash: 'DELETED',
       },
     });
+  }
+
+  async listGenerations(params: ListGenerationsParams): Promise<ListGenerationsResult> {
+    const page = params.page ?? 1;
+    const limit = params.limit ?? 20;
+    const skip = (page - 1) * limit;
+
+    const where: Record<string, unknown> = {};
+
+    if (params.status) {
+      where.status = params.status;
+    }
+    if (params.email) {
+      where.project = {
+        is: {
+          user: {
+            is: {
+              email: { contains: params.email, mode: 'insensitive' },
+            },
+          },
+        },
+      };
+    }
+
+    const [generations, total, groupByResult] = await Promise.all([
+      prisma.generation.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          project: {
+            include: { user: { select: { email: true } } },
+          },
+        },
+      }),
+      prisma.generation.count({ where }),
+      prisma.generation.groupBy({
+        by: ['status'],
+        _count: { _all: true },
+      }),
+    ]);
+
+    const statusCounts: Record<string, number> = {};
+    for (const row of groupByResult) {
+      statusCounts[row.status] = row._count._all;
+    }
+
+    return {
+      generations: generations.map((g) => ({
+        id: g.id,
+        mode: g.mode,
+        status: g.status,
+        errorMessage: g.errorMessage,
+        retryCount: g.retryCount,
+        promptData: g.promptData,
+        options: g.options,
+        createdAt: g.createdAt,
+        userEmail: g.project.user.email,
+      })),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+      statusCounts,
+    };
+  }
+
+  async retryGeneration(id: string) {
+    const generation = await prisma.generation.findUnique({
+      where: { id },
+      include: { project: true },
+    });
+
+    if (!generation) {
+      throw new Error('Generation not found');
+    }
+    if (generation.status !== 'failed') {
+      throw new Error('Only failed generations can be retried');
+    }
+
+    const updated = await prisma.generation.update({
+      where: { id },
+      data: {
+        status: 'pending',
+        errorMessage: null,
+        retryCount: { increment: 1 },
+      },
+    });
+
+    const promptData = (generation.promptData as Record<string, unknown>) ?? {};
+    const options = (generation.options as Record<string, unknown>) ?? {};
+
+    await addGenerationJob({
+      generationId: generation.id,
+      userId: generation.project.userId,
+      projectId: generation.projectId,
+      mode: generation.mode as 'ip_change' | 'sketch_to_real',
+      sourceImagePath: promptData.sourceImagePath as string | undefined,
+      characterImagePath: promptData.characterImagePath as string | undefined,
+      textureImagePath: promptData.textureImagePath as string | undefined,
+      prompt: promptData.prompt as string | undefined,
+      options: {
+        preserveStructure: (options.preserveStructure as boolean) ?? false,
+        transparentBackground: (options.transparentBackground as boolean) ?? false,
+        outputCount: (options.outputCount as number) ?? 1,
+      },
+    });
+
+    return updated;
+  }
+
+  async listGeneratedImages(params: ListImagesParams): Promise<ListImagesResult> {
+    const page = params.page ?? 1;
+    const limit = params.limit ?? 20;
+    const skip = (page - 1) * limit;
+
+    const where: Record<string, unknown> = {};
+
+    if (params.email) {
+      where.generation = {
+        is: {
+          project: {
+            is: {
+              user: {
+                is: {
+                  email: { contains: params.email, mode: 'insensitive' },
+                },
+              },
+            },
+          },
+        },
+      };
+    }
+    if (params.projectId) {
+      where.generation = {
+        ...(where.generation as object | undefined),
+        is: {
+          ...((where.generation as Record<string, unknown> | undefined)?.is as object | undefined),
+          projectId: params.projectId,
+        },
+      };
+    }
+    if (params.startDate || params.endDate) {
+      const createdAt: Record<string, unknown> = {};
+      if (params.startDate) createdAt.gte = params.startDate;
+      if (params.endDate) createdAt.lte = params.endDate;
+      where.createdAt = createdAt;
+    }
+
+    const [images, total] = await Promise.all([
+      prisma.generatedImage.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          generationId: true,
+          filePath: true,
+          thumbnailPath: true,
+          type: true,
+          width: true,
+          height: true,
+          fileSize: true,
+          createdAt: true,
+        },
+      }),
+      prisma.generatedImage.count({ where }),
+    ]);
+
+    return {
+      images,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async deleteGeneratedImage(imageId: string): Promise<void> {
+    const image = await prisma.generatedImage.findUnique({ where: { id: imageId } });
+
+    if (!image) {
+      throw new Error('Image not found');
+    }
+
+    try {
+      await uploadService.deleteFile(image.filePath);
+    } catch {
+      // File may already be missing; proceed with DB delete
+    }
+    if (image.thumbnailPath) {
+      try {
+        await uploadService.deleteFile(image.thumbnailPath);
+      } catch {
+        // File may already be missing; proceed with DB delete
+      }
+    }
+
+    await prisma.generatedImage.delete({ where: { id: imageId } });
+  }
+
+  async countImages(params: Omit<ListImagesParams, 'page' | 'limit'>): Promise<number> {
+    const where: Record<string, unknown> = {};
+
+    if (params.email) {
+      where.generation = {
+        is: {
+          project: {
+            is: {
+              user: {
+                is: {
+                  email: { contains: params.email, mode: 'insensitive' },
+                },
+              },
+            },
+          },
+        },
+      };
+    }
+    if (params.projectId) {
+      where.generation = {
+        is: {
+          projectId: params.projectId,
+        },
+      };
+    }
+    if (params.startDate || params.endDate) {
+      const createdAt: Record<string, unknown> = {};
+      if (params.startDate) createdAt.gte = params.startDate;
+      if (params.endDate) createdAt.lte = params.endDate;
+      where.createdAt = createdAt;
+    }
+    if (params.ids) {
+      where.id = { in: params.ids };
+    }
+
+    return prisma.generatedImage.count({ where });
+  }
+
+  async bulkDeleteImages(params: Omit<ListImagesParams, 'page' | 'limit'>): Promise<void> {
+    const where: Record<string, unknown> = {};
+
+    if (params.email) {
+      where.generation = {
+        is: {
+          project: {
+            is: {
+              user: {
+                is: {
+                  email: { contains: params.email, mode: 'insensitive' },
+                },
+              },
+            },
+          },
+        },
+      };
+    }
+    if (params.projectId) {
+      where.generation = {
+        is: {
+          projectId: params.projectId,
+        },
+      };
+    }
+    if (params.startDate || params.endDate) {
+      const createdAt: Record<string, unknown> = {};
+      if (params.startDate) createdAt.gte = params.startDate;
+      if (params.endDate) createdAt.lte = params.endDate;
+      where.createdAt = createdAt;
+    }
+    if (params.ids) {
+      where.id = { in: params.ids };
+    }
+
+    const images = await prisma.generatedImage.findMany({
+      where,
+      select: { id: true, filePath: true, thumbnailPath: true },
+    });
+
+    for (const image of images) {
+      try {
+        await uploadService.deleteFile(image.filePath);
+      } catch {
+        // File may already be missing
+      }
+      if (image.thumbnailPath) {
+        try {
+          await uploadService.deleteFile(image.thumbnailPath);
+        } catch {
+          // File may already be missing
+        }
+      }
+    }
+
+    await prisma.generatedImage.deleteMany({ where });
   }
 }
 
