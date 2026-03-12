@@ -192,7 +192,7 @@ export interface DashboardStats {
   failedJobCount: number;
   queueDepth: number;
   storageBytes: number;
-  activeApiKeys: null;
+  activeApiKeys: { alias: string; callCount: number } | null;
   userCountYesterday: number;
   generationCountYesterday: number;
   failedJobCountYesterday: number;

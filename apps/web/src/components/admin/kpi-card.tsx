@@ -10,6 +10,7 @@ interface KpiCardProps {
   delta?: { value: number; percentage: number } | null;
   format?: 'number' | 'bytes';
   placeholder?: boolean;
+  subtitle?: string;
 }
 
 function formatBytes(bytes: number): string {
@@ -24,7 +25,7 @@ function formatNumber(value: number): string {
   return new Intl.NumberFormat('ko-KR').format(value);
 }
 
-export function KpiCard({ label, value, icon, delta, format = 'number', placeholder = false }: KpiCardProps) {
+export function KpiCard({ label, value, icon, delta, format = 'number', placeholder = false, subtitle }: KpiCardProps) {
   const displayValue = (() => {
     if (placeholder) return 'N/A';
     if (typeof value === 'string') return value;
@@ -64,6 +65,8 @@ export function KpiCard({ label, value, icon, delta, format = 'number', placehol
             {delta.percentage.toFixed(1)}%)
           </span>
         </div>
+      ) : subtitle ? (
+        <p className="text-sm text-[var(--text-secondary)]">{subtitle}</p>
       ) : (
         <p className="text-sm text-[var(--text-secondary)]">—</p>
       )}
