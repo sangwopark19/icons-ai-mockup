@@ -46,12 +46,12 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### API Key Management
 
-- [ ] **KEY-01**: 관리자가 Gemini API 키 목록을 조회할 수 있다 (별칭, 마지막 4자리, 상태)
-- [ ] **KEY-02**: 관리자가 새 API 키를 등록할 수 있다 (암호화 저장)
-- [ ] **KEY-03**: 관리자가 API 키를 삭제할 수 있다
-- [ ] **KEY-04**: 관리자가 활성 키를 수동 전환할 수 있다 (단일 활성 키 제약)
-- [ ] **KEY-05**: GeminiService가 DB의 활성 키를 읽어 사용한다 (.env 대신)
-- [ ] **KEY-06**: 각 API 키의 호출 횟수가 표시된다
+- [x] **KEY-01**: 관리자가 Gemini API 키 목록을 조회할 수 있다 (별칭, 마지막 4자리, 상태)
+- [x] **KEY-02**: 관리자가 새 API 키를 등록할 수 있다 (암호화 저장)
+- [x] **KEY-03**: 관리자가 API 키를 삭제할 수 있다
+- [x] **KEY-04**: 관리자가 활성 키를 수동 전환할 수 있다 (단일 활성 키 제약)
+- [x] **KEY-05**: GeminiService가 DB의 활성 키를 읽어 사용한다 (.env 대신)
+- [x] **KEY-06**: 각 API 키의 호출 횟수가 표시된다
 
 ## v2 Requirements
 
@@ -110,12 +110,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CONT-02 | Phase 3 | Complete |
 | CONT-03 | Phase 3 | Complete |
 | CONT-04 | Phase 3 | Complete |
-| KEY-01 | Phase 4 | Pending |
-| KEY-02 | Phase 4 | Pending |
-| KEY-03 | Phase 4 | Pending |
-| KEY-04 | Phase 4 | Pending |
-| KEY-05 | Phase 4 | Pending |
-| KEY-06 | Phase 4 | Pending |
+| KEY-01 | Phase 4 | Complete |
+| KEY-02 | Phase 4 | Complete |
+| KEY-03 | Phase 4 | Complete |
+| KEY-04 | Phase 4 | Complete |
+| KEY-05 | Phase 4 | Complete |
+| KEY-06 | Phase 4 | Complete |
 
 **Coverage:**
 - v1 requirements: 28 total

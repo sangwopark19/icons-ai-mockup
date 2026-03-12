@@ -78,7 +78,7 @@ Plans:
   3. Admin can delete an API key (only if it is not currently active)
   4. Admin can activate a different key; only one key is active at a time and new generation jobs immediately use the newly active key
   5. Image generation continues to work end-to-end after switching the active key (no env var fallback)
-**Plans:** 5 plans
+**Plans:** 1/5 plans executed
 Plans:
 - [ ] 04-01-PLAN.md — TDD Wave 0: RED tests for crypto utility and AdminService API key methods
 - [ ] 04-02-PLAN.md — Backend: Prisma ApiKey model, crypto utility, AdminService API key methods (GREEN)
@@ -96,4 +96,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | 1. Auth Foundation | 2/2 | Complete   | 2026-03-10 |
 | 2. Dashboard and User Management | 0/4 | Planning complete | - |
 | 3. Generation and Content Monitoring | 5/6 | In Progress|  |
-| 4. API Key Management | 0/5 | Planning complete | - |
+| 4. API Key Management | 1/5 | In Progress|  |
