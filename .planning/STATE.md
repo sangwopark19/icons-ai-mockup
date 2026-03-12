@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Phase 5 context gathered
-last_updated: "2026-03-12T05:31:09.904Z"
+stopped_at: Completed 05-01-PLAN.md — DASH-04 gap closed
+last_updated: "2026-03-12T05:43:39.079Z"
 last_activity: 2026-03-10 — Roadmap created, 28 requirements mapped to 4 phases
 progress:
   total_phases: 5
-  completed_phases: 4
-  total_plans: 17
-  completed_plans: 17
+  completed_phases: 5
+  total_plans: 18
+  completed_plans: 18
   percent: 0
 ---
 
@@ -69,6 +69,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 04-api-key-management P04 | 7 | 2 tasks | 4 files |
 | Phase 04-api-key-management P05 | 2 | 1 tasks | 0 files |
 | Phase 04-api-key-management P05 | 2 | 2 tasks | 0 files |
+| Phase 05-dashboard-active-key-wiring P01 | 5 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -116,6 +117,8 @@ Progress: [░░░░░░░░░░] 0%
 - [Phase 04-api-key-management]: Custom toast state (not sonner) — sonner not installed; matched existing content-grid.tsx pattern
 - [Phase 04-api-key-management]: Reused ConfirmDialog from Phase 2/3 for delete/activate confirmations — already has stopPropagation, loading state, danger variant
 - [Phase 04-api-key-management]: Phase 4 declared complete after human visual verification of /admin/api-keys — KEY-01 through KEY-06 all satisfied
+- [Phase 05-dashboard-active-key-wiring]: subtitle prop renders in same bottom slot as delta — only shows when delta is absent, preserving card layout
+- [Phase 05-dashboard-active-key-wiring]: callCount used as primary KPI value for active key; delta not passed since cumulative counts are not meaningful as day-over-day delta
 
 ### Pending Todos
 
@@ -129,6 +132,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-12T05:31:09.901Z
-Stopped at: Phase 5 context gathered
-Resume file: .planning/phases/05-dashboard-active-key-wiring/05-CONTEXT.md
+Last session: 2026-03-12T05:43:39.077Z
+Stopped at: Completed 05-01-PLAN.md — DASH-04 gap closed
+Resume file: None

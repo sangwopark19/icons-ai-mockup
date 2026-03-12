@@ -20,7 +20,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **DASH-01**: 전체 사용자 수, 전체 생성 건수 KPI 카드 표시
 - [x] **DASH-02**: 최근 24시간 실패 작업 수, 현재 큐 깊이 표시
 - [x] **DASH-03**: 전체 이미지 스토리지 사용량 표시
-- [ ] **DASH-04**: 활성 Gemini API 키 정보 및 호출 횟수 표시
+- [x] **DASH-04**: 활성 Gemini API 키 정보 및 호출 횟수 표시
 - [x] **DASH-05**: 시간대별 생성 실패율 차트 표시
 
 ### User Management
@@ -96,7 +96,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DASH-01 | Phase 2 | Complete |
 | DASH-02 | Phase 2 | Complete |
 | DASH-03 | Phase 2 | Complete |
-| DASH-04 | Phase 5 | Pending |
+| DASH-04 | Phase 5 | Complete |
 | DASH-05 | Phase 2 | Complete |
 | USER-01 | Phase 2 | Complete |
 | USER-02 | Phase 2 | Complete |

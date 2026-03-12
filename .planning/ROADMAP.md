@@ -14,7 +14,7 @@ This milestone adds a secure admin panel to an existing AI mockup generation Saa
 - [ ] **Phase 2: Dashboard and User Management** - System health overview and full user CRUD
 - [ ] **Phase 3: Generation and Content Monitoring** - Job monitoring, queue visibility, and content browsing/deletion
 - [x] **Phase 4: API Key Management** - Multi-key Gemini management with GeminiService refactor (completed 2026-03-12)
-- [ ] **Phase 5: Dashboard Active Key Display Wiring** - DASH-04 frontend placeholder → real active key data (gap closure)
+- [x] **Phase 5: Dashboard Active Key Display Wiring** - DASH-04 frontend placeholder → real active key data (gap closure) (completed 2026-03-12)
 
 ## Phase Details
 
@@ -110,4 +110,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | 2. Dashboard and User Management | 0/4 | Planning complete | - |
 | 3. Generation and Content Monitoring | 5/6 | In Progress|  |
 | 4. API Key Management | 5/5 | Complete   | 2026-03-12 |
-| 5. Dashboard Active Key Wiring | 0/1 | Pending | - |
+| 5. Dashboard Active Key Wiring | 1/1 | Complete   | 2026-03-12 |
