@@ -3,6 +3,7 @@ import dashboardRoutes from './dashboard.routes.js';
 import usersRoutes from './users.routes.js';
 import generationsRoutes from './generations.routes.js';
 import contentRoutes from './content.routes.js';
+import apiKeysRoutes from './api-keys.routes.js';
 
 /**
  * 관리자 라우트
@@ -30,6 +31,9 @@ const adminRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
 
   // 콘텐츠 관리 라우트 등록
   fastify.register(contentRoutes, { prefix: '/content' });
+
+  // API 키 관리 라우트 등록
+  fastify.register(apiKeysRoutes, { prefix: '/api-keys' });
 };
 
 export default adminRoutes;
