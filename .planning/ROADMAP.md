@@ -14,6 +14,7 @@ This milestone adds a secure admin panel to an existing AI mockup generation Saa
 - [ ] **Phase 2: Dashboard and User Management** - System health overview and full user CRUD
 - [ ] **Phase 3: Generation and Content Monitoring** - Job monitoring, queue visibility, and content browsing/deletion
 - [x] **Phase 4: API Key Management** - Multi-key Gemini management with GeminiService refactor (completed 2026-03-12)
+- [ ] **Phase 5: Dashboard Active Key Display Wiring** - DASH-04 frontend placeholder → real active key data (gap closure)
 
 ## Phase Details
 
@@ -86,6 +87,18 @@ Plans:
 - [ ] 04-04-PLAN.md — Frontend: API key management page (table, add/delete/activate modals)
 - [ ] 04-05-PLAN.md — Visual and functional verification checkpoint
 
+### Phase 5: Dashboard Active Key Display Wiring
+**Goal**: Dashboard KPI 카드가 백엔드의 활성 API 키 데이터를 실제로 표시한다 — Phase 4 백엔드와 Phase 2 프론트엔드 간 DASH-04 연결 완성
+**Depends on**: Phase 4
+**Requirements**: DASH-04
+**Gap Closure:** Closes gaps from v1.0 milestone audit
+**Success Criteria** (what must be TRUE):
+  1. `DashboardStats.activeApiKeys` 타입이 `{ alias: string; callCount: number } | null`이다
+  2. 활성 키가 있을 때 KPI 카드에 alias와 callCount가 표시된다
+  3. 활성 키가 없을 때 KPI 카드에 "없음" 또는 적절한 fallback이 표시된다
+Plans:
+- [ ] 05-01-PLAN.md — Type fix + KPI card wiring
+
 ## Progress
 
 **Execution Order:**
@@ -97,3 +110,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | 2. Dashboard and User Management | 0/4 | Planning complete | - |
 | 3. Generation and Content Monitoring | 5/6 | In Progress|  |
 | 4. API Key Management | 5/5 | Complete   | 2026-03-12 |
+| 5. Dashboard Active Key Wiring | 0/1 | Pending | - |
