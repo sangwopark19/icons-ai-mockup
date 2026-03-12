@@ -171,6 +171,19 @@ export const imageApi = {
 };
 
 /**
+ * API 키 타입
+ */
+export interface AdminApiKey {
+  id: string;
+  alias: string;
+  maskedKey: string;
+  isActive: boolean;
+  callCount: number;
+  lastUsedAt: string | null;
+  createdAt: string;
+}
+
+/**
  * 관리자 API 타입
  */
 export interface DashboardStats {
@@ -385,6 +398,28 @@ export const adminApi = {
       '/api/admin/content/projects',
       { token }
     ),
+
+  listApiKeys: (token: string) =>
+    request<{ success: true; data: AdminApiKey[] }>('/api/admin/api-keys', { token }),
+
+  createApiKey: (token: string, data: { alias: string; apiKey: string }) =>
+    request<{ success: true; data: AdminApiKey }>('/api/admin/api-keys', {
+      method: 'POST',
+      token,
+      body: JSON.stringify(data),
+    }),
+
+  deleteApiKey: (token: string, id: string) =>
+    request<{ success: true; message: string }>(`/api/admin/api-keys/${id}`, {
+      method: 'DELETE',
+      token,
+    }),
+
+  activateApiKey: (token: string, id: string) =>
+    request<{ success: true; data: AdminApiKey }>(`/api/admin/api-keys/${id}/activate`, {
+      method: 'PATCH',
+      token,
+    }),
 };
 
 export default { authApi, projectApi, imageApi, adminApi };
