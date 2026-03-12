@@ -1,6 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
 import type { HardwareSpec, ThoughtSignatureData } from '@mockup-ai/shared/types';
-import { config } from '../config/index.js';
 
 /**
  * 생성 옵션 타입
@@ -28,7 +27,6 @@ interface GenerationResult {
  * @google/genai SDK 사용 (가이드 준수)
  */
 export class GeminiService {
-  private readonly ai: GoogleGenAI;
   // 고품질 이미지 생성용 모델 (Nano Banana Pro)
   private readonly imageModel = 'gemini-3-pro-image-preview';
   private readonly signatureBypass = 'context_engineering_is_the_way_to_go';
@@ -74,22 +72,18 @@ IMPORTANT: 위 규칙은 필수입니다. 절대 위반하지 마세요.
 `,
   };
 
-  constructor() {
-    const apiKey = config.geminiApiKey || process.env.GEMINI_API_KEY || '';
-    if (!apiKey) {
-      console.warn('⚠️ GEMINI_API_KEY가 설정되지 않았습니다');
-    }
-    this.ai = new GoogleGenAI({ apiKey });
-  }
+  constructor() {}
 
   /**
    * IP 변경 목업 생성
    */
   async generateIPChange(
+    apiKey: string,
     sourceImageBase64: string,
     characterImageBase64: string,
     options: GenerationOptions
   ): Promise<GenerationResult> {
+    const ai = new GoogleGenAI({ apiKey });
     const systemPrompt = this.buildIPChangePrompt(options);
 
     // 이미지 생성 요청 (가이드에 따른 구조)
@@ -99,7 +93,7 @@ IMPORTANT: 위 규칙은 필수입니다. 절대 위반하지 마세요.
 
     for (let i = 0; i < outputCount; i++) {
       try {
-        const response = await this.ai.models.generateContent({
+        const response = await ai.models.generateContent({
           model: this.imageModel,
           contents: [
             {
@@ -156,10 +150,12 @@ IMPORTANT: 위 규칙은 필수입니다. 절대 위반하지 마세요.
    * 스케치 실사화 생성
    */
   async generateSketchToReal(
+    apiKey: string,
     sketchImageBase64: string,
     textureImageBase64: string | null,
     options: GenerationOptions
   ): Promise<GenerationResult> {
+    const ai = new GoogleGenAI({ apiKey });
     const systemPrompt = this.buildSketchToRealPrompt(options);
 
     // 요청 파츠 구성
@@ -193,7 +189,7 @@ IMPORTANT: 위 규칙은 필수입니다. 절대 위반하지 마세요.
 
     for (let i = 0; i < outputCount; i++) {
       try {
-        const response = await this.ai.models.generateContent({
+        const response = await ai.models.generateContent({
           model: this.imageModel,
           contents: [
             {
@@ -233,7 +229,12 @@ IMPORTANT: 위 규칙은 필수입니다. 절대 위반하지 마세요.
    * 부분 수정 생성
    * 이미지 편집은 chat 모드 사용 권장 (가이드 참조)
    */
-  async generateEdit(originalImageBase64: string, editPrompt: string): Promise<GenerationResult> {
+  async generateEdit(
+    apiKey: string,
+    originalImageBase64: string,
+    editPrompt: string
+  ): Promise<GenerationResult> {
+    const ai = new GoogleGenAI({ apiKey });
     const systemPrompt = `당신은 이미지 편집 전문가입니다.
 주어진 이미지에서 사용자가 요청한 부분만 수정하고, 나머지는 절대 변경하지 마세요.
 수정 요청: ${editPrompt}
@@ -244,7 +245,7 @@ IMPORTANT: 위 규칙은 필수입니다. 절대 위반하지 마세요.
 - 전체적인 스타일과 조명 일관성 유지`;
 
     // 이미지 편집은 chat 모드 사용 (가이드 권장)
-    const chat = this.ai.chats.create({ model: this.imageModel });
+    const chat = ai.chats.create({ model: this.imageModel });
 
     try {
       const response = await chat.sendMessage({
@@ -369,12 +370,14 @@ IMPORTANT: 위 규칙은 필수입니다. 절대 위반하지 마세요.
    * 스타일 복사 생성 (Chat 모드 히스토리 포함)
    */
   async generateWithStyleCopy(
+    apiKey: string,
     previousPrompt: string,
     previousImageBase64: string,
     signatures: ThoughtSignatureData,
     newParts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }>,
     options: GenerationOptions
   ): Promise<GenerationResult> {
+    const ai = new GoogleGenAI({ apiKey });
     const systemPrompt = this.buildIPChangePrompt(options);
     const contents = this.buildConversationHistory(
       previousPrompt,
@@ -383,7 +386,7 @@ IMPORTANT: 위 규칙은 필수입니다. 절대 위반하지 마세요.
       newParts
     );
 
-    const response = await this.ai.models.generateContent({
+    const response = await ai.models.generateContent({
       model: this.imageModel,
       contents,
       config: {

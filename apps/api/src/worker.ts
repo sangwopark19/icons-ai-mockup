@@ -3,6 +3,7 @@ import { redis } from './lib/redis.js';
 import { geminiService } from './services/gemini.service.js';
 import { uploadService } from './services/upload.service.js';
 import { generationService } from './services/generation.service.js';
+import { adminService } from './services/admin.service.js';
 import type { GenerationJobData } from './lib/queue.js';
 import type { ThoughtSignatureData } from '@mockup-ai/shared/types';
 
@@ -52,6 +53,9 @@ const generationWorker = new Worker<GenerationJobData>(
     console.log(`🚀 생성 작업 시작: ${generationId}`);
 
     try {
+      // DB에서 활성 API 키 조회 (작업별 1회, 캐싱 없음 — CONTEXT.md 정책)
+      const { id: activeKeyId, key: activeApiKey } = await adminService.getActiveApiKey();
+
       // 상태를 processing으로 업데이트
       await generationService.updateStatus(generationId, 'processing');
 
@@ -117,7 +121,9 @@ const generationWorker = new Worker<GenerationJobData>(
             },
           ];
 
+          await adminService.incrementCallCount(activeKeyId);
           const result = await geminiService.generateWithStyleCopy(
+            activeApiKey,
             (reference.promptData as any)?.userPrompt || '원본 스타일 생성 요청',
             referenceBase64,
             signature,
@@ -139,7 +145,9 @@ const generationWorker = new Worker<GenerationJobData>(
           generatedImages = result.images;
           thoughtSignatures = result.signatures;
         } else {
+          await adminService.incrementCallCount(activeKeyId);
           const result = await geminiService.generateIPChange(
+            activeApiKey,
             sourceImageBase64,
             characterImageBase64,
             {
@@ -163,7 +171,9 @@ const generationWorker = new Worker<GenerationJobData>(
           throw new Error('스케치 이미지가 필요합니다');
         }
 
+        await adminService.incrementCallCount(activeKeyId);
         const result = await geminiService.generateSketchToReal(
+          activeApiKey,
           sourceImageBase64,
           textureImageBase64 || null,
           {
