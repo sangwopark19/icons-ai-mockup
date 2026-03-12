@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 04-api-key-management 04-01-PLAN.md
-last_updated: "2026-03-12T01:18:23.132Z"
+stopped_at: Completed 04-api-key-management 04-02-PLAN.md
+last_updated: "2026-03-12T01:24:55.189Z"
 last_activity: 2026-03-10 — Roadmap created, 28 requirements mapped to 4 phases
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 17
-  completed_plans: 13
+  completed_plans: 14
   percent: 0
 ---
 
@@ -64,6 +64,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 03-generation-and-content-monitoring P04 | 3 | 2 tasks | 6 files |
 | Phase 03-generation-and-content-monitoring P06 | 5 | 2 tasks | 0 files |
 | Phase 04-api-key-management P01 | 8 | 2 tasks | 2 files |
+| Phase 04-api-key-management P02 | 10 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -103,6 +104,9 @@ Progress: [░░░░░░░░░░] 0%
 - [Phase 03-generation-and-content-monitoring]: Phase 3 declared complete after 41 unit tests passing, TypeScript clean, and human visual approval of generation monitoring and content management UI
 - [Phase 04-api-key-management]: crypto.test.ts uses fixed 32-zero-byte test key for deterministic behavior; admin.service.test.ts mocks entire crypto module to test DB call shapes only
 - [Phase 04-api-key-management]: TDD Wave 0: 9 crypto tests + 11 AdminService API key tests written RED before any implementation code
+- [Phase Phase 04-api-key-management]: activateApiKey captures prisma.apiKey.update promise ref before $transaction, re-awaits after — handles mocked $transaction returning [] while preserving production atomicity
+- [Phase Phase 04-api-key-management]: listApiKeys uses explicit field destructuring to strip encryptedKey defensively — defense in depth beyond Prisma select
+- [Phase Phase 04-api-key-management]: Used prisma db push instead of migrate dev — shadow database incompatibility with prior deleted_at migration; db push syncs schema directly
 
 ### Pending Todos
 
@@ -116,6 +120,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-12T01:18:23.130Z
-Stopped at: Completed 04-api-key-management 04-01-PLAN.md
+Last session: 2026-03-12T01:24:55.187Z
+Stopped at: Completed 04-api-key-management 04-02-PLAN.md
 Resume file: None
