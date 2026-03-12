@@ -99,9 +99,9 @@ export default function DashboardPage() {
             />
             <KpiCard
               label="활성 API 키"
-              value="N/A"
+              value={stats.activeApiKeys ? stats.activeApiKeys.callCount : '없음'}
               icon={<Key className="h-5 w-5" />}
-              placeholder={true}
+              subtitle={stats.activeApiKeys ? `키: ${stats.activeApiKeys.alias}` : '활성 키 미설정'}
             />
           </>
         )}
