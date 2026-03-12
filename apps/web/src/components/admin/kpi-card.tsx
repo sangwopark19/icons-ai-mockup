@@ -46,7 +46,7 @@ export function KpiCard({ label, value, icon, delta, format = 'number', placehol
     delta && delta.value > 0 ? ArrowUp : delta && delta.value < 0 ? ArrowDown : null;
 
   return (
-    <div className="rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card,#fff)] p-5 shadow-sm">
+    <div className="rounded-lg border border-[var(--border-default)] bg-[var(--bg-secondary)] p-5 shadow-sm">
       <div className="mb-3 flex items-start justify-between">
         <p className="text-sm font-medium text-[var(--text-secondary)]">{label}</p>
         <span className="text-[var(--text-secondary)]">{icon}</span>

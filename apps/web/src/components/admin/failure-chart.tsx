@@ -34,7 +34,7 @@ function CustomTooltip({
 }) {
   if (active && payload && payload.length > 0) {
     return (
-      <div className="rounded border border-[var(--border-primary)] bg-[var(--bg-card,#fff)] px-3 py-2 text-sm shadow">
+      <div className="rounded border border-[var(--border-default)] bg-[var(--bg-secondary)] px-3 py-2 text-sm shadow">
         <p className="text-[var(--text-secondary)]">{label ? formatHour(label) : ''}</p>
         <p className="font-semibold text-[var(--text-primary)]">{payload[0].value}건</p>
       </div>
@@ -57,7 +57,7 @@ export function FailureChart({ data }: FailureChartProps) {
     // If that occurs, replace with explicit width/height on BarChart directly.
     <ResponsiveContainer width="100%" height={250}>
       <BarChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-primary, #e5e7eb)" />
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-default, #e5e7eb)" />
         <XAxis
           dataKey="hour"
           tickFormatter={formatHour}

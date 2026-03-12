@@ -112,7 +112,7 @@ export default function DashboardPage() {
         <h2 className="mb-4 text-lg font-semibold text-[var(--text-primary)]">
           시간대별 실패 건수 (24시간)
         </h2>
-        <div className="rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card,#fff)] p-4 shadow-sm">
+        <div className="rounded-lg border border-[var(--border-default)] bg-[var(--bg-secondary)] p-4 shadow-sm">
           {chart === null ? (
             <div className="h-[250px] animate-pulse rounded bg-muted" />
           ) : (

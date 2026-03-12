@@ -2,7 +2,7 @@
 
 export function KpiSkeleton() {
   return (
-    <div className="rounded-lg border border-[var(--border-primary)] bg-[var(--bg-card,#fff)] p-5 shadow-sm">
+    <div className="rounded-lg border border-[var(--border-default)] bg-[var(--bg-secondary)] p-5 shadow-sm">
       <div className="mb-3 flex items-start justify-between">
         {/* Label area */}
         <div className="h-4 w-24 animate-pulse rounded bg-muted" />
