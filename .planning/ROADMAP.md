@@ -15,7 +15,7 @@ This milestone adds a secure admin panel to an existing AI mockup generation Saa
 - [ ] **Phase 3: Generation and Content Monitoring** - Job monitoring, queue visibility, and content browsing/deletion
 - [x] **Phase 4: API Key Management** - Multi-key Gemini management with GeminiService refactor (completed 2026-03-12)
 - [x] **Phase 5: Dashboard Active Key Display Wiring** - DASH-04 frontend placeholder → real active key data (gap closure) (completed 2026-03-12)
-- [ ] **Phase 6: Edit-Mode API Call Count Fix** - edit.routes.ts edit-mode Gemini 호출 카운트 누락 수정 (gap closure)
+- [x] **Phase 6: Edit-Mode API Call Count Fix** - edit.routes.ts edit-mode Gemini 호출 카운트 누락 수정 (gap closure) (completed 2026-03-12)
 
 ## Phase Details
 
@@ -124,4 +124,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | 3. Generation and Content Monitoring | 5/6 | In Progress|  |
 | 4. API Key Management | 5/5 | Complete   | 2026-03-12 |
 | 5. Dashboard Active Key Wiring | 1/1 | Complete   | 2026-03-12 |
-| 6. Edit-Mode Call Count Fix | 0/1 | Pending    | - |
+| 6. Edit-Mode Call Count Fix | 1/1 | Complete   | 2026-03-12 |
