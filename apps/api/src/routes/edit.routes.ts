@@ -53,9 +53,10 @@ const editRoutes: FastifyPluginAsync = async (fastify) => {
       const originalBase64 = originalBuffer.toString('base64');
 
       // DB에서 활성 API 키 조회
-      const { key: activeApiKey } = await adminService.getActiveApiKey();
+      const { id: activeKeyId, key: activeApiKey } = await adminService.getActiveApiKey();
 
       // Gemini API로 부분 수정
+      await adminService.incrementCallCount(activeKeyId);
       const editResult = await geminiService.generateEdit(activeApiKey, originalBase64, body.prompt);
 
       // 새 생성 기록 저장
