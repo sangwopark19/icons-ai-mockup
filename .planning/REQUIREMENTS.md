@@ -51,7 +51,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **KEY-03**: 관리자가 API 키를 삭제할 수 있다
 - [x] **KEY-04**: 관리자가 활성 키를 수동 전환할 수 있다 (단일 활성 키 제약)
 - [x] **KEY-05**: GeminiService가 DB의 활성 키를 읽어 사용한다 (.env 대신)
-- [x] **KEY-06**: 각 API 키의 호출 횟수가 표시된다
+- [ ] **KEY-06**: 각 API 키의 호출 횟수가 표시된다
 
 ## v2 Requirements
 
@@ -115,12 +115,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | KEY-03 | Phase 4 | Complete |
 | KEY-04 | Phase 4 | Complete |
 | KEY-05 | Phase 4 | Complete |
-| KEY-06 | Phase 4 | Complete |
+| KEY-06 | Phase 6 | Pending |
 
 **Coverage:**
 - v1 requirements: 28 total
 - Mapped to phases: 28
 - Unmapped: 0
+- Satisfied: 27/28 (KEY-06 pending in Phase 6)
 
 ---
 *Requirements defined: 2026-03-10*
