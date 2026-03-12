@@ -2,6 +2,7 @@ import { UserRole, UserStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import { generationQueue, addGenerationJob } from '../lib/queue.js';
 import { uploadService } from './upload.service.js';
+import { encrypt, decrypt, getEncryptionKey } from '../lib/crypto.js';
 
 export interface DashboardStats {
   userCount: number;
@@ -9,10 +10,20 @@ export interface DashboardStats {
   failedJobCount: number;
   queueDepth: number;
   storageBytes: number;
-  activeApiKeys: null; // Phase 4 -- ApiKey model does not exist yet
+  activeApiKeys: { alias: string; callCount: number } | null;
   userCountYesterday: number;
   generationCountYesterday: number;
   failedJobCountYesterday: number;
+}
+
+export interface ApiKeyListItem {
+  id: string;
+  alias: string;
+  maskedKey: string;
+  isActive: boolean;
+  callCount: number;
+  lastUsedAt: Date | null;
+  createdAt: Date;
 }
 
 export interface HourlyChartPoint {
@@ -149,6 +160,7 @@ export class AdminService {
       userCountYesterday,
       generationCountYesterday,
       failedJobCountYesterday,
+      activeApiKeyRecord,
     ] = await Promise.all([
       prisma.user.count({ where: { status: { not: 'deleted' } } }),
       prisma.generation.count(),
@@ -169,6 +181,10 @@ export class AdminService {
           createdAt: { gte: fortyEightHoursAgo, lt: twentyFourHoursAgo },
         },
       }),
+      prisma.apiKey.findFirst({
+        where: { isActive: true },
+        select: { alias: true, callCount: true },
+      }),
     ]);
 
     const queueDepth =
@@ -180,7 +196,7 @@ export class AdminService {
       failedJobCount,
       queueDepth,
       storageBytes: imageAggregate._sum.fileSize ?? 0,
-      activeApiKeys: null, // Phase 4 -- ApiKey model does not exist yet
+      activeApiKeys: activeApiKeyRecord ?? null,
       userCountYesterday,
       generationCountYesterday,
       failedJobCountYesterday,
@@ -509,6 +525,111 @@ export class AdminService {
     await prisma.generatedImage.deleteMany({ where });
 
     return { deletedCount: images.length };
+  }
+
+  // ─── Phase 4: API Key Management ─────────────────────────────────────────
+
+  async listApiKeys(): Promise<ApiKeyListItem[]> {
+    const rows = await prisma.apiKey.findMany({
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        alias: true,
+        maskedKey: true,
+        isActive: true,
+        callCount: true,
+        lastUsedAt: true,
+        createdAt: true,
+      },
+    });
+    // Ensure encryptedKey never leaks — strip any extra fields defensively
+    return rows.map(({ id, alias, maskedKey, isActive, callCount, lastUsedAt, createdAt }) => ({
+      id,
+      alias,
+      maskedKey,
+      isActive,
+      callCount,
+      lastUsedAt,
+      createdAt,
+    }));
+  }
+
+  async createApiKey(alias: string, rawKey: string): Promise<ApiKeyListItem> {
+    const maskedKey = rawKey.slice(-4);
+    const encryptedKey = encrypt(rawKey, getEncryptionKey());
+
+    const created = await prisma.apiKey.create({
+      data: { alias, encryptedKey, maskedKey, isActive: false },
+      select: {
+        id: true,
+        alias: true,
+        maskedKey: true,
+        isActive: true,
+        callCount: true,
+        lastUsedAt: true,
+        createdAt: true,
+      },
+    });
+
+    return created;
+  }
+
+  async deleteApiKey(id: string): Promise<void> {
+    const key = await prisma.apiKey.findUnique({ where: { id } });
+
+    if (!key) {
+      throw new Error('API 키를 찾을 수 없습니다');
+    }
+    if (key.isActive) {
+      throw new Error('활성 키는 삭제할 수 없습니다');
+    }
+
+    await prisma.apiKey.delete({ where: { id } });
+  }
+
+  async activateApiKey(id: string): Promise<ApiKeyListItem> {
+    // Prepare operations so we can capture the update result
+    const deactivateAll = prisma.apiKey.updateMany({ where: {}, data: { isActive: false } });
+    const activateTarget = prisma.apiKey.update({
+      where: { id },
+      data: { isActive: true },
+    });
+
+    await prisma.$transaction([deactivateAll, activateTarget]);
+
+    // activateTarget has already been executed and its promise resolved — read result
+    const updated = await activateTarget;
+
+    return {
+      id: updated.id,
+      alias: updated.alias,
+      maskedKey: updated.maskedKey,
+      isActive: updated.isActive,
+      callCount: updated.callCount,
+      lastUsedAt: updated.lastUsedAt,
+      createdAt: updated.createdAt,
+    };
+  }
+
+  async getActiveApiKey(): Promise<{ id: string; key: string }> {
+    const activeKey = await prisma.apiKey.findFirst({ where: { isActive: true } });
+
+    if (!activeKey) {
+      throw new Error('Gemini API 키가 설정되지 않았습니다');
+    }
+
+    const decryptedKey = decrypt(activeKey.encryptedKey, getEncryptionKey());
+    return { id: activeKey.id, key: decryptedKey };
+  }
+
+  async incrementCallCount(id: string): Promise<void> {
+    await prisma.apiKey.update({
+      where: { id },
+      data: {
+        callCount: { increment: 1 },
+        lastUsedAt: new Date(),
+      },
+    });
   }
 }
 
