@@ -13,7 +13,7 @@ This milestone adds a secure admin panel to an existing AI mockup generation Saa
 - [x] **Phase 1: Auth Foundation** - Role system, requireAdmin middleware, and /admin route guards (completed 2026-03-10)
 - [ ] **Phase 2: Dashboard and User Management** - System health overview and full user CRUD
 - [ ] **Phase 3: Generation and Content Monitoring** - Job monitoring, queue visibility, and content browsing/deletion
-- [ ] **Phase 4: API Key Management** - Multi-key Gemini management with GeminiService refactor
+- [x] **Phase 4: API Key Management** - Multi-key Gemini management with GeminiService refactor (completed 2026-03-12)
 
 ## Phase Details
 
@@ -78,7 +78,7 @@ Plans:
   3. Admin can delete an API key (only if it is not currently active)
   4. Admin can activate a different key; only one key is active at a time and new generation jobs immediately use the newly active key
   5. Image generation continues to work end-to-end after switching the active key (no env var fallback)
-**Plans:** 4/5 plans executed
+**Plans:** 5/5 plans complete
 Plans:
 - [ ] 04-01-PLAN.md — TDD Wave 0: RED tests for crypto utility and AdminService API key methods
 - [ ] 04-02-PLAN.md — Backend: Prisma ApiKey model, crypto utility, AdminService API key methods (GREEN)
@@ -96,4 +96,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | 1. Auth Foundation | 2/2 | Complete   | 2026-03-10 |
 | 2. Dashboard and User Management | 0/4 | Planning complete | - |
 | 3. Generation and Content Monitoring | 5/6 | In Progress|  |
-| 4. API Key Management | 4/5 | In Progress|  |
+| 4. API Key Management | 5/5 | Complete   | 2026-03-12 |
