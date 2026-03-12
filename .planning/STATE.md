@@ -130,6 +130,12 @@ None yet.
 - [Phase 4]: GeminiService refactor is highest-risk integration — must not silently fall back to process.env.GEMINI_API_KEY; throw clear error if no active DB key found
 - [Phase 2]: Recharts 2.x + React 19 requires react-is@19.0.0 pnpm override — verify override works in this monorepo before building dashboard charts
 
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 1 | admin 대시보드 흰배경 흰글자 색상 수정 | 2026-03-12 | 7238c61 | [1-admin](./quick/1-admin/) |
+
 ## Session Continuity
 
 Last session: 2026-03-12T06:04:31.277Z
