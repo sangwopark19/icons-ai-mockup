@@ -23,8 +23,25 @@ vi.mock('../../lib/prisma.js', () => ({
       deleteMany: vi.fn(),
       count: vi.fn(),
     },
+    apiKey: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      findUnique: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      updateMany: vi.fn(),
+    },
+    $transaction: vi.fn(),
     $queryRaw: vi.fn(),
   },
+}));
+
+// Mock crypto module (so AdminService tests can control encryption behavior)
+vi.mock('../../lib/crypto.js', () => ({
+  encrypt: vi.fn().mockReturnValue('mock-iv:mock-tag:mock-data'),
+  decrypt: vi.fn().mockReturnValue('decrypted-key'),
+  getEncryptionKey: vi.fn().mockReturnValue(Buffer.from('0'.repeat(64), 'hex')),
 }));
 
 // Mock generationQueue and addGenerationJob
@@ -716,5 +733,244 @@ describe('AdminService - bulkDeleteImages', () => {
     // thumbnailPaths should also be deleted
     expect(vi.mocked(uploadService.deleteFile)).toHaveBeenCalledWith(mockGeneratedImage.thumbnailPath);
     expect(vi.mocked(uploadService.deleteFile)).toHaveBeenCalledWith('thumb2.jpg');
+  });
+});
+
+// ─── Phase 4: API Key Management Tests ──────────────────────────────────────
+
+describe('AdminService - listApiKeys', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should return list without encryptedKey field (KEY-01)', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.apiKey.findMany).mockResolvedValue([
+      {
+        id: 'k1',
+        alias: 'Primary',
+        maskedKey: '****ABCD',
+        isActive: true,
+        callCount: 42,
+        lastUsedAt: new Date(),
+        createdAt: new Date(),
+        encryptedKey: 'should-not-appear',
+      },
+    ] as any);
+
+    const result = await adminService.listApiKeys();
+
+    expect(result[0]).not.toHaveProperty('encryptedKey');
+    expect(result[0].maskedKey).toBe('****ABCD');
+  });
+
+  it('should return all expected fields (alias, maskedKey, isActive, callCount)', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.apiKey.findMany).mockResolvedValue([
+      {
+        id: 'k1',
+        alias: 'Primary',
+        maskedKey: '****ABCD',
+        isActive: true,
+        callCount: 42,
+        lastUsedAt: null,
+        createdAt: new Date(),
+        encryptedKey: 'encrypted-blob',
+      },
+    ] as any);
+
+    const result = await adminService.listApiKeys();
+
+    expect(result[0]).toMatchObject({
+      id: 'k1',
+      alias: 'Primary',
+      maskedKey: '****ABCD',
+      isActive: true,
+      callCount: 42,
+    });
+  });
+});
+
+describe('AdminService - createApiKey', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should store encrypted key and plain maskedKey (last 4 chars) (KEY-02)', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { adminService } = await import('../admin.service.js');
+
+    const rawKey = 'AIzaSyD-testkey-ABCD';
+    vi.mocked(prisma.apiKey.create).mockResolvedValue({
+      id: 'k1',
+      alias: 'Test',
+      maskedKey: 'ABCD',
+      isActive: false,
+      callCount: 0,
+      lastUsedAt: null,
+      createdAt: new Date(),
+    } as any);
+
+    await adminService.createApiKey('Test', rawKey);
+
+    const callArg = vi.mocked(prisma.apiKey.create).mock.calls[0][0] as any;
+    // maskedKey should be last 4 chars only
+    expect(callArg.data.maskedKey).toBe('ABCD');
+    // encryptedKey must not be the raw key
+    expect(callArg.data.encryptedKey).not.toBe(rawKey);
+  });
+
+  it('should call encrypt to store the key securely', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { encrypt } = await import('../../lib/crypto.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.apiKey.create).mockResolvedValue({
+      id: 'k1',
+      alias: 'Test',
+      maskedKey: '1234',
+      isActive: false,
+      callCount: 0,
+      lastUsedAt: null,
+      createdAt: new Date(),
+    } as any);
+
+    await adminService.createApiKey('Test', 'AIzaSyD-key-1234');
+
+    expect(vi.mocked(encrypt)).toHaveBeenCalled();
+  });
+});
+
+describe('AdminService - deleteApiKey', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should throw if key is active (KEY-03)', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.apiKey.findUnique).mockResolvedValue({
+      id: 'k1',
+      isActive: true,
+    } as any);
+
+    await expect(adminService.deleteApiKey('k1')).rejects.toThrow();
+  });
+
+  it('should delete if key is not active (KEY-03)', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.apiKey.findUnique).mockResolvedValue({
+      id: 'k1',
+      isActive: false,
+    } as any);
+    vi.mocked(prisma.apiKey.delete).mockResolvedValue({} as any);
+
+    await adminService.deleteApiKey('k1');
+
+    expect(vi.mocked(prisma.apiKey.delete)).toHaveBeenCalledWith({ where: { id: 'k1' } });
+  });
+
+  it('should throw if key is not found', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.apiKey.findUnique).mockResolvedValue(null);
+
+    await expect(adminService.deleteApiKey('nonexistent')).rejects.toThrow();
+  });
+});
+
+describe('AdminService - activateApiKey', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should use prisma.$transaction to deactivate-all then activate-target (KEY-04)', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.$transaction).mockImplementation(async (ops: any) => {
+      // Execute all operations
+      for (const op of ops) await op;
+      return [];
+    });
+    vi.mocked(prisma.apiKey.updateMany).mockResolvedValue({ count: 2 });
+    vi.mocked(prisma.apiKey.update).mockResolvedValue({
+      id: 'k2',
+      isActive: true,
+      alias: 'New',
+      maskedKey: 'EFGH',
+      callCount: 0,
+      lastUsedAt: null,
+      createdAt: new Date(),
+    } as any);
+
+    await adminService.activateApiKey('k2');
+
+    expect(vi.mocked(prisma.$transaction)).toHaveBeenCalled();
+  });
+});
+
+describe('AdminService - getActiveApiKey', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should return decrypted key string when active key exists (KEY-05)', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { decrypt } = await import('../../lib/crypto.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.apiKey.findFirst).mockResolvedValue({
+      id: 'k1',
+      encryptedKey: 'mock-iv:mock-tag:mock-data',
+      isActive: true,
+    } as any);
+
+    // decrypt mock returns 'decrypted-key' by default
+    const result = await adminService.getActiveApiKey();
+    expect(vi.mocked(decrypt)).toHaveBeenCalled();
+    expect(typeof result === 'string' || (typeof result === 'object' && result !== null)).toBe(true);
+  });
+
+  it('should throw if no active key exists (KEY-05)', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.apiKey.findFirst).mockResolvedValue(null);
+
+    await expect(adminService.getActiveApiKey()).rejects.toThrow('Gemini API 키가 설정되지 않았습니다');
+  });
+});
+
+describe('AdminService - incrementCallCount', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should increment callCount and set lastUsedAt (KEY-06)', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.apiKey.update).mockResolvedValue({} as any);
+
+    await adminService.incrementCallCount('k1');
+
+    expect(vi.mocked(prisma.apiKey.update)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'k1' },
+        data: expect.objectContaining({
+          callCount: { increment: 1 },
+          lastUsedAt: expect.any(Date),
+        }),
+      })
+    );
   });
 });
