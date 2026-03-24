@@ -6,14 +6,68 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 interface RequestOptions extends RequestInit {
   token?: string;
+  _retried?: boolean;
+}
+
+/**
+ * Refresh token으로 새 access token 발급
+ * 동시 다발적 401에 대비해 한 번만 실행되도록 중복 방지
+ */
+let refreshPromise: Promise<{ accessToken: string; refreshToken: string }> | null = null;
+
+async function tryRefreshToken(): Promise<{ accessToken: string; refreshToken: string } | null> {
+  // zustand persist 스토어에서 refreshToken 읽기
+  const raw = typeof window !== 'undefined' ? localStorage.getItem('auth-storage') : null;
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw);
+    const refreshToken = parsed?.state?.refreshToken;
+    if (!refreshToken) return null;
+
+    const response = await fetch(`${API_URL}/api/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    return data.data as { accessToken: string; refreshToken: string };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 토큰 갱신 후 zustand persist 스토어 업데이트
+ */
+function updateStoredTokens(accessToken: string, refreshToken: string) {
+  if (typeof window === 'undefined') return;
+  const raw = localStorage.getItem('auth-storage');
+  if (!raw) return;
+
+  try {
+    const parsed = JSON.parse(raw);
+    parsed.state.accessToken = accessToken;
+    parsed.state.refreshToken = refreshToken;
+    localStorage.setItem('auth-storage', JSON.stringify(parsed));
+  } catch {
+    // ignore
+  }
+
+  // zustand 스토어에도 동기화 (런타임 상태 업데이트)
+  window.dispatchEvent(new CustomEvent('auth:tokens-refreshed', {
+    detail: { accessToken, refreshToken },
+  }));
 }
 
 /**
  * API 요청 함수
  */
 async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
-  const { token, ...fetchOptions } = options;
-  const method = fetchOptions.method ?? 'GET';
+  const { token, _retried, ...fetchOptions } = options;
 
   const headers: HeadersInit = {
     ...options.headers,
@@ -36,9 +90,38 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   const data = await response.json();
 
   if (!response.ok) {
-    // 401 에러 시 토큰 만료 이벤트 발생
+    // 401 에러 시 토큰 갱신 시도
+    if (response.status === 401 && token && !_retried) {
+      // 이미 진행 중인 refresh가 있으면 재사용
+      if (!refreshPromise) {
+        refreshPromise = tryRefreshToken().then((result) => {
+          refreshPromise = null;
+          if (!result) throw new Error('refresh failed');
+          return result;
+        });
+      }
+
+      try {
+        const newTokens = await refreshPromise;
+        updateStoredTokens(newTokens.accessToken, newTokens.refreshToken);
+
+        // 새 access token으로 원래 요청 재시도
+        return request<T>(endpoint, {
+          ...options,
+          token: newTokens.accessToken,
+          _retried: true,
+        });
+      } catch {
+        // refresh 실패 시 로그아웃
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('auth:token-expired'));
+        }
+        throw new Error('인증이 만료되었습니다. 다시 로그인해주세요.');
+      }
+    }
+
+    // refresh 재시도 후에도 401이면 로그아웃
     if (response.status === 401) {
-      // 브라우저 환경에서만 이벤트 발생
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('auth:token-expired'));
       }

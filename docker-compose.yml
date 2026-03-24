@@ -65,6 +65,8 @@ services:
       - UPLOAD_DIR=/app/data
       # CORS 허용 origin (프론트엔드 URL) - Tailscale 사용으로 모든 origin 허용
       - CORS_ORIGIN=${CORS_ORIGIN:-*}
+      - JWT_ACCESS_EXPIRY=${JWT_ACCESS_EXPIRY:-24h}
+      - JWT_REFRESH_EXPIRY=${JWT_REFRESH_EXPIRY:-7d}
     volumes:
       - app_data:/app/data
     depends_on:
