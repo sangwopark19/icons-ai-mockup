@@ -1,6 +1,7 @@
 ---
 phase: quick-1-admin
 plan: 01
+status: complete
 subsystem: admin-dashboard
 tags: [css, dark-mode, admin, bug-fix]
 dependency_graph:

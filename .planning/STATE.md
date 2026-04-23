@@ -136,6 +136,16 @@ None yet.
 |---|-------------|------|--------|-----------|
 | 1 | admin 대시보드 흰배경 흰글자 색상 수정 | 2026-03-12 | 7238c61 | [1-admin](./quick/1-admin/) |
 
+## Deferred Items
+
+Items acknowledged and deferred at milestone close on 2026-04-23:
+
+| Category | Item | Status |
+|----------|------|--------|
+| verification | Phase 01: 01-VERIFICATION.md | human_needed runtime/browser checks |
+| verification | Phase 02: 02-VERIFICATION.md | human_needed runtime/browser checks |
+| verification | Phase 03: 03-VERIFICATION.md | human_needed runtime/browser checks |
+
 ## Session Continuity
 
 Last session: 2026-03-12T06:04:31.277Z

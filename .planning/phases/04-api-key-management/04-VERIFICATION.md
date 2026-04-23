@@ -1,19 +1,11 @@
 ---
 phase: 04-api-key-management
 verified: 2026-03-12T05:11:07Z
-status: gaps_found
-score: 4/5 success criteria verified
-re_verification: false
-gaps:
-  - truth: "Image generation continues to work end-to-end after switching the active key (no env var fallback)"
-    status: partial
-    reason: "generateEdit route fetches active key correctly but does NOT call incrementCallCount — call count is silently under-counted for edit-mode generations. All three worker code paths call incrementCallCount correctly, but the fourth Gemini call path (edit.routes.ts) is missing it."
-    artifacts:
-      - path: "apps/api/src/routes/edit.routes.ts"
-        issue: "adminService.getActiveApiKey() is called, activeApiKey is passed to geminiService.generateEdit(), but adminService.incrementCallCount() is never called — edit calls do not increment the call count (KEY-06 partial)"
-    missing:
-      - "Add: const { id: activeKeyId, key: activeApiKey } = await adminService.getActiveApiKey(); (destructure id too)"
-      - "Add: await adminService.incrementCallCount(activeKeyId); before the geminiService.generateEdit() call in edit.routes.ts"
+reverified: 2026-04-23T00:00:00+09:00
+status: passed
+score: 5/5 success criteria verified
+re_verification: true
+gaps: []
 human_verification:
   - test: "Navigate to /admin/api-keys in the browser"
     expected: "Page loads with empty state message '등록된 API 키가 없습니다', 'API 키 관리' title, '키 추가' button visible"
@@ -30,8 +22,8 @@ human_verification:
 
 **Phase Goal:** Admin can manage multiple Gemini API keys in the DB and activate one at a time; GeminiService reads the active key from DB instead of the environment variable
 **Verified:** 2026-03-12T05:11:07Z
-**Status:** gaps_found — 1 gap blocking full KEY-06 compliance
-**Re-verification:** No — initial verification
+**Status:** passed — KEY-06 gap rechecked and closed
+**Re-verification:** Yes — 2026-04-23 artifact cleanup confirmed `edit.routes.ts` now increments call count
 
 ---
 
@@ -45,9 +37,9 @@ human_verification:
 | 2 | Admin can add a new API key with an alias; the key is stored encrypted and never returned in full via API | VERIFIED | `createApiKey()` calls `encrypt(rawKey, getEncryptionKey())`; selects only non-secret fields on return; `api-keys.routes.ts` has no reference to encryptedKey; `AddKeyModal.tsx` wired to `adminApi.createApiKey` |
 | 3 | Admin can delete an API key (only if it is not currently active) | VERIFIED | `deleteApiKey()` throws `'활성 키는 삭제할 수 없습니다'` if `isActive === true`; route returns 400 with `ACTIVE_KEY_CANNOT_BE_DELETED`; `ApiKeyTable.tsx` hides delete button for active rows |
 | 4 | Admin can activate a different key; only one key is active at a time and new generation jobs immediately use the newly active key | VERIFIED | `activateApiKey()` uses `prisma.$transaction([updateMany deactivate-all, update activate-target])`; Worker calls `getActiveApiKey()` at job start per job — no caching |
-| 5 | Image generation continues to work end-to-end after switching the active key (no env var fallback) | PARTIAL | GeminiService has no `process.env.GEMINI_API_KEY` reference; Worker passes `activeApiKey` to all 3 generation paths with `incrementCallCount`; BUT `edit.routes.ts` calls `getActiveApiKey()` without capturing `id` and never calls `incrementCallCount` — edit-mode calls do not count toward KEY-06 |
+| 5 | Image generation continues to work end-to-end after switching the active key (no env var fallback) | VERIFIED | GeminiService has no `process.env.GEMINI_API_KEY` reference; Worker passes `activeApiKey` to all 3 generation paths with `incrementCallCount`; `edit.routes.ts` now destructures `id` from `getActiveApiKey()` and calls `incrementCallCount(activeKeyId)` before `generateEdit()` |
 
-**Score:** 4/5 success criteria verified (1 partial)
+**Score:** 5/5 success criteria verified
 
 ---
 
@@ -84,7 +76,7 @@ human_verification:
 | `apps/api/src/worker.ts` | `apps/api/src/services/gemini.service.ts` | `geminiService.*` with `activeApiKey` as first arg | WIRED | Lines 125, 149, 175 — all 3 worker Gemini calls pass activeApiKey |
 | `apps/web/src/app/admin/api-keys/page.tsx` | `apps/web/src/lib/api.ts` | `adminApi.listApiKeys/createApiKey/deleteApiKey/activateApiKey` | WIRED | Lines 34, 51, 79, 82 of page.tsx |
 | `apps/web/src/lib/api.ts` | `/api/admin/api-keys` | fetch calls in request() | WIRED | Lines 403, 406, 413, 418 reference the backend endpoint paths |
-| `apps/api/src/routes/edit.routes.ts` | `apps/api/src/services/admin.service.ts` | `adminService.getActiveApiKey()` | PARTIAL | Key is fetched and passed to generateEdit, but `incrementCallCount` is NOT called — edit calls do not count |
+| `apps/api/src/routes/edit.routes.ts` | `apps/api/src/services/admin.service.ts` | `adminService.getActiveApiKey()` + `incrementCallCount()` | WIRED | Lines 56-60 destructure `activeKeyId`, increment the active key call count, then call `generateEdit()` with the active key |
 
 ---
 
@@ -97,7 +89,7 @@ human_verification:
 | KEY-03 | 04-01, 04-02, 04-03, 04-04 | 관리자가 API 키를 삭제할 수 있다 | SATISFIED | `deleteApiKey()` throws if active; route returns 400 with ACTIVE_KEY_CANNOT_BE_DELETED; `ApiKeyTable.tsx` hides delete button for active row |
 | KEY-04 | 04-01, 04-02, 04-03, 04-04 | 관리자가 활성 키를 수동 전환할 수 있다 (단일 활성 키 제약) | SATISFIED | `activateApiKey()` uses `prisma.$transaction` to deactivate-all then activate-target atomically; single-active constraint enforced |
 | KEY-05 | 04-01, 04-02, 04-03 | GeminiService가 DB의 활성 키를 읽어 사용한다 (.env 대신) | SATISFIED | No `process.env.GEMINI_API_KEY` in gemini.service.ts; Worker and edit.routes.ts both call `getActiveApiKey()` before Gemini calls; `getActiveApiKey()` throws clear error if no active key |
-| KEY-06 | 04-01, 04-02, 04-04 | 각 API 키의 호출 횟수가 표시된다 | PARTIAL | `callCount` displayed in `ApiKeyTable.tsx`; `incrementCallCount()` called in worker for 3 paths (ip_change, sketch_to_real, style_copy); NOT called in `edit.routes.ts` — edit-mode API calls are silently not counted |
+| KEY-06 | 04-01, 04-02, 04-04 | 각 API 키의 호출 횟수가 표시된다 | SATISFIED | `callCount` displayed in `ApiKeyTable.tsx`; `incrementCallCount()` called in worker for 3 paths (ip_change, sketch_to_real, style_copy) and in `edit.routes.ts` before `generateEdit()` |
 
 **All 6 requirement IDs from plans accounted for.** No orphaned requirements.
 
@@ -107,7 +99,6 @@ human_verification:
 
 | File | Line | Pattern | Severity | Impact |
 |------|------|---------|----------|--------|
-| `apps/api/src/routes/edit.routes.ts` | ~57 | Missing `incrementCallCount` after `getActiveApiKey()` | Warning | KEY-06 under-counting for edit operations — does not block correctness, but call count stat is inaccurate for edit-mode |
 | `apps/api/src/services/admin.service.ts` | 595-610 | `activateApiKey` constructs Prisma promise objects before transaction, then re-awaits the settled `activateTarget` promise after transaction | Info | Works correctly (re-awaiting a settled Promise returns cached result); adds a redundant DB call via the re-await, but harmless in tests and passes all 62 tests |
 
 ---
@@ -136,15 +127,11 @@ human_verification:
 
 ## Gaps Summary
 
-**1 gap identified:** KEY-06 is partially implemented.
+No open gaps remain.
 
-The `edit.routes.ts` file was updated during Plan 03 to pass `activeApiKey` to `geminiService.generateEdit()` (required to fix a TypeScript error). However, only `key` was destructured from `getActiveApiKey()` — not `id`. As a result, there is no `activeKeyId` variable in scope and `incrementCallCount()` was never added to this code path.
+The previous KEY-06 gap has been closed. `edit.routes.ts` now destructures both `id` and `key` from `getActiveApiKey()`, then calls `await adminService.incrementCallCount(activeKeyId);` before `geminiService.generateEdit()`.
 
-Every generation job through the worker increments call count correctly across all three modes (ip_change, sketch_to_real, style_copy). But user-facing edit operations through `POST /api/generations/:id/edit` are silently excluded from the count. The displayed call count in the admin table and dashboard will under-count actual API usage when edits are performed.
-
-**Root cause:** Plan 03 Task 2 instructions specified updating `worker.ts` but did not explicitly call out `edit.routes.ts` needing `incrementCallCount` — the edit route was only mentioned in the context of the TypeScript fix for the missing `apiKey` argument.
-
-**Fix required:** In `edit.routes.ts`, change the destructuring from `const { key: activeApiKey }` to `const { id: activeKeyId, key: activeApiKey }`, then add `await adminService.incrementCallCount(activeKeyId);` before the `geminiService.generateEdit()` call.
+Every Gemini call path now increments the active key call count: worker modes (`ip_change`, `sketch_to_real`, `style_copy`) and edit-mode calls through `POST /api/generations/:id/edit`.
 
 ---
 
