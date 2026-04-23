@@ -113,11 +113,8 @@ jobs:
 
             # ENCRYPTION_KEY is required for admin-managed API keys.
             # Generate it once if missing/invalid, then keep it stable for future decrypts.
-            current_encryption_key="$(awk '/^ENCRYPTION_KEY=/{value=$0; sub(/^ENCRYPTION_KEY=/, "", value)} END{print value}' .env)"
-            current_encryption_key="${current_encryption_key%$'\r'}"
-            current_encryption_key="${current_encryption_key%\"}"
-            current_encryption_key="${current_encryption_key#\"}"
-            if printf '%s' "$current_encryption_key" | grep -Eq '^[0-9a-fA-F]{64}$'; then
+            echo "Checking ENCRYPTION_KEY"
+            if grep -Eq '^ENCRYPTION_KEY="?[0-9a-fA-F]{64}"?$' .env; then
               echo "ENCRYPTION_KEY is configured"
             else
               new_encryption_key="$(openssl rand -hex 32)"
