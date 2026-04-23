@@ -1,248 +1,371 @@
-# Pitfalls Research
+# Domain Pitfalls
 
-**Domain:** Admin panel added to existing Next.js + Fastify AI mockup generation app
-**Researched:** 2026-03-10
+**Domain:** Existing Gemini-based mockup product adding OpenAI GPT Image 2 as a second provider  
+**Researched:** 2026-04-23  
 **Confidence:** HIGH
 
----
+## Current Repo Signals
+
+- `apps/api/src/worker.ts` is hard-wired to `geminiService` and branches only on `mode`, not `provider`.
+- `apps/api/prisma/schema.prisma` stores `Generation.mode` and a provider-agnostic `ApiKey`, but no `provider`, `model`, or OpenAI request metadata.
+- `apps/api/src/routes/edit.routes.ts` always calls `geminiService.generateEdit(...)`.
+- `apps/web/src/app/projects/[id]/generations/[genId]/page.tsx` routes `edit`, `regenerate`, and `style copy` only by `mode`.
+- `apps/web/src/app/projects/[id]/history/page.tsx` and admin key UI show no provider badge or provider-specific controls.
+
+This repo’s main risk is not “adding one more SDK.” It is letting existing Gemini assumptions leak through schema, queue, admin key management, and follow-up UX.
 
 ## Critical Pitfalls
 
-### Pitfall 1: Relying Solely on Next.js Middleware for Admin Route Protection
+### Pitfall 1: Adding OpenAI Without a First-Class `provider` Dimension
 
-**What goes wrong:**
-Admin routes at `/admin/*` are protected by Next.js middleware checking `role === 'admin'` in the JWT. An attacker sends a crafted `x-middleware-subrequest` header (CVE-2025-29927) or simply manipulates client-side state. The middleware is bypassed entirely, and admin pages render for unauthenticated users. Because this is a self-hosted deployment using `next start`, the app is in the affected class.
+**What goes wrong:**  
+OpenAI jobs enter a system that only understands `mode`. The worker, history API, result page, regenerate flow, and admin tooling cannot reliably tell whether a generation came from Gemini or OpenAI.
 
-**Why it happens:**
-The natural reflex when building admin routes in Next.js is to add a `middleware.ts` check. It feels complete. But CVE-2025-29927 — a critical vulnerability disclosed in March 2025 — demonstrates that Next.js middleware alone is insufficient as a security boundary for self-hosted apps. Developers treat middleware as the security gate, not as a UX redirect layer.
+**Why it happens:**  
+Today `Generation`, `GenerationJobData`, and API responses all center on `mode` (`ip_change`, `sketch_to_real`). That was fine when Gemini was the only runtime. It becomes a structural bug the moment two providers share the same product surface.
 
-**How to avoid:**
-- Treat Next.js middleware as UX-only (fast redirect for non-admins). It is not a security gate.
-- Every admin API endpoint on the Fastify backend must have its own `requireAdmin` preHandler that reads `request.user.role` from the DB-verified token.
-- Add a server-side check in every admin page (via Next.js Server Component or API call) that re-validates role before rendering any data.
-- Pin to Next.js >= 15.2.3 (the patched version) and keep updated.
-- Strip the `x-middleware-subrequest` header at the reverse proxy/nginx level.
+**Consequences:**  
+- OpenAI jobs can be routed into Gemini-only code paths.
+- History and result pages cannot preserve provider identity.
+- Follow-up actions become nondeterministic.
+- Debugging and support become guesswork.
 
-**Warning signs:**
-- Admin pages load data directly from the frontend store without re-verifying on the server.
-- The Fastify admin routes only have `fastify.authenticate` but no role check.
-- The admin middleware file is the only location where `role === 'admin'` is checked.
+**Prevention:**  
+- Add `provider` and `model` everywhere before adding new UI entry points:
+  - request payloads
+  - queue payloads
+  - `Generation`
+  - history/detail responses
+  - admin generation views
+- Make worker dispatch `provider -> service` first, then `mode -> method`.
+- Treat `provider` as required, not inferred.
 
-**Phase to address:** Phase 1 (Role system and auth middleware) — must be the first phase; all other admin work depends on this being correct.
+**Detection:**  
+- A completed generation record exists with no `provider` or `model`.
+- Worker code still imports only `geminiService`.
+- History cards cannot answer “Gemini or OpenAI?”
 
----
+**Roadmap handling:**  
+Phase 1: schema and API contract foundation. Do this before any OpenAI menu is exposed.
 
-### Pitfall 2: JWT Token Payload Does Not Include `role` — Stale Role After DB Change
+### Pitfall 2: Reusing One Global “Active API Key” Across Both Providers
 
-**What goes wrong:**
-The JWT is issued at login with the user's role at that point in time. An admin demotes a user (sets `role = 'user'`), but the user's existing access token still has `role = 'admin'` in its payload for the next 15–60 minutes. Conversely, if a user is promoted to admin, they cannot access admin features until their token expires and they log back in.
+**What goes wrong:**  
+Activating an OpenAI key deactivates Gemini, or vice versa. A job asks for “the active key” and gets a valid key for the wrong provider.
 
-**Why it happens:**
-The existing `auth.plugin.ts` calls `authService.getUserFromToken(token)` which re-queries the DB on every request (HIGH confidence — confirmed by reading the code). This is actually the safer pattern. The pitfall appears during the Prisma migration phase: if the role field is added to the User model but the `getUserFromToken` DB query does not `SELECT` the new `role` field, the returned `user` object will have `role: undefined`, and every admin check will silently fail.
+**Why it happens:**  
+Current `ApiKey` has no `provider`. `activateApiKey()` deactivates all rows globally, and `getActiveApiKey()` returns exactly one decrypted key with a Gemini-specific error message.
 
-**How to avoid:**
-- When adding the `role` field to the User Prisma model, immediately update the `getUserFromToken` query to include `role` in the select clause.
-- Write a test: login as admin, call an admin endpoint, confirm 200. Login as regular user, call the same endpoint, confirm 403.
-- After granting/revoking admin role in the DB, the change takes effect on the next request automatically (no token invalidation needed, because the existing code already re-queries the DB).
+**Consequences:**  
+- Gemini jobs can break when OpenAI is activated.
+- OpenAI jobs can fetch a Gemini key and fail at runtime.
+- Admin UI cannot safely rotate keys per provider.
+- Dashboard KPI becomes misleading because it implies a single runtime.
 
-**Warning signs:**
-- The `(request as any).user` object is used in route handlers without TypeScript enforcement; `user.role` evaluates to `undefined` rather than throwing a type error.
-- Admin check passes for all authenticated users because `undefined !== 'admin'` silently falls through to a wrong branch.
+**Prevention:**  
+- Add `ApiKey.provider`.
+- Enforce one active key per provider, not one active key globally.
+- Replace `getActiveApiKey()` with `getActiveApiKey(provider)`.
+- Split admin screens by provider tab or filter.
+- Show active key alias and usage per provider.
 
-**Phase to address:** Phase 1 (Role system and auth middleware) — specifically when writing the Prisma migration and updating AuthService.
+**Detection:**  
+- Activating one key flips `isActive` on every row.
+- Error text still says `Gemini API 키가 설정되지 않았습니다` on OpenAI paths.
+- Dashboard has only one “active key” slot.
 
----
+**Roadmap handling:**  
+Phase 2: admin/provider control plane before OpenAI runtime wiring.
 
-### Pitfall 3: Gemini API Keys Stored in DB Without Encryption
+### Pitfall 3: Follow-Up Actions Drift Back to Gemini
 
-**What goes wrong:**
-Admin adds a Gemini API key via the admin panel. The key is stored as plain text in a `gemini_api_keys` table. A database backup, a Prisma Studio session, or a SQL injection vulnerability exposes the key in plaintext. The attacker uses the key to generate images or exhaust API quotas.
+**What goes wrong:**  
+A user creates an image with OpenAI, then clicks `부분 수정`, `동일 조건 재생성`, or `스타일 복사`. The follow-up flow silently runs on Gemini because the repo currently routes follow-ups by `mode`, not by originating provider.
 
-**Why it happens:**
-Encryption feels like complexity for an internal tool. "It's in the DB, behind auth" feels sufficient. But API keys stored in DB are a top secret management failure — a single point of exposure (DB read access, accidental log output, Prisma query logging in dev) leaks production credentials.
+**Why it happens:**  
+- `edit.routes.ts` always uses `geminiService`.
+- `generationService.regenerate()` and `copyStyle()` preserve `mode` only.
+- The result page routes `handleModifyConditions()` and `handleStyleCopy()` to provider-agnostic pages.
+- History responses return no provider metadata.
 
-**How to avoid:**
-- Encrypt API key values at rest using a symmetric encryption key stored in environment variables (not in the DB). Use `node:crypto` AES-256-GCM or a library like `@noble/ciphers`.
-- Never log the decrypted key value. Mask it in API responses (return only the last 4 characters for display).
-- The GeminiService reads the active key from the DB, decrypts in memory, uses it for the API call, and discards it — never caches in plaintext.
-- Apply the same practice as the existing `.env`-based `GEMINI_API_KEY`: treat DB-stored keys as secrets, not data.
+**Consequences:**  
+- Same-user same-screen workflows produce different engines unexpectedly.
+- Style continuity breaks.
+- Users believe OpenAI is “inconsistent” when the system actually switched providers.
+- Support cannot reproduce bugs from history alone.
 
-**Warning signs:**
-- The admin endpoint for listing keys returns full key values in JSON.
-- Prisma query logging is enabled in development and the key appears in logs.
-- The key field in the Prisma schema is `String` without any application-layer encryption mention in comments.
+**Prevention:**  
+- Persist provider on every generation.
+- Default every downstream action to the source generation’s provider.
+- Carry provider through detail/history APIs and UI state.
+- If a cross-provider follow-up is not supported, block it explicitly instead of silently falling back.
 
-**Phase to address:** Phase 3 (Gemini API key management) — design the key table with encryption from day one; retrofitting encryption requires a data migration.
+**Detection:**  
+- OpenAI-generated result page triggers Gemini edit/regenerate.
+- Style copy from an OpenAI result jumps to the current Gemini page without warning.
+- Result/history payloads lack provider info.
 
----
+**Roadmap handling:**  
+Phase 3: result page, history, regenerate, edit, and style-copy parity.
 
-### Pitfall 4: Missing Authorization on Admin Fastify Routes (IDOR on User Data)
+### Pitfall 4: Assuming `transparentBackground` Works Natively on `gpt-image-2`
 
-**What goes wrong:**
-The admin API endpoint `GET /api/admin/users/:id/generations` returns all generations for a given user. The route has `fastify.authenticate` (confirms the caller is logged in) but not a role check. A regular user who discovers this URL pattern can view other users' entire generation history.
+**What goes wrong:**  
+The UI offers the same transparency checkbox for both providers, but OpenAI’s model does not natively support transparent backgrounds. Requests either fail or return opaque images while the product implies parity.
 
-**Why it happens:**
-When creating admin routes, developers add them to the same route plugin structure as regular routes and copy the `preHandler: [fastify.authenticate]` pattern. The role check is added as an afterthought or forgotten. The existing codebase uses `(request as any).user` without TypeScript type safety on `role`, so missing a role check produces no compile-time error.
+**Why it happens:**  
+The current product already exposes `transparentBackground` in UI and stores it in `options`. Gemini prompt-building also treats it as a direct generation instruction. OpenAI’s current image docs explicitly state that `gpt-image-2` does not support transparent backgrounds.
 
-**How to avoid:**
-- Create a dedicated `admin-auth.plugin.ts` that adds a `requireAdmin` decorator:
-  ```typescript
-  fastify.decorate('requireAdmin', async (request, reply) => {
-    await fastify.authenticate(request, reply);
-    if ((request as any).user?.role !== 'admin') {
-      return reply.code(403).send({ success: false, error: { code: 'FORBIDDEN' } });
-    }
-  });
-  ```
-- All admin routes use `preHandler: [fastify.requireAdmin]` — never just `fastify.authenticate`.
-- Register all admin routes under a Fastify sub-plugin that applies `requireAdmin` as a hook globally:
-  ```typescript
-  fastify.register(adminRoutes, { prefix: '/api/admin' });
-  // inside adminRoutes: fastify.addHook('preHandler', fastify.requireAdmin);
-  ```
-  This ensures no individual route can accidentally skip the check.
+**Consequences:**  
+- Broken parity between Gemini and OpenAI.
+- User trust drops because the same checkbox means different things.
+- Saved metadata like `hasTransparency` becomes wrong if not post-processed.
 
-**Warning signs:**
-- Admin routes and regular routes are in the same route file.
-- Admin endpoints return different data for different users based only on the `userId` in the JWT, not on their `role`.
-- `/api/admin` routes appear in the same Fastify plugin registration as `/api/generations`.
+**Prevention:**  
+- Keep the checkbox for UX parity, but implement OpenAI as:
+  1. generate opaque image
+  2. run downstream background removal
+  3. persist actual transparency metadata
+- Do not send unsupported transparent-background options to OpenAI and hope for graceful handling.
+- Adjust UI copy to reflect implementation if needed.
 
-**Phase to address:** Phase 1 (Role system and auth middleware) — the `requireAdmin` decorator must exist before any admin endpoint is created.
+**Detection:**  
+- OpenAI path errors when transparency is enabled.
+- Generated PNG is opaque even though the option was selected.
+- `hasTransparency` remains `false` for supposed transparent outputs.
 
----
+**Roadmap handling:**  
+Phase 4: OpenAI runtime plus post-processing.
 
-### Pitfall 5: Admin Bulk Delete Causes DB Lock and File Orphaning
+### Pitfall 5: Porting Gemini `thoughtSignature` Lineage Into OpenAI
 
-**What goes wrong:**
-Admin triggers "delete all generations for user X" or "delete all images before date Y." Prisma's `deleteMany` wraps thousands of rows in a single transaction, causing a table-level lock that blocks all concurrent user generation requests for several seconds. Additionally, the cascade-deleted `GeneratedImage` records still have files on disk at `filePath` and `thumbnailPath` — the file system and DB become inconsistent.
+**What goes wrong:**  
+OpenAI style-copy and follow-up generation are implemented using Gemini’s `thoughtSignature` model, or OpenAI generations are forced into `thoughtSignatures` storage even though the provider uses different continuation primitives.
 
-**Why it happens:**
-The existing `deleteGeneration` flow in `GenerationService` handles one generation at a time for regular users. Admin bulk delete is a new operation with different scale characteristics. Developers write `prisma.generation.deleteMany({ where: { userId } })` and assume cascades handle everything — but cascades handle DB rows, not filesystem files.
+**Why it happens:**  
+Current style-copy logic depends on:
+- `Generation.thoughtSignatures`
+- `buildConversationHistory()`
+- `signatureBypass`
+- `styleReferenceId` that assumes Gemini-style continuation
 
-**How to avoid:**
-- Implement bulk admin deletes as batched operations: fetch IDs in pages of 100, collect all `filePath`/`thumbnailPath` values from `GeneratedImage` rows, delete DB rows in a transaction, then delete files after DB commit succeeds.
-- Never use `deleteMany` without pagination on unbounded datasets in an admin context.
-- Consider soft-delete first (set a `deletedAt` timestamp) and run actual file deletion in a background job to avoid blocking the request.
-- Add an explicit warning in the admin UI: "Deleting X users will remove Y images (Z GB). This is irreversible."
+OpenAI’s documented continuation model is different: `previous_response_id`, `image_generation_call.id`, and revised prompt tracking.
 
-**Warning signs:**
-- Admin delete endpoints do not return a count of what will be deleted before confirming.
-- The service layer bulk delete method calls `prisma.generatedImage.findMany` after `prisma.generation.deleteMany` — but the images are already gone from DB via cascade, so file paths are lost.
-- No background job or queue exists for bulk file cleanup.
+**Consequences:**  
+- OpenAI style-copy and iterative flows either fail outright or degrade silently.
+- Cross-provider style references become corrupt.
+- Future debugging is impossible because the wrong lineage artifact was stored.
 
-**Phase to address:** Phase 2 (Content management) — bulk delete is a required feature; design the batched approach from the start.
+**Prevention:**  
+- Keep Gemini lineage and OpenAI lineage separate.
+- Add OpenAI-specific fields on `Generation`:
+  - `openaiRequestId`
+  - `openaiResponseId`
+  - `openaiImageCallId`
+  - `openaiRevisedPrompt`
+- Treat `styleReferenceId` as provider-scoped lineage.
+- Do not attempt to reuse Gemini `thoughtSignatures` in OpenAI code.
 
----
+**Detection:**  
+- OpenAI code reads `generation.thoughtSignatures`.
+- A style-copy flow requires a Gemini signature even when source generation was OpenAI.
+- Cross-provider reference reuse is allowed without explicit conversion logic.
 
-## Technical Debt Patterns
+**Roadmap handling:**  
+Phase 4: lineage model and provider-specific style-copy implementation.
 
-| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
-|----------|-------------------|----------------|-----------------|
-| Frontend-only admin role check via Zustand store | Fast to ship | Regular users can access admin API endpoints; security bypass is trivial | Never |
-| Single Fastify `authenticate` hook on admin routes without role check | Reuses existing pattern | IDOR vulnerability on all admin data endpoints | Never |
-| Storing Gemini API keys as plain text in DB | Simpler schema | Keys exposed in any DB read (backups, logs, Prisma Studio) | Never |
-| `prisma.generation.deleteMany` without batching | Simple code | Table lock on large datasets; file orphaning on cascade | Only for guaranteed small datasets (< 100 rows) |
-| Polling admin dashboard stats every 5 seconds without debounce | Simple implementation | N redundant DB queries when dashboard tab is open; scales poorly | Acceptable in v1 if polling interval >= 30s |
-| Manual DB `UPDATE users SET role = 'admin'` for first admin user | No code needed | Fine for initial setup | Acceptable — this is the stated design decision |
+### Pitfall 6: Using the Wrong OpenAI API Surface for the Current Worker Model
 
----
+**What goes wrong:**  
+The team uses the Responses API for the initial rollout just because it seems more general, or sets `model: "gpt-image-2"` on a Responses call, which is not valid there.
 
-## Integration Gotchas
+**Why it happens:**  
+This repo’s current shape is a single-request, queued worker pipeline. That maps naturally to the Image API for first rollout. OpenAI docs reserve Responses image generation for tool-based flows and require a text-capable mainline `model` such as `gpt-5.4`, not `gpt-image-2`.
 
-| Integration | Common Mistake | Correct Approach |
-|-------------|----------------|------------------|
-| BullMQ queue monitoring in admin | Directly instantiate a new `Queue` object in the Fastify route handler to call `getJobCounts()` | Reuse the existing queue instance from `apps/api/src/lib/queue.ts` — creating a new `Queue` object creates a new Redis connection per request |
-| Gemini API key switching | Switching the active key mid-request causes in-flight generation jobs to fail because the worker loaded the old key at job start | Worker must read the active key at job start and pin it for that job; key switch only affects new jobs enqueued after the change |
-| Prisma migration adding `role` enum | Running `prisma migrate dev` in production accidentally creates migration in non-standard state | Always use `prisma migrate deploy` in production; never `migrate dev` outside of local development |
-| Next.js Server Components on admin pages | Fetching admin data via a client-side `fetch()` from within a `useEffect` — the data briefly renders before auth check completes | Use Next.js Server Components that call the Fastify admin API server-side, or use `getServerSideProps` with redirect on auth failure |
+**Consequences:**  
+- Invalid requests in production.
+- Extra implementation complexity for no user benefit.
+- Slower rollout because the team debugs API-shape mistakes instead of product logic.
 
----
+**Prevention:**  
+- Use Image API first for the current worker-driven rollout.
+- Use Responses API only for genuinely iterative OpenAI-only workflows later.
+- If Responses is used, enforce:
+  - text-capable top-level `model`
+  - persisted `response.id`
+  - persisted `image_generation_call.id`
 
-## Performance Traps
+**Detection:**  
+- Code contains `responses.create({ model: 'gpt-image-2' ... })`.
+- A non-conversational worker job is implemented on Responses by default.
+- Runtime design cannot explain why Responses is needed for the first milestone.
 
-| Trap | Symptoms | Prevention | When It Breaks |
-|------|----------|------------|----------------|
-| Dashboard stats query joining users + generations + images without index | Admin dashboard takes 3-5 seconds to load; DB CPU spikes | Use aggregation queries with `COUNT` and `GROUP BY` on indexed columns; add `@@index([userId, createdAt])` on `generations` (already exists) | Beyond 10k generations |
-| Listing all users with `prisma.user.findMany()` without pagination | Admin user list hangs on apps with many users | Always paginate: `skip`, `take`, return `total` count | Beyond 500 users |
-| BullMQ `getJobs(['waiting', 'active', 'completed', 'failed'])` fetching all jobs | Queue status panel is slow; Redis memory spikes | Use `getJobCounts()` for counts; only fetch individual jobs on demand | Beyond 1k jobs in queue |
-| Admin dashboard polling every 5s while tab is active | Constant DB load even when no changes | Set polling interval to 30s minimum; use visibility API to pause polling when tab is hidden | Immediately with any concurrent users |
+**Roadmap handling:**  
+Phase 4: runtime implementation decision. Lock this before coding service adapters.
 
----
+### Pitfall 7: Shipping OpenAI Without Request IDs, Revised Prompts, and Model Metadata
 
-## Security Mistakes
+**What goes wrong:**  
+OpenAI produces an unexpected output, rate-limits, or safety denial, but the repo stores only generic status/error text. There is no request ID, no revised prompt, and no model snapshot to debug against.
 
-| Mistake | Risk | Prevention |
-|---------|------|------------|
-| Returning full Gemini API key in admin list endpoint | Key exposed to anyone who compromises an admin session | Return only masked value (e.g., `AIZA...k4Qw`) — never the full key |
-| No rate limiting on admin endpoints | Admin login brute force; admin actions spammable | Apply existing Fastify rate limiting to `/api/admin/*`; admin endpoints must not be more permissive than regular endpoints |
-| Admin-promoted user retains admin access after being demoted | If the DB update succeeds but the user is cached as admin in any in-memory store | The existing pattern (re-query DB on every request in `getUserFromToken`) prevents this — do not add any caching layer around user role lookup |
-| Exposing internal stack traces in admin error responses | Reveals schema, file paths, internal logic to compromised admin session | Admin API follows the same `{ success: false, error: { code, message } }` format — never forward raw `error.stack` |
-| Admin can delete their own account via user management panel | Leaves system with no admin | Prevent admin from performing destructive operations on their own `userId` at the service layer |
+**Why it happens:**  
+Current generation persistence was designed around Gemini. It does not store provider-debug metadata, and current admin/history views do not expose it. OpenAI’s SDK and docs provide `_request_id`, `.withResponse()`, and `revised_prompt`, but these are easy to omit in a “just make it work” rollout.
 
----
+**Consequences:**  
+- Support cannot escalate vendor issues.
+- Output drift cannot be explained to users.
+- Rate limit and safety incidents look like random failures.
+- You lose the main debugging benefits OpenAI already exposes.
 
-## UX Pitfalls
+**Prevention:**  
+- Persist at least:
+  - `provider`
+  - `model`
+  - `_request_id`
+  - `response.id` where applicable
+  - `image_generation_call.id` where applicable
+  - `revised_prompt` where available
+- Surface provider/model/request ID in admin generation detail.
+- Log request IDs on both success and failure paths.
 
-| Pitfall | User Impact | Better Approach |
-|---------|-------------|-----------------|
-| Destructive actions (ban user, delete images) with no confirmation | Admin fat-fingers a delete; data lost permanently | All destructive actions require a confirmation dialog showing what will be deleted; show record counts before confirming |
-| Admin dashboard showing live queue counts without loading states | Stale numbers appear to be current; admin is confused about whether queue is actually empty | Show timestamp of last refresh; display loading spinner during each poll cycle |
-| User suspension with no feedback to suspended user | Suspended user continues submitting generation requests and receives generic auth errors | On account suspension, API returns a specific error code (`ACCOUNT_SUSPENDED`) that the frontend displays as a clear message |
-| No audit trail for admin actions | Cannot determine who deleted which content or when | Log admin actions to a simple `admin_audit_log` table: `adminUserId`, `action`, `targetId`, `timestamp`, `metadata` |
-| API key "activate" button with no indication which key is current | Admin activates wrong key; current active key deactivated unexpectedly | Show active key prominently with a visual indicator; require explicit confirmation to switch |
+**Detection:**  
+- An OpenAI failure log has no request ID.
+- Admin generation detail cannot show which model/version produced the output.
+- Support cannot answer “what prompt revision did the provider actually use?”
 
----
+**Roadmap handling:**  
+Phase 5: observability and admin diagnostics, but the schema fields must exist earlier.
 
-## "Looks Done But Isn't" Checklist
+## Moderate Pitfalls
 
-- [ ] **Admin role check:** The `/admin` page redirects non-admins — verify the Fastify `/api/admin/*` routes also return 403 for non-admins (test with a regular user token).
-- [ ] **Gemini key switching:** Admin activates a new key in the UI — verify that the next generation job actually uses the new key by checking logs, not just by trusting the UI toggle.
-- [ ] **User suspension:** Admin suspends a user account — verify the suspended user's existing valid JWT is rejected at the next API call (requires `isActive`/`isSuspended` flag checked in `getUserFromToken`, not just in the admin UI).
-- [ ] **Bulk delete:** Admin deletes a user's content — verify that image files are actually removed from disk, not just DB rows. Check `uploads/` directory after deletion.
-- [ ] **Queue monitoring:** Admin dashboard shows "0 active jobs" — verify this matches actual Redis queue state, not a stale poll result.
-- [ ] **Stats dashboard:** Generation count on dashboard matches `SELECT COUNT(*) FROM generations` in DB directly.
-- [ ] **Prisma migration:** `role` field added to User model — verify existing users get the default value `user` and do not require manual DB updates.
+### Pitfall 1: Retry and Timeout Multiplication Causes Queue Starvation and Cost Spikes
 
----
+**What goes wrong:**  
+One failing OpenAI job consumes multiple SDK retries, then BullMQ retries the whole job again. With default SDK timeout at 10 minutes and current queue attempts at 3, a single bad request can monopolize the worker and multiply spend.
 
-## Recovery Strategies
+**Why it happens:**  
+This repo already has BullMQ retries. The OpenAI Node SDK also retries certain failures by default and allows very long default timeouts.
 
-| Pitfall | Recovery Cost | Recovery Steps |
-|---------|---------------|----------------|
-| Admin bypass via middleware-only auth | HIGH | Audit all admin API endpoints; add `requireAdmin` hook to every route; rotate any potentially exposed data |
-| Gemini key stored in plaintext and exposed | HIGH | Immediately rotate affected Google Cloud API keys; add encryption before re-inserting new keys; audit access logs |
-| Bulk delete without file cleanup | MEDIUM | Implement a reconciliation job that scans DB `file_path` columns and removes files not referenced by any DB row |
-| Missing admin role check on a specific endpoint (IDOR) | MEDIUM | Add role check; invalidate all active admin sessions as precaution; audit access logs for that endpoint |
-| Prisma migration adding `role` field breaks existing tokens | LOW | The existing code re-queries DB so role is always fresh; recovery is just deploying the fix and running `prisma migrate deploy` |
+**Prevention:**  
+- Set explicit OpenAI `timeout`.
+- Reduce or disable SDK retries when BullMQ already retries.
+- Make retry policy provider-specific.
+- Separate retryable errors from permanent request-shape errors.
 
----
+**Roadmap handling:**  
+Phase 5: runtime hardening and ops safety.
 
-## Pitfall-to-Phase Mapping
+### Pitfall 2: OpenAI Cost and Latency Are Underestimated
 
-| Pitfall | Prevention Phase | Verification |
-|---------|------------------|--------------|
-| Middleware-only admin protection (CVE-2025-29927 class) | Phase 1 — Role system and auth middleware | Call admin endpoint with regular user token; expect 403 |
-| JWT payload stale role / missing role in DB query | Phase 1 — Role system and auth middleware | Change user role in DB; confirm next request reflects new role without re-login |
-| Missing `requireAdmin` on Fastify routes | Phase 1 — Role system and auth middleware | Integration test: regular user token against every `/api/admin/*` route |
-| Gemini API keys stored in plaintext | Phase 3 — Gemini API key management | Inspect DB directly; confirm key value is not plaintext |
-| Admin bulk delete locking + file orphaning | Phase 2 — Content management | Delete 1000 generations in test; measure lock duration; verify files removed from disk |
-| User suspension not enforced at API level | Phase 2 — User management | Suspend user; make API call with their valid token; expect 403 with ACCOUNT_SUSPENDED |
-| Audit log missing for admin actions | Phase 1 or 2 — whichever implements first destructive action | Perform admin action; check `admin_audit_log` table for entry |
+**What goes wrong:**  
+The team assumes OpenAI cost roughly matches Gemini behavior, but `gpt-image-2` always processes image inputs at high fidelity, and reference-image workflows increase input image token cost. Current product defaults also aim for two outputs, which can multiply spend fast.
 
----
+**Why it happens:**  
+Current UX already expects multiple outputs. Current Gemini service hardcodes two generation loops. IP change and style-copy flows also involve multiple reference images by design.
+
+**Prevention:**  
+- Launch OpenAI with conservative defaults.
+- Budget per-provider separately.
+- Add provider-specific metrics, not only call counts.
+- Re-evaluate whether OpenAI should ship with `outputCount` parity immediately.
+
+**Roadmap handling:**  
+Phase 5: cost controls, quotas, and provider-specific SLOs.
+
+### Pitfall 3: Upload and MIME Assumptions Break on OpenAI Paths
+
+**What goes wrong:**  
+Users upload JPG or WEBP, but the generation pipeline labels inputs as `image/png` or otherwise assumes PNG semantics. Gemini may tolerate this. OpenAI edit/reference flows can be less forgiving, especially when masks and multipart uploads enter the picture.
+
+**Why it happens:**  
+Uploads already accept `image/jpeg`, `image/png`, and `image/webp`, but current runtime code hardcodes `image/png` when building upstream requests.
+
+**Prevention:**  
+- Persist actual upload MIME and format.
+- Use real MIME when sending to provider APIs.
+- If OpenAI uses file uploads, preserve original format or normalize intentionally in one place.
+- Validate transparency and mask format from actual file metadata, not assumptions.
+
+**Roadmap handling:**  
+Phase 4: input pipeline and OpenAI request construction.
+
+### Pitfall 4: UI and Admin Surfaces Hide Provider Identity
+
+**What goes wrong:**  
+The product ships dual-provider generation, but project menus, history cards, result views, and admin key screens still look single-provider. Users and operators cannot tell what they are using.
+
+**Why it happens:**  
+Current UI was built for one provider, so all surface area is “mode-first.” Provider does not exist in response contracts yet.
+
+**Prevention:**  
+- Add adjacent OpenAI entry points, not hidden switches.
+- Add badges in history and result pages.
+- Split admin API key management and dashboard metrics by provider.
+
+**Roadmap handling:**  
+Phase 3 for user-facing parity, Phase 5 for admin observability.
+
+## Minor Pitfalls
+
+### Pitfall 1: Promising Precise Partial Edit Parity Without Mask Support
+
+**What goes wrong:**  
+The UI implies “부분 수정” parity, but OpenAI’s surgical mask-based edit path has extra input requirements: mask must match image size/format and include an alpha channel. The current edit UI does not capture any mask at all.
+
+**Prevention:**  
+- Scope initial OpenAI edit as prompt-only whole-image edit, or
+- explicitly plan a later mask UI and backend validation phase
+- avoid shipping copy that implies pixel-precise selective edit before mask support exists
+
+### Pitfall 2: Gemini-Specific Copy and Errors Leak Into OpenAI UX
+
+**What goes wrong:**  
+Users and admins see Gemini-specific error strings, labels, or metrics while operating OpenAI features. It makes the rollout look half-migrated even if runtime works.
+
+**Prevention:**  
+- Replace provider-specific strings in shared paths.
+- Make provider explicit in error messages, admin labels, and support screens.
+
+## Phase-Specific Warnings
+
+| Phase Topic | Likely Pitfall | Mitigation |
+|-------------|---------------|------------|
+| Schema and API contracts | Adding OpenAI pages before `provider` and `model` exist in DB/API | Add provider/model/OpenAI metadata fields first; worker and history must consume them |
+| Admin key management | One global active key breaks both runtimes | Provider-scope keys and activation rules before any OpenAI traffic |
+| OpenAI runtime | Wrong API surface, unsupported transparent background, missing request IDs | Use Image API first, post-process background removal, persist request metadata |
+| Follow-up flows | OpenAI result actions silently fall back to Gemini | Route `edit`, `regenerate`, `copy-style` by originating provider |
+| Cost and reliability | SDK retries + BullMQ retries + high-fidelity inputs multiply cost | Explicit timeout/retry policy and conservative output defaults |
+| UI rollout | Users cannot tell which provider produced a result | Add provider badges and adjacent menu entries, not hidden switches |
 
 ## Sources
 
-- CVE-2025-29927 Next.js Middleware Authorization Bypass: [ProjectDiscovery Analysis](https://projectdiscovery.io/blog/nextjs-middleware-authorization-bypass), [Datadog Security Labs](https://securitylabs.datadoghq.com/articles/nextjs-middleware-auth-bypass/), [JFrog Blog](https://jfrog.com/blog/cve-2025-29927-next-js-authorization-bypass/)
-- Fastify role authorization patterns: [Permit.io Fastify Middleware Guide](https://www.permit.io/blog/how-to-create-an-authorization-middleware-for-fastify), [Logto Fastify RBAC + JWT](https://docs.logto.io/api-protection/nodejs/fastify)
-- Next.js RBAC pitfalls: [Medium: Hidden Pitfalls of Next.js Permissions](https://medium.com/@adorekasun/the-hidden-pitfalls-of-next-js-permissions-and-how-i-solved-them-5557325cb769), [EastonDev RBAC Admin Guide](https://eastondev.com/blog/en/posts/dev/20260107-nextjs-rbac-admin-guide/)
-- API key security: [GitGuardian Secrets API Management](https://blog.gitguardian.com/secrets-api-management/), [OWASP Secrets Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html)
-- Prisma migration production safety: [Prisma Migrate Dev vs. Deploy](https://www.prisma.io/docs/orm/prisma-migrate/workflows/development-and-production), [Prisma Data Migration Guide](https://www.prisma.io/docs/guides/data-migration)
-- BullMQ monitoring: [BullMQ Metrics Docs](https://docs.bullmq.io/guide/metrics), [Bull Board](https://github.com/felixmosh/bull-board)
-- Bulk delete database safety: [CockroachDB Bulk Delete Guide](https://www.cockroachlabs.com/docs/stable/bulk-delete-data), [Medium: Delete Large Rows in Production](https://aashishpeepra-ap.medium.com/how-to-delete-a-large-number-of-rows-in-production-394b89179d26)
-- Existing codebase review: `apps/api/src/plugins/auth.plugin.ts`, `apps/api/prisma/schema.prisma`, `apps/api/src/routes/generation.routes.ts`
+### Repo evidence
 
----
+- `apps/api/prisma/schema.prisma`
+- `apps/api/src/lib/queue.ts`
+- `apps/api/src/services/gemini.service.ts`
+- `apps/api/src/services/generation.service.ts`
+- `apps/api/src/services/admin.service.ts`
+- `apps/api/src/services/upload.service.ts`
+- `apps/api/src/routes/generation.routes.ts`
+- `apps/api/src/routes/edit.routes.ts`
+- `apps/api/src/routes/upload.routes.ts`
+- `apps/api/src/worker.ts`
+- `apps/web/src/app/projects/[id]/page.tsx`
+- `apps/web/src/app/projects/[id]/ip-change/page.tsx`
+- `apps/web/src/app/projects/[id]/sketch-to-real/page.tsx`
+- `apps/web/src/app/projects/[id]/generations/[genId]/page.tsx`
+- `apps/web/src/app/projects/[id]/history/page.tsx`
+- `apps/web/src/app/admin/api-keys/page.tsx`
+- `.codex/skills/mockup-openai-dual-provider/references/project-rollout.md`
+- `.codex/skills/mockup-openai-dual-provider/references/official-source-map.md`
+- `.codex/skills/mockup-openai-cli-smoke/references/official-cli-notes.md`
 
-*Pitfalls research for: Admin panel in Next.js + Fastify AI mockup generation app*
-*Researched: 2026-03-10*
+### Official sources
+
+- OpenAI GPT Image 2 model page: https://developers.openai.com/api/docs/models/gpt-image-2
+- OpenAI image generation guide: https://developers.openai.com/api/docs/guides/image-generation
+- OpenAI image generation tool guide: https://developers.openai.com/api/docs/guides/tools-image-generation
+- OpenAI Node SDK: https://github.com/openai/openai-node
+- OpenAI system card for image safety context: https://deploymentsafety.openai.com/chatgpt-images-2-0
+

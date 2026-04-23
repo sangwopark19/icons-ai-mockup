@@ -1,344 +1,254 @@
 # Architecture Research
 
-**Domain:** Admin panel integration into existing Next.js + Fastify monorepo
-**Researched:** 2026-03-10
-**Confidence:** HIGH
+**Domain:** MockupAI dual-provider image architecture (`Gemini` + `OpenAI GPT Image 2`)  
+**Researched:** 2026-04-23  
+**Overall confidence:** HIGH
 
-## Standard Architecture
+## Executive Recommendation
 
-### System Overview
+이 milestone의 핵심 아키텍처 변화는 "새 시스템 추가"가 아니라 "기존 generation pipeline에 `provider` 축을 추가"하는 것이다. 현재 구조는 `mode` 중심이다. 다음 milestone에서는 `provider -> mode -> service method` 순으로 분기해야 한다.
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                     Next.js Frontend (apps/web)                      │
-│                                                                      │
-│  ┌──────────────────────┐    ┌──────────────────────────────────┐   │
-│  │  Regular App Routes  │    │      Admin Routes (/admin/*)     │   │
-│  │  /dashboard          │    │  /admin/dashboard                │   │
-│  │  /projects/**        │    │  /admin/users                    │   │
-│  │                      │    │  /admin/generations              │   │
-│  │  Auth: isAuthenticated│    │  /admin/content                  │   │
-│  └──────────────────────┘    │  /admin/api-keys                 │   │
-│                              │                                  │   │
-│                              │  Auth: isAuthenticated + isAdmin │   │
-│                              └──────────────────────────────────┘   │
-│                                                                      │
-│  ┌────────────────────────────────────────────────────────────────┐  │
-│  │              middleware.ts (Next.js Edge Middleware)            │  │
-│  │  - Match /admin/* routes                                       │  │
-│  │  - Decode JWT from Authorization header                        │  │
-│  │  - Check role === 'admin', redirect if not                     │  │
-│  └────────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────┘
-                           │ HTTP (Bearer JWT)
-                           ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                     Fastify API (apps/api)                           │
-│                                                                      │
-│  ┌──────────────────────┐    ┌──────────────────────────────────┐   │
-│  │  Existing Routes     │    │      Admin Routes                │   │
-│  │  /api/auth/**        │    │  /api/admin/stats                │   │
-│  │  /api/projects/**    │    │  /api/admin/users/**             │   │
-│  │  /api/generations/** │    │  /api/admin/generations/**       │   │
-│  │  /api/images/**      │    │  /api/admin/content/**           │   │
-│  │                      │    │  /api/admin/api-keys/**          │   │
-│  │  preHandler:         │    │                                  │   │
-│  │    [authenticate]    │    │  preHandler:                     │   │
-│  └──────────────────────┘    │    [authenticate, requireAdmin]  │   │
-│                              └──────────────────────────────────┘   │
-│                                                                      │
-│  ┌────────────────────────────────────────────────────────────────┐  │
-│  │                  auth.plugin.ts (existing)                     │  │
-│  │  + requireAdmin decorator (NEW)                                │  │
-│  │    → reads request.user.role, rejects non-admin with 403      │  │
-│  └────────────────────────────────────────────────────────────────┘  │
-│                                                                      │
-│  ┌─────────────────────────────────────────────────────────────┐    │
-│  │                      Service Layer                           │    │
-│  │  Existing services + AdminService (NEW)                      │    │
-│  │  AdminService: stats queries, bulk ops, cross-user access    │    │
-│  └─────────────────────────────────────────────────────────────┘    │
-│                                                                      │
-│  ┌─────────────────────────────────────────────────────────────┐    │
-│  │                      Prisma / PostgreSQL                     │    │
-│  │  User.role field (NEW enum: 'user' | 'admin')               │    │
-│  │  ApiKey table (NEW): id, key, label, isActive, usageCount   │    │
-│  └─────────────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────────────┘
+권장 구조는 다음과 같다.
+
+- frontend는 기존 기능 페이지를 유지하면서 provider-aware 진입점을 추가
+- API contract는 `provider`를 필수로 받음
+- `Generation`과 `ApiKey`가 provider-aware가 됨
+- BullMQ queue는 유지하되 job payload에 `provider`를 추가
+- worker는 `geminiService`와 `openaiImageService` 사이를 provider 기준으로 라우팅
+- follow-up flows (`edit`, `regenerate`, `style copy`)는 원본 generation의 provider를 그대로 따라감
+
+## Current Architecture Snapshot
+
+현재 repo의 흐름:
+
+```text
+Next.js project pages
+  -> apps/web/src/lib/api.ts
+  -> Fastify generation/edit routes
+  -> generationService.create()
+  -> BullMQ generation queue
+  -> apps/api/src/worker.ts
+  -> geminiService only
+  -> uploadService + GeneratedImage persistence
 ```
 
-### Component Responsibilities
+이 구조는 Gemini 단일 provider일 때는 충분했지만, OpenAI를 추가하면 아래 지점이 병목이 된다.
 
-| Component | Responsibility | Communicates With |
-|-----------|----------------|-------------------|
-| `middleware.ts` (Next.js) | Intercepts all `/admin/*` requests, checks JWT role before page renders | Zustand auth store (reads token), redirects to `/login` or `/forbidden` |
-| `app/(admin)/` route group | Admin UI pages: dashboard, users, generations, content, api-keys | Admin API client functions in `lib/api.ts` |
-| `AdminGuard` component | Client-side role double-check; renders fallback if `user.role !== 'admin'` | Zustand auth store |
-| `requireAdmin` Fastify decorator | Backend guard on all `/api/admin/*` routes, runs after `authenticate` | Reads `request.user.role` set by existing auth plugin |
-| `admin.routes.ts` (Fastify) | Route handlers for all admin API endpoints, registered under `/api/admin` prefix | AdminService |
-| `AdminService` | Cross-user queries, aggregate stats, bulk delete, API key CRUD | Prisma client |
-| `User.role` (Prisma) | Role field (`user` \| `admin`) on existing User model | Set directly in DB for initial admin; exposed in JWT payload |
-| `ApiKey` table (Prisma) | Stores multiple Gemini API keys with label, status, usage count | GeminiService reads active key instead of env var |
+- request payload에 provider가 없음
+- queue payload에 provider가 없음
+- worker가 `geminiService`에 직접 결합
+- `edit.routes.ts`가 항상 Gemini 사용
+- `ApiKey`가 전역 단일 active key 모델
+- `Generation`이 provider/model/debug trace를 저장하지 않음
 
-## Recommended Project Structure
+## Target Architecture
 
-```
-apps/
-├── web/src/
-│   ├── app/
-│   │   ├── (auth)/               # existing
-│   │   ├── dashboard/            # existing
-│   │   ├── projects/             # existing
-│   │   └── (admin)/              # NEW route group
-│   │       ├── layout.tsx        # Admin layout + AdminGuard wrapper
-│   │       ├── admin/
-│   │       │   ├── page.tsx              # Redirect to /admin/dashboard
-│   │       │   ├── dashboard/page.tsx    # Stats, queue status, API usage
-│   │       │   ├── users/
-│   │       │   │   ├── page.tsx          # User list with search/filter
-│   │       │   │   └── [id]/page.tsx     # User detail + suspend/delete/role
-│   │       │   ├── generations/page.tsx  # All generation jobs, queue state
-│   │       │   ├── content/page.tsx      # Image search, bulk delete
-│   │       │   └── api-keys/page.tsx     # Gemini key management
-│   ├── lib/
-│   │   └── api.ts                # extend with adminApi.* functions
-│   ├── stores/
-│   │   └── auth.store.ts         # add role field to User type
-│   └── middleware.ts             # NEW — admin route guard at Edge
-│
-└── api/src/
-    ├── plugins/
-    │   └── auth.plugin.ts        # add requireAdmin decorator
-    ├── routes/
-    │   └── admin.routes.ts       # NEW — all /api/admin/* handlers
-    ├── services/
-    │   └── admin.service.ts      # NEW — cross-user queries, stats
-    └── prisma/
-        └── schema.prisma         # add User.role, ApiKey model, migration
+```text
+Project page (Gemini version / OpenAI version)
+  -> shared API client with provider
+  -> Fastify routes
+  -> generationService (provider-neutral orchestration)
+  -> BullMQ generation queue with provider-aware payload
+  -> worker dispatch
+       -> geminiService
+       -> openaiImageService
+  -> uploadService + image persistence
+  -> provider/model/trace metadata stored on Generation
 ```
 
-### Structure Rationale
+## Recommended File-Level Changes
 
-- **`(admin)/` route group:** Next.js route groups create layout isolation without affecting URL structure. The group-level `layout.tsx` contains a single `AdminGuard` component that handles the client-side role check, keeping each page clean.
-- **`middleware.ts` at web root:** Next.js middleware runs at the Edge before any page component loads. Matching only `/admin/*` (not `/_next/**` or `/api/**`) keeps it cheap. It decodes the JWT from the Zustand-persisted localStorage token passed as a query param, or uses a cookie strategy.
-- **`admin.routes.ts` as a single file:** All admin endpoints collected in one file makes auditing admin access easy. Register with `{ prefix: '/api/admin' }` in server.ts.
-- **`admin.service.ts` separate from domain services:** Admin queries are cross-user by nature (e.g., "get all generations for any user"). Keeping them isolated prevents accidental cross-user leakage in user-facing services.
+### Frontend
 
-## Architectural Patterns
+| File | Change | Why |
+|------|--------|-----|
+| `apps/web/src/app/projects/[id]/page.tsx` | OpenAI version entry points 추가 | 기존 Gemini 메뉴 옆에 같은 기능군을 provider별로 노출 |
+| `apps/web/src/app/projects/[id]/ip-change/page.tsx` | provider-aware variant 또는 parallel page 지원 | 같은 form contract를 유지하면서 provider를 넘겨야 함 |
+| `apps/web/src/app/projects/[id]/sketch-to-real/page.tsx` | provider-aware variant 또는 parallel page 지원 | same |
+| `apps/web/src/app/projects/[id]/generations/[genId]/page.tsx` | provider badge, provider-aware edit/regenerate/style copy | 후속 action이 원본 provider를 따라가야 함 |
+| `apps/web/src/lib/api.ts` | generation/edit DTO에 `provider`, `model` metadata 반영 | UI와 backend가 같은 contract를 공유해야 함 |
 
-### Pattern 1: Fastify Decorator Chain for Role Authorization
+### API / Worker
 
-**What:** Extend the existing `authenticate` decorator with an `requireAdmin` decorator. Routes needing admin access list both in `preHandler`.
-**When to use:** All `/api/admin/*` routes. Some routes may need `authenticate` only (e.g., `/api/auth/me` already works this way).
-**Trade-offs:** Explicit over implicit. Each route declares its security requirements in one array. Adding roles later is additive.
+| File | Change | Why |
+|------|--------|-----|
+| `apps/api/src/routes/generation.routes.ts` | create, regenerate, copy-style payload에 `provider` 추가 | 초기 generate와 follow-up action 모두 provider 고정이 필요 |
+| `apps/api/src/routes/edit.routes.ts` | selected generation의 provider 기준으로 runtime 분기 | 현재는 OpenAI 결과도 Gemini edit로 빠질 수 있음 |
+| `apps/api/src/services/generation.service.ts` | `provider`, `providerModel`, `providerTrace` 저장 | history/debug/regenerate source of truth |
+| `apps/api/src/lib/queue.ts` | `GenerationJobData.provider` 추가 | worker dispatch의 필수 입력 |
+| `apps/api/src/worker.ts` | provider dispatch layer 추가 | Gemini/OpenAI service split |
+| `apps/api/src/services/openai-image.service.ts` | 신규 추가 | OpenAI 전용 service |
+| `apps/api/src/services/admin.service.ts` | provider-aware API key CRUD/activation/getActive | 전역 active key 패턴 제거 |
 
-**Example:**
-```typescript
-// apps/api/src/plugins/auth.plugin.ts (addition)
-fastify.decorate(
-  'requireAdmin',
-  async function (request: FastifyRequest, reply: FastifyReply) {
-    const user = (request as any).user;
-    if (!user || user.role !== 'admin') {
-      return reply.code(403).send({
-        success: false,
-        error: { code: 'FORBIDDEN', message: '관리자 권한이 필요합니다' },
-      });
-    }
-  }
-);
+### Shared Types / Schema
 
-// apps/api/src/routes/admin.routes.ts
-fastify.get('/stats', {
-  preHandler: [fastify.authenticate, fastify.requireAdmin],
-  handler: async (request, reply) => { /* ... */ },
-});
+| Area | Change | Why |
+|------|--------|-----|
+| `packages/shared/src/types/index.ts` | `ImageProvider`, generation DTO 확장 | web/api consistency |
+| `apps/api/prisma/schema.prisma` | `Generation.provider`, `Generation.providerModel`, `Generation.providerTrace`, `ApiKey.provider` | provider identity와 debug trace 저장 |
+
+## Recommended Data Model
+
+### `Generation`
+
+추가 권장 필드:
+
+```prisma
+provider      String   @default("gemini")
+providerModel String?  @map("provider_model")
+providerTrace Json?    @map("provider_trace")
 ```
 
-### Pattern 2: Next.js Edge Middleware for Admin Route Guard
+권장 의미:
 
-**What:** `middleware.ts` at `apps/web/src/` runs before every request. Use the `matcher` config to scope it to `/admin/*` only. Decode JWT (without full verification — keep middleware lean) and check the `role` claim.
-**When to use:** Prevents admin pages from rendering at all for non-admin users. This is the first line of defense on the frontend.
-**Trade-offs:** Edge middleware cannot access localStorage. The token must either be in a cookie or passed differently. Given the existing architecture uses localStorage/Zustand, the cleanest approach is to also set an `auth-token` cookie on login (HttpOnly optional, but needed for middleware to read it). The backend remains the authoritative security boundary.
+- `provider`: `gemini` | `openai`
+- `providerModel`: `gemini-3-pro-image-preview`, `gpt-image-2`, 또는 top-level transport model
+- `providerTrace`: provider-specific debug and continuation metadata
 
-**Example:**
-```typescript
-// apps/web/src/middleware.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { jwtDecode } from 'jwt-decode';
+OpenAI trace 예시:
 
-export function middleware(request: NextRequest) {
-  const token = request.cookies.get('access-token')?.value;
-
-  if (!token) {
-    return NextResponse.redirect(new URL('/login', request.url));
-  }
-
-  try {
-    const payload = jwtDecode<{ role?: string }>(token);
-    if (payload.role !== 'admin') {
-      return NextResponse.redirect(new URL('/dashboard', request.url));
-    }
-  } catch {
-    return NextResponse.redirect(new URL('/login', request.url));
-  }
-
-  return NextResponse.next();
+```json
+{
+  "endpoint": "images.edit",
+  "imageModel": "gpt-image-2",
+  "transportModel": null,
+  "requestId": "req_...",
+  "responseId": null,
+  "imageGenerationCallIds": [],
+  "revisedPrompt": null
 }
-
-export const config = {
-  matcher: ['/admin/:path*'],
-};
 ```
 
-### Pattern 3: Role Field in JWT Payload
+Responses API 예시:
 
-**What:** When the user logs in, include `role` in the JWT payload. The existing `authService.login()` builds the JWT — add `role` to the signed payload. The auth plugin then exposes `request.user.role` after token verification.
-**When to use:** All authentication flows. This avoids an extra DB lookup per request to check admin status.
-**Trade-offs:** Role changes (e.g., revoking admin) require token expiry before taking effect. Acceptable since the role is assigned manually and admin count is tiny.
-
-## Data Flow
-
-### Admin Request Flow
-
-```
-Admin navigates to /admin/users
-    ↓
-middleware.ts intercepts (Edge)
-    → reads 'access-token' cookie
-    → decodes JWT, checks role claim
-    → if role !== 'admin': redirect /dashboard
-    ↓
-AdminGuard component (client-side double-check)
-    → reads Zustand auth store user.role
-    → if role !== 'admin': renders Forbidden UI
-    ↓
-Admin page component renders
-    → calls adminApi.listUsers(token, params)
-    → fetch POST /api/admin/users
-    ↓
-Fastify receives request
-    → preHandler[0]: authenticate  → sets request.user (includes role)
-    → preHandler[1]: requireAdmin  → checks request.user.role === 'admin'
-    → handler: AdminService.listUsers(filters, pagination)
-    → Prisma query: SELECT * FROM users WHERE ...
-    ↓
-Response returned → Admin UI renders table
+```json
+{
+  "endpoint": "responses.create",
+  "imageModel": "gpt-image-2",
+  "transportModel": "gpt-5.4",
+  "requestId": "req_...",
+  "responseId": "resp_...",
+  "previousResponseId": "resp_prev",
+  "imageGenerationCallIds": ["ig_..."],
+  "revisedPrompt": "..."
+}
 ```
 
-### Gemini API Key Active Key Flow
+### `ApiKey`
 
-```
-GeminiService needs to call Gemini API
-    ↓
-Instead of process.env.GEMINI_API_KEY:
-    → AdminService.getActiveApiKey()
-    → SELECT key FROM api_keys WHERE is_active = true LIMIT 1
-    ↓
-Admin triggers key switch via /api/admin/api-keys/:id/activate
-    → UPDATE api_keys SET is_active = false (all)
-    → UPDATE api_keys SET is_active = true WHERE id = :id
-    ↓
-Next Gemini call picks up new active key
+현재 전역 단일 active key 구조를 provider별 active key 구조로 바꾸는 것이 필수다.
+
+권장 필드:
+
+```prisma
+provider String @default("gemini")
 ```
 
-### Auth Store Role Extension
+운영 규칙:
 
+- provider당 active key는 최대 1개
+- `getActiveApiKey(provider)` 형태로 조회
+- admin UI는 provider 탭/필터를 제공
+
+## Provider-Aware Request Flows
+
+### 1. New generation
+
+```text
+User chooses OpenAI IP Change
+  -> frontend submits { mode: ip_change, provider: openai, ... }
+  -> generationService persists provider/model seed
+  -> queue payload includes provider
+  -> worker dispatches to openaiImageService.generateIPChange()
+  -> output saved to existing image/history flow
 ```
-Login response from /api/auth/login
-    → includes user.role in response body
-    ↓
-Zustand auth.store.ts
-    → User type gains: role: 'user' | 'admin'
-    → login() action stores role in persisted state
-    ↓
-Components and middleware read user.role from store / cookie
+
+### 2. Partial edit
+
+```text
+User opens generation detail
+  -> detail API returns provider
+  -> edit request targets generationId
+  -> edit.routes.ts loads generation
+  -> branch by generation.provider
+  -> call geminiService or openaiImageService
 ```
 
-## Build Order (Dependencies)
+### 3. Regenerate
 
-The following order is required — later phases depend on earlier ones:
+```text
+User clicks regenerate
+  -> generationService loads original generation
+  -> copies original provider + original inputs/options
+  -> new generation record created with same provider
+  -> worker runs matching provider
+```
 
-1. **DB Schema + Role field** — Foundation. `User.role` must exist before any role check can work. `ApiKey` table must exist before key management. Single Prisma migration.
+### 4. Style copy
 
-2. **Backend: `requireAdmin` decorator + JWT role payload** — Gates all admin API routes. Must exist before any admin endpoints are registered. Also requires updating `auth.service.ts` to include `role` in the JWT and in the `/api/auth/me` response so the frontend can read it.
+```text
+User selects approved result
+  -> styleReferenceId points to source generation
+  -> source generation provider is loaded
+  -> if provider=openai, use OpenAI lineage strategy
+  -> if provider=gemini, use thoughtSignature strategy
+```
 
-3. **Backend: `admin.routes.ts` + `AdminService`** — The actual admin API surface. Depends on decorator from step 2. Each endpoint group (users, generations, content, api-keys) can be built independently but all depend on the decorator.
+## Build Order Recommendation
 
-4. **Frontend: Auth store role + cookie** — Login must write `role` to Zustand store AND set an `access-token` cookie so `middleware.ts` can read it. Depends on backend returning `role` (step 2).
+### Phase A: Foundation
 
-5. **Frontend: `middleware.ts` route guard** — Depends on cookie being set (step 4). Must match only `/admin/*`.
+- schema changes for provider/model/trace
+- shared types and API contract
+- provider-aware API key model
 
-6. **Frontend: Admin layout + AdminGuard** — Client-side guard in `(admin)/layout.tsx`. Depends on auth store having `role` (step 4).
+### Phase B: Runtime
 
-7. **Frontend: Individual admin pages** — Each page depends on its corresponding backend endpoint (step 3) and the layout guard (step 6).
+- install `openai` SDK
+- add `openai-image.service.ts`
+- queue payload provider
+- worker dispatch
 
-8. **GeminiService key source switch** — Switch from `env.GEMINI_API_KEY` to `AdminService.getActiveApiKey()`. Depends on `ApiKey` table (step 1) and admin key management endpoint (step 3).
+### Phase C: Core user flows
 
-## Anti-Patterns
+- OpenAI IP Change
+- OpenAI Sketch to Real
+- OpenAI history/result integration
 
-### Anti-Pattern 1: Role Check Only on the Frontend
+### Phase D: Follow-up flows
 
-**What people do:** Check `user.role === 'admin'` in React components or Next.js middleware only, and skip the backend check.
-**Why it's wrong:** The API remains accessible to anyone with a valid JWT. An attacker who knows the endpoint can bypass the UI entirely.
-**Do this instead:** Always enforce with `preHandler: [authenticate, requireAdmin]` on every Fastify admin route. Frontend checks are UX only; backend is the security boundary.
+- OpenAI partial edit
+- OpenAI regenerate
+- OpenAI style copy
 
-### Anti-Pattern 2: Separate Admin App / Sub-domain
+### Phase E: UX and ops
 
-**What people do:** Create a separate Next.js app at `admin.example.com` for the admin panel.
-**Why it's wrong:** The project explicitly scopes admin to `/admin/*` within the existing app. A separate app duplicates the auth system, complicates deployment, and introduces CORS between admin app and API.
-**Do this instead:** Use a Next.js route group `(admin)` with a dedicated layout. This shares the same auth infrastructure with zero additional CORS config.
+- provider badges
+- admin provider-aware key UI
+- debug metadata surfacing
+- parity verification
 
-### Anti-Pattern 3: Cross-User Queries in Existing User-Scoped Services
+## What Not To Do
 
-**What people do:** Add `getAll()` methods to existing services like `GenerationService` that return results for all users.
-**Why it's wrong:** Existing services are written with the assumption that operations are scoped to `request.user.id`. Adding cross-user variants risks accidental exposure if the wrong method is called from a user-facing route.
-**Do this instead:** All cross-user queries live in `AdminService`. User-facing services remain scoped to the authenticated user's ID.
-
-### Anti-Pattern 4: Hardcoding Gemini Key in `admin.service.ts` Fallback
-
-**What people do:** Fall back to `process.env.GEMINI_API_KEY` if no active key is found in the database.
-**Why it's wrong:** Silently hides misconfiguration. If the DB table is empty or migration not run, the system appears to work but bypasses the key management system.
-**Do this instead:** Throw a clear error if no active key is found: `throw new Error('No active Gemini API key configured')`. Alert the admin rather than silently falling back.
-
-## Integration Points
-
-### Internal Boundaries
-
-| Boundary | Communication | Notes |
-|----------|---------------|-------|
-| Next.js middleware ↔ Fastify | HTTP (Bearer JWT in Authorization header) | Middleware only reads JWT — no direct API call. The actual admin API calls happen in page components. |
-| AdminService ↔ GeminiService | Direct function call (same process) | GeminiService calls `adminService.getActiveApiKey()` on each generation job, replacing env var lookup. Must handle the case where no active key exists. |
-| AdminService ↔ existing services | None (intentional) | AdminService uses Prisma directly for cross-user queries rather than delegating to user-scoped services. |
-| auth.plugin.ts `requireAdmin` ↔ `authenticate` | Shared `request.user` object | `requireAdmin` must run after `authenticate` (which populates `request.user`). Always chain as `[authenticate, requireAdmin]`. |
-
-### External Services
-
-| Service | Integration Pattern | Notes |
-|---------|---------------------|-------|
-| Gemini API | `AdminService.getActiveApiKey()` returns key string; `GeminiService` passes it to the SDK | Active key cached at application level is risky (stale after switch); query DB per generation or use a short in-memory TTL (30s). |
-| PostgreSQL | Prisma queries in AdminService | Admin stats queries may be expensive (COUNT, GROUP BY across large tables). Add DB indexes on `generations.status`, `generations.created_at` if not already present. |
-
-## Scaling Considerations
-
-| Scale | Architecture Adjustments |
-|-------|--------------------------|
-| 0-1k users | Current approach fine. Polling for queue status is acceptable. |
-| 1k-100k users | Admin stats queries become slow. Add materialized views or a separate analytics table updated by the worker. |
-| 100k+ users | Admin panel becomes its own service concern. Consider read replicas for admin queries to avoid impacting user-facing DB performance. |
-
-### Scaling Priorities
-
-1. **First bottleneck:** Admin dashboard stats (COUNT queries across all users/generations). Mitigate with indexed queries and/or caching stats in Redis with a 60s TTL.
-2. **Second bottleneck:** Bulk content delete operations. Implement as background jobs (BullMQ already present) rather than synchronous HTTP responses.
+| Avoid | Why |
+|-------|-----|
+| OpenAI microservice 분리 | 현재 규모에 비해 과도하고 existing worker flow와 어긋남 |
+| separate queue per provider | provider field로 충분하며 운영 복잡도만 증가 |
+| `gemini.service.ts` 안에 OpenAI code 혼합 | provider drift와 maintenance cost 증가 |
+| OpenAI result를 Gemini follow-up으로 암묵 fallback | 사용자 신뢰를 깨뜨림 |
+| OpenAI lineage를 `thoughtSignatures`에 억지 저장 | provider-specific continuation model이 다름 |
 
 ## Sources
 
-- Next.js middleware matcher docs: [https://nextjs.org/docs/app/building-your-application/routing/middleware](https://nextjs.org/docs/app/building-your-application/routing/middleware) — HIGH confidence
-- Fastify preHandler hook pattern: [https://www.permit.io/blog/how-to-create-an-authorization-middleware-for-fastify](https://www.permit.io/blog/how-to-create-an-authorization-middleware-for-fastify) — MEDIUM confidence
-- Next.js RBAC with App Router: [https://www.jigz.dev/blogs/how-to-use-middleware-for-role-based-access-control-in-next-js-15-app-router](https://www.jigz.dev/blogs/how-to-use-middleware-for-role-based-access-control-in-next-js-15-app-router) — MEDIUM confidence
-- Existing codebase analysis: `apps/api/src/plugins/auth.plugin.ts`, `apps/api/src/server.ts`, `apps/api/prisma/schema.prisma` — HIGH confidence
-
----
-*Architecture research for: Admin panel integration into Next.js 16 + Fastify 5 monorepo*
-*Researched: 2026-03-10*
+- `apps/api/prisma/schema.prisma`
+- `apps/api/src/lib/queue.ts`
+- `apps/api/src/services/generation.service.ts`
+- `apps/api/src/routes/generation.routes.ts`
+- `apps/api/src/routes/edit.routes.ts`
+- `apps/api/src/worker.ts`
+- `apps/web/src/lib/api.ts`
+- `apps/web/src/app/projects/[id]/ip-change/page.tsx`
+- `apps/web/src/app/projects/[id]/sketch-to-real/page.tsx`
+- `apps/web/src/app/projects/[id]/generations/[genId]/page.tsx`
+- `.codex/skills/mockup-openai-dual-provider/SKILL.md`
+- `.codex/skills/mockup-openai-image-runtime/references/endpoint-matrix.md`
