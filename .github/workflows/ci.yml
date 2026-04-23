@@ -94,7 +94,9 @@ jobs:
           username: ${{ vars.MAC_USERNAME }}
           key: ${{ secrets.MAC_SSH_KEY }}
           command_timeout: 30m
+          script_stop: true
           script: |
+            set -euo pipefail
             export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
 
             cd "${{ vars.MAC_DEPLOY_PATH }}"

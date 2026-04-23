@@ -19,14 +19,17 @@ RUN pnpm install --frozen-lockfile
 FROM base AS builder
 WORKDIR /app
 
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
-COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules
-
 # 소스 복사
 COPY packages/shared ./packages/shared
 COPY apps/web ./apps/web
 COPY turbo.json ./
+
+# 의존성 복사
+# Source COPY can overwrite package directories; copy pnpm symlink trees after
+# source files so workspace dependencies remain resolvable during Next build.
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
+COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules
 
 # 빌드 시 API URL을 ARG로 받음 (NEXT_PUBLIC_* 변수는 빌드 타임에 번들에 포함됨)
 ARG NEXT_PUBLIC_API_URL=http://localhost:4000
