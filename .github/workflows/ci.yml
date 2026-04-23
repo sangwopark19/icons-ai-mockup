@@ -64,9 +64,10 @@ jobs:
           MAC_SSH_KEY: ${{ secrets.MAC_SSH_KEY }}
           MAC_HOST: ${{ vars.MAC_HOST }}
           MAC_USERNAME: ${{ vars.MAC_USERNAME }}
+          MAC_DEPLOY_PATH: ${{ vars.MAC_DEPLOY_PATH }}
         run: |
           missing=0
-          for name in TS_OAUTH_CLIENT_ID TS_OAUTH_SECRET MAC_SSH_KEY MAC_HOST MAC_USERNAME; do
+          for name in TS_OAUTH_CLIENT_ID TS_OAUTH_SECRET MAC_SSH_KEY MAC_HOST MAC_USERNAME MAC_DEPLOY_PATH; do
             if [ -z "${!name}" ]; then
               echo "::error::$name is not configured"
               missing=1
@@ -92,9 +93,14 @@ jobs:
           host: ${{ vars.MAC_HOST }}
           username: ${{ vars.MAC_USERNAME }}
           key: ${{ secrets.MAC_SSH_KEY }}
+          command_timeout: 30m
           script: |
-            cd ~/projects/mockup-ai-v10-C
-            git pull origin main
+            export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
+
+            cd "${{ vars.MAC_DEPLOY_PATH }}"
+            git fetch origin main
+            git checkout main
+            git pull --ff-only origin main
             
             # 환경 변수 확인
             if [ ! -f .env ]; then
@@ -103,13 +109,13 @@ jobs:
             fi
             
             # Docker 이미지 빌드 및 실행
-            docker-compose down
-            docker-compose build --no-cache
-            docker-compose up -d
+            docker compose down
+            docker compose build --no-cache
+            docker compose up -d
             
             # 상태 확인
             sleep 10
-            docker-compose ps
+            docker compose ps
             
             # 불필요한 이미지 정리
             docker image prune -f
