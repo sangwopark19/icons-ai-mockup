@@ -68,6 +68,49 @@
 
 </details>
 
+## Phase Details
+
+### Phase 7: Provider Foundation and Key Separation
+**Goal**: Make generation, admin key management, and queue routing provider-aware without breaking Gemini
+**Depends on**: v1.0 AI Mockup Admin Panel
+**Requirements**: OPS-01, OPS-02, OPS-03, OPS-04
+**Success Criteria** (what must be TRUE):
+  1. Admin can create, activate, and inspect API keys separately for Gemini and OpenAI
+  2. Generation records persist `provider`, `providerModel`, and provider-specific trace metadata
+  3. Queue payloads and worker dispatch route jobs by provider before mode-specific execution
+  4. Existing Gemini flows continue to run unchanged after provider-aware schema and worker refactor
+
+### Phase 8: OpenAI IP Change Parity
+**Goal**: Add an OpenAI GPT Image 2 version of the `IP 변경` workflow that matches current product expectations
+**Depends on**: Phase 7
+**Requirements**: PROV-01, OIP-01, OIP-02, OIP-03
+**Success Criteria** (what must be TRUE):
+  1. Users can enter the OpenAI IP Change flow from the same project context as Gemini
+  2. OpenAI IP Change returns two candidates and preserves structure/viewpoint/hardware constraints
+  3. OpenAI IP Change outputs can be selected, saved to history, reopened, and downloaded through the existing lifecycle
+  4. Gemini IP Change entry and behavior remain available and unaffected
+
+### Phase 9: OpenAI Sketch to Real Parity
+**Goal**: Add an OpenAI GPT Image 2 version of `스케치 실사화` with the same design-preservation contract
+**Depends on**: Phase 7
+**Requirements**: PROV-02, OSR-01, OSR-02, OSR-03
+**Success Criteria** (what must be TRUE):
+  1. Users can enter the OpenAI Sketch to Real flow from the same project context as Gemini
+  2. OpenAI Sketch to Real returns two candidates from sketch plus optional texture input
+  3. Layout, silhouette, and key character/product details remain preserved while realistic material treatment is applied
+  4. Transparent-background requests succeed through background-removal post-processing rather than unsupported direct model output
+
+### Phase 10: Provider-Aware Result Continuation
+**Goal**: Make result pages, history, regenerate, edit, and style-copy flows stay pinned to the originating provider
+**Depends on**: Phases 8 and 9
+**Requirements**: PROV-03, PROV-04, OED-01, OED-02, OED-03
+**Success Criteria** (what must be TRUE):
+  1. Result and history views clearly show provider/model for every generation
+  2. Regenerate reuses the original provider and saved inputs/options instead of silently switching engines
+  3. OpenAI-generated results support partial edit from the existing result page
+  4. OpenAI style-copy and iterative follow-ups use OpenAI lineage rather than Gemini-only `thoughtSignature`
+  5. Follow-up actions on Gemini and OpenAI results no longer drift into the wrong provider runtime
+
 ## Progress
 
 | Milestone | Phases | Plans | Status | Shipped |

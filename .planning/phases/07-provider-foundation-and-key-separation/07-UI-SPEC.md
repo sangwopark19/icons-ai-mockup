@@ -1,7 +1,7 @@
 ---
 phase: 7
 slug: provider-foundation-and-key-separation
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-04-23
@@ -186,11 +186,11 @@ Safety decision: use existing local UI only. No third-party registry code enters
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: FLAG — action labels `재시도`, `활성화`, and `삭제` are single-word labels, accepted because they preserve existing admin UI conventions.
+- [x] Dimension 2 Visuals: FLAG — primary focal point is implied by the provider tablist under the page header; executor should treat that tablist as the main control.
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved 2026-04-23
