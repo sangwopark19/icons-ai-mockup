@@ -28,6 +28,11 @@ const envSchema = z.object({
   JWT_ACCESS_EXPIRY: z.string().default('15m'),
   JWT_REFRESH_EXPIRY: z.string().default('7d'),
 
+  // API key encryption
+  ENCRYPTION_KEY: z
+    .string()
+    .regex(/^[0-9a-fA-F]{64}$/, 'ENCRYPTION_KEY must be a 64-character hex string (32 bytes)'),
+
   // Gemini API
   GEMINI_API_KEY: z.string().optional(),
 
@@ -70,8 +75,14 @@ function parseEnv() {
     console.error(parsed.error.format());
 
     // 개발 환경에서는 기본값 사용
-    if (process.env.NODE_ENV === 'development') {
+    const nodeEnv = process.env.NODE_ENV ?? 'development';
+    if (nodeEnv === 'development') {
       console.warn('⚠️ 개발 환경에서 기본값을 사용합니다');
+      const developmentEncryptionKey = /^[0-9a-fA-F]{64}$/.test(process.env.ENCRYPTION_KEY ?? '')
+        ? process.env.ENCRYPTION_KEY!
+        : '0'.repeat(64);
+      process.env.ENCRYPTION_KEY = developmentEncryptionKey;
+
       return {
         nodeEnv: 'development' as const,
         port: 4000,
@@ -80,6 +91,7 @@ function parseEnv() {
         jwtSecret: 'development-secret-key-change-in-production',
         jwtAccessExpiry: '15m',
         jwtRefreshExpiry: '7d',
+        encryptionKey: developmentEncryptionKey,
         geminiApiKey: undefined,
         maxFileSize: 10 * 1024 * 1024,
         uploadDir: './data',
@@ -98,6 +110,7 @@ function parseEnv() {
     jwtSecret: parsed.data.JWT_SECRET,
     jwtAccessExpiry: parsed.data.JWT_ACCESS_EXPIRY,
     jwtRefreshExpiry: parsed.data.JWT_REFRESH_EXPIRY,
+    encryptionKey: parsed.data.ENCRYPTION_KEY,
     geminiApiKey: parsed.data.GEMINI_API_KEY,
     maxFileSize: parsed.data.MAX_FILE_SIZE,
     uploadDir: parsed.data.UPLOAD_DIR,

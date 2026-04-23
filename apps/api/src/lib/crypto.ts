@@ -3,6 +3,7 @@ import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12; // 96-bit IV — recommended for GCM
 const TAG_LENGTH = 16; // 128-bit auth tag — GCM default
+const ENCRYPTION_KEY_PATTERN = /^[0-9a-fA-F]{64}$/;
 
 /**
  * Encrypts plaintext with AES-256-GCM.
@@ -37,7 +38,7 @@ export function decrypt(ciphertext: string, key: Buffer): string {
  */
 export function getEncryptionKey(): Buffer {
   const hexKey = process.env.ENCRYPTION_KEY;
-  if (!hexKey || hexKey.length !== 64) {
+  if (!hexKey || !ENCRYPTION_KEY_PATTERN.test(hexKey)) {
     throw new Error('ENCRYPTION_KEY must be a 64-character hex string (32 bytes)');
   }
   return Buffer.from(hexKey, 'hex');

@@ -8,13 +8,13 @@
 
 ### 필수 요구사항
 
-| 항목 | 최소 사양 | 권장 사양 |
-|------|----------|----------|
-| Docker | 20.x 이상 | 최신 버전 |
-| Docker Compose | 2.x 이상 | 최신 버전 |
-| RAM | 4GB | 8GB 이상 |
-| 저장 공간 | 5GB | 20GB 이상 |
-| 포트 | 3000, 4000 | - |
+| 항목           | 최소 사양  | 권장 사양 |
+| -------------- | ---------- | --------- |
+| Docker         | 20.x 이상  | 최신 버전 |
+| Docker Compose | 2.x 이상   | 최신 버전 |
+| RAM            | 4GB        | 8GB 이상  |
+| 저장 공간      | 5GB        | 20GB 이상 |
+| 포트           | 3000, 4000 | -         |
 
 ### 필수 API 키
 
@@ -33,10 +33,17 @@
 # 필수 설정
 GEMINI_API_KEY=your-gemini-api-key-here
 JWT_SECRET=your-super-secret-jwt-key-minimum-32-characters
+ENCRYPTION_KEY=your-64-character-hex-string
 
 # 선택 설정 (기본값 사용 가능)
 NEXT_PUBLIC_API_URL=http://localhost:4000
 CORS_ORIGIN=http://localhost:3000
+```
+
+`ENCRYPTION_KEY`는 관리자 화면에서 등록한 API 키를 암호화하는 키입니다. 다음 명령으로 생성하세요:
+
+```bash
+openssl rand -hex 32
 ```
 
 ### 2. 서비스 시작
@@ -57,7 +64,7 @@ docker compose ps
 # mockup-postgres   Up (healthy)        5432
 # mockup-redis      Up (healthy)        6379
 # mockup-api        Up (healthy)        4000
-# mockup-worker     Up                  
+# mockup-worker     Up
 # mockup-web        Up                  3000
 ```
 
@@ -92,6 +99,7 @@ ip addr
 # .env 파일
 GEMINI_API_KEY=your-gemini-api-key
 JWT_SECRET=your-super-secret-jwt-key-minimum-32-characters
+ENCRYPTION_KEY=your-64-character-hex-string
 
 # 서버 IP로 변경
 NEXT_PUBLIC_API_URL=http://192.168.1.100:4000
@@ -108,6 +116,7 @@ docker compose up -d --build
 ### 4. 사용자 안내
 
 사용자들에게 다음 주소로 접속하도록 안내:
+
 ```
 http://192.168.1.100:3000
 ```
@@ -116,14 +125,15 @@ http://192.168.1.100:3000
 
 ## 🔧 환경 변수 상세
 
-| 변수명 | 필수 | 기본값 | 설명 |
-|--------|------|--------|------|
-| `GEMINI_API_KEY` | ✅ | - | Google Gemini API 키 |
-| `JWT_SECRET` | ✅ | 개발용 | JWT 토큰 서명 키 (32자 이상) |
-| `NEXT_PUBLIC_API_URL` | ❌ | `http://172.30.1.42:4000` | 프론트엔드에서 접근할 API URL |
-| `CORS_ORIGIN` | ❌ | `http://localhost:3000` | 허용할 프론트엔드 Origin (쉼표 구분) |
-| `DATABASE_URL` | ❌ | Docker 내부 | PostgreSQL 연결 URL |
-| `REDIS_URL` | ❌ | Docker 내부 | Redis 연결 URL |
+| 변수명                | 필수 | 기본값                    | 설명                                                            |
+| --------------------- | ---- | ------------------------- | --------------------------------------------------------------- |
+| `GEMINI_API_KEY`      | ✅   | -                         | Google Gemini API 키                                            |
+| `JWT_SECRET`          | ✅   | 개발용                    | JWT 토큰 서명 키 (32자 이상)                                    |
+| `ENCRYPTION_KEY`      | ✅   | -                         | 관리자 API 키 암호화용 64자 hex 문자열 (`openssl rand -hex 32`) |
+| `NEXT_PUBLIC_API_URL` | ❌   | `http://172.30.1.42:4000` | 프론트엔드에서 접근할 API URL                                   |
+| `CORS_ORIGIN`         | ❌   | `http://localhost:3000`   | 허용할 프론트엔드 Origin (쉼표 구분)                            |
+| `DATABASE_URL`        | ❌   | Docker 내부               | PostgreSQL 연결 URL                                             |
+| `REDIS_URL`           | ❌   | Docker 내부               | Redis 연결 URL                                                  |
 
 ---
 
@@ -149,13 +159,13 @@ http://192.168.1.100:3000
 └─────────────────────────────────────────────────────────┘
 ```
 
-| 서비스 | 역할 | 포트 |
-|--------|------|------|
-| **web** | 사용자 인터페이스 (Next.js) | 3000 |
-| **api** | REST API 서버 (Fastify) | 4000 |
-| **worker** | 이미지 생성 작업 처리 | - |
-| **postgres** | 데이터베이스 | 5432 |
-| **redis** | 캐시 및 작업 큐 | 6379 |
+| 서비스       | 역할                        | 포트 |
+| ------------ | --------------------------- | ---- |
+| **web**      | 사용자 인터페이스 (Next.js) | 3000 |
+| **api**      | REST API 서버 (Fastify)     | 4000 |
+| **worker**   | 이미지 생성 작업 처리       | -    |
+| **postgres** | 데이터베이스                | 5432 |
+| **redis**    | 캐시 및 작업 큐             | 6379 |
 
 ---
 
@@ -258,20 +268,34 @@ lsof -i :3000
 ```
 
 `docker-compose.yml`에서 포트 변경:
+
 ```yaml
 web:
   ports:
-    - "3001:3000"  # 외부:내부
+    - '3001:3000' # 외부:내부
 ```
+
+### 관리자 API 키 등록 실패
+
+`ENCRYPTION_KEY must be a 64-character hex string (32 bytes)` 에러가 뜨면 `.env`의 `ENCRYPTION_KEY`가 없거나 형식이 잘못된 상태입니다.
+
+```bash
+openssl rand -hex 32
+docker compose up -d --build
+```
+
+생성된 값을 `.env`의 `ENCRYPTION_KEY`에 넣은 뒤 다시 배포하세요.
 
 ### 이미지 생성 실패
 
 1. **Gemini API 키 확인**
+
 ```bash
 docker compose logs worker | grep -i "error\|gemini"
 ```
 
 2. **워커 재시작**
+
 ```bash
 docker compose restart worker
 ```
@@ -289,6 +313,7 @@ docker compose logs postgres
 ### 메모리 부족
 
 Docker Desktop 설정에서 메모리 할당 증가:
+
 - Docker Desktop → Settings → Resources → Memory: 8GB 이상
 
 ---
@@ -298,10 +323,11 @@ Docker Desktop 설정에서 메모리 할당 증가:
 ### 동시 작업 수 조정
 
 `docker-compose.yml`의 worker 설정에서:
+
 ```yaml
 worker:
   environment:
-    - WORKER_CONCURRENCY=4  # 동시 처리 작업 수
+    - WORKER_CONCURRENCY=4 # 동시 처리 작업 수
 ```
 
 ### 이미지 캐시 정리
@@ -318,16 +344,19 @@ docker system prune -a
 문제 발생 시 수집해야 할 정보:
 
 1. **Docker 로그**
+
 ```bash
 docker compose logs > logs_$(date +%Y%m%d).txt
 ```
 
 2. **서비스 상태**
+
 ```bash
 docker compose ps
 ```
 
 3. **시스템 정보**
+
 ```bash
 docker version
 docker compose version

@@ -1,7 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Users, Image as ImageIcon, AlertTriangle, ListOrdered, HardDrive, Key } from 'lucide-react';
+import {
+  Users,
+  Image as ImageIcon,
+  AlertTriangle,
+  ListOrdered,
+  HardDrive,
+  Key,
+} from 'lucide-react';
 import { adminApi, DashboardStats, HourlyChartPoint } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth.store';
 import { KpiCard } from '@/components/admin/kpi-card';
@@ -22,23 +29,38 @@ export default function DashboardPage() {
   const accessToken = useAuthStore((state) => state.accessToken);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [chart, setChart] = useState<HourlyChartPoint[] | null>(null);
+  const [statsError, setStatsError] = useState<string | null>(null);
+  const [chartError, setChartError] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
 
     const fetchData = async () => {
       if (!accessToken || !mounted) return;
-      try {
-        const [statsRes, chartRes] = await Promise.all([
-          adminApi.getDashboardStats(accessToken),
-          adminApi.getFailureChart(accessToken),
-        ]);
-        if (mounted) {
-          setStats(statsRes.data);
-          setChart(chartRes.data);
-        }
-      } catch (err) {
-        console.error('Dashboard fetch error:', err);
+      setStatsError(null);
+      setChartError(null);
+
+      const [statsResult, chartResult] = await Promise.allSettled([
+        adminApi.getDashboardStats(accessToken),
+        adminApi.getFailureChart(accessToken),
+      ]);
+
+      if (!mounted) return;
+
+      if (statsResult.status === 'fulfilled') {
+        setStats(statsResult.value.data);
+      } else {
+        console.error('Dashboard stats fetch error:', statsResult.reason);
+        setStats(null);
+        setStatsError('대시보드 통계를 불러오지 못했습니다. API 로그를 확인해주세요.');
+      }
+
+      if (chartResult.status === 'fulfilled') {
+        setChart(chartResult.value.data);
+      } else {
+        console.error('Dashboard chart fetch error:', chartResult.reason);
+        setChart(null);
+        setChartError('실패 차트 데이터를 불러오지 못했습니다.');
       }
     };
 
@@ -57,7 +79,11 @@ export default function DashboardPage() {
 
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-        {stats === null ? (
+        {statsError ? (
+          <div className="col-span-2 rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700 lg:col-span-3 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-300">
+            {statsError}
+          </div>
+        ) : stats === null ? (
           <>
             <KpiSkeleton />
             <KpiSkeleton />
@@ -113,8 +139,12 @@ export default function DashboardPage() {
           시간대별 실패 건수 (24시간)
         </h2>
         <div className="rounded-lg border border-[var(--border-default)] bg-[var(--bg-secondary)] p-4 shadow-sm">
-          {chart === null ? (
-            <div className="h-[250px] animate-pulse rounded bg-muted" />
+          {chartError ? (
+            <div className="flex h-[250px] items-center justify-center text-sm font-medium text-red-600 dark:text-red-300">
+              {chartError}
+            </div>
+          ) : chart === null ? (
+            <div className="bg-muted h-[250px] animate-pulse rounded" />
           ) : (
             <FailureChart data={chart} />
           )}

@@ -108,6 +108,18 @@ export interface ListImagesResult {
   pagination: { page: number; limit: number; total: number; totalPages: number };
 }
 
+type DashboardJobCounts = Partial<Record<'waiting' | 'active' | 'delayed', number>>;
+
+async function getDashboardJobCounts(): Promise<DashboardJobCounts> {
+  try {
+    return await generationQueue.getJobCounts('waiting', 'active', 'delayed');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`Dashboard queue depth unavailable: ${message}`);
+    return { waiting: 0, active: 0, delayed: 0 };
+  }
+}
+
 function buildImageWhere(params: Omit<ListImagesParams, 'page' | 'limit'>) {
   const where: Record<string, unknown> = {};
 
@@ -168,7 +180,7 @@ export class AdminService {
         where: { status: 'failed', createdAt: { gte: twentyFourHoursAgo } },
       }),
       prisma.generatedImage.aggregate({ _sum: { fileSize: true } }),
-      generationQueue.getJobCounts('waiting', 'active', 'delayed'),
+      getDashboardJobCounts(),
       prisma.user.count({
         where: { createdAt: { gte: fortyEightHoursAgo, lt: twentyFourHoursAgo } },
       }),
@@ -499,7 +511,9 @@ export class AdminService {
     });
   }
 
-  async bulkDeleteImages(params: Omit<ListImagesParams, 'page' | 'limit'>): Promise<{ deletedCount: number }> {
+  async bulkDeleteImages(
+    params: Omit<ListImagesParams, 'page' | 'limit'>
+  ): Promise<{ deletedCount: number }> {
     const where = buildImageWhere(params);
 
     const images = await prisma.generatedImage.findMany({

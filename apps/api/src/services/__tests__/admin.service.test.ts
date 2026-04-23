@@ -106,8 +106,14 @@ describe('AdminService - getDashboardStats', () => {
 
     vi.mocked(prisma.user.count).mockResolvedValue(0);
     vi.mocked(prisma.generation.count).mockResolvedValue(0);
-    vi.mocked(prisma.generatedImage.aggregate).mockResolvedValue({ _sum: { fileSize: null } } as any);
-    vi.mocked(generationQueue.getJobCounts).mockResolvedValue({ waiting: 0, active: 0, delayed: 0 } as any);
+    vi.mocked(prisma.generatedImage.aggregate).mockResolvedValue({
+      _sum: { fileSize: null },
+    } as any);
+    vi.mocked(generationQueue.getJobCounts).mockResolvedValue({
+      waiting: 0,
+      active: 0,
+      delayed: 0,
+    } as any);
 
     await adminService.getDashboardStats();
 
@@ -124,11 +130,39 @@ describe('AdminService - getDashboardStats', () => {
 
     vi.mocked(prisma.user.count).mockResolvedValue(0);
     vi.mocked(prisma.generation.count).mockResolvedValue(0);
-    vi.mocked(prisma.generatedImage.aggregate).mockResolvedValue({ _sum: { fileSize: null } } as any);
-    vi.mocked(generationQueue.getJobCounts).mockResolvedValue({ waiting: 0, active: 0, delayed: 0 } as any);
+    vi.mocked(prisma.generatedImage.aggregate).mockResolvedValue({
+      _sum: { fileSize: null },
+    } as any);
+    vi.mocked(generationQueue.getJobCounts).mockResolvedValue({
+      waiting: 0,
+      active: 0,
+      delayed: 0,
+    } as any);
 
     const stats = await adminService.getDashboardStats();
     expect(stats.storageBytes).toBe(0);
+  });
+
+  it('should keep stats available when queue depth lookup fails', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { generationQueue } = await import('../../lib/queue.js');
+    const { adminService } = await import('../admin.service.js');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    vi.mocked(prisma.user.count).mockResolvedValue(0);
+    vi.mocked(prisma.generation.count).mockResolvedValue(0);
+    vi.mocked(prisma.generatedImage.aggregate).mockResolvedValue({
+      _sum: { fileSize: null },
+    } as any);
+    vi.mocked(generationQueue.getJobCounts).mockRejectedValue(new Error('redis unavailable'));
+
+    try {
+      const stats = await adminService.getDashboardStats();
+      expect(stats.queueDepth).toBe(0);
+      expect(warn).toHaveBeenCalledWith('Dashboard queue depth unavailable: redis unavailable');
+    } finally {
+      warn.mockRestore();
+    }
   });
 });
 
@@ -178,7 +212,16 @@ describe('AdminService - listUsers', () => {
     const { adminService } = await import('../admin.service.js');
 
     const mockUsers = [
-      { id: 'u1', email: 'a@a.com', name: 'A', role: 'user', status: 'active', createdAt: new Date(), updatedAt: new Date(), lastLoginAt: null },
+      {
+        id: 'u1',
+        email: 'a@a.com',
+        name: 'A',
+        role: 'user',
+        status: 'active',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        lastLoginAt: null,
+      },
     ];
     vi.mocked(prisma.user.findMany).mockResolvedValue(mockUsers as any);
     vi.mocked(prisma.user.count).mockResolvedValue(1);
@@ -634,9 +677,7 @@ describe('AdminService - deleteGeneratedImage', () => {
 
     await adminService.deleteGeneratedImage('img1');
 
-    expect(vi.mocked(uploadService.deleteFile)).toHaveBeenCalledWith(
-      mockGeneratedImage.filePath
-    );
+    expect(vi.mocked(uploadService.deleteFile)).toHaveBeenCalledWith(mockGeneratedImage.filePath);
     expect(vi.mocked(uploadService.deleteFile)).toHaveBeenCalledWith(
       mockGeneratedImage.thumbnailPath
     );
@@ -731,7 +772,9 @@ describe('AdminService - bulkDeleteImages', () => {
     expect(vi.mocked(uploadService.deleteFile)).toHaveBeenCalledWith(mockGeneratedImage.filePath);
     expect(vi.mocked(uploadService.deleteFile)).toHaveBeenCalledWith('path2.jpg');
     // thumbnailPaths should also be deleted
-    expect(vi.mocked(uploadService.deleteFile)).toHaveBeenCalledWith(mockGeneratedImage.thumbnailPath);
+    expect(vi.mocked(uploadService.deleteFile)).toHaveBeenCalledWith(
+      mockGeneratedImage.thumbnailPath
+    );
     expect(vi.mocked(uploadService.deleteFile)).toHaveBeenCalledWith('thumb2.jpg');
   });
 });
@@ -937,7 +980,9 @@ describe('AdminService - getActiveApiKey', () => {
     // decrypt mock returns 'decrypted-key' by default
     const result = await adminService.getActiveApiKey();
     expect(vi.mocked(decrypt)).toHaveBeenCalled();
-    expect(typeof result === 'string' || (typeof result === 'object' && result !== null)).toBe(true);
+    expect(typeof result === 'string' || (typeof result === 'object' && result !== null)).toBe(
+      true
+    );
   });
 
   it('should throw if no active key exists (KEY-05)', async () => {
@@ -946,7 +991,9 @@ describe('AdminService - getActiveApiKey', () => {
 
     vi.mocked(prisma.apiKey.findFirst).mockResolvedValue(null);
 
-    await expect(adminService.getActiveApiKey()).rejects.toThrow('Gemini API 키가 설정되지 않았습니다');
+    await expect(adminService.getActiveApiKey()).rejects.toThrow(
+      'Gemini API 키가 설정되지 않았습니다'
+    );
   });
 });
 

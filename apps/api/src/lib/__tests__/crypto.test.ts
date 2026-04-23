@@ -81,4 +81,11 @@ describe('crypto - getEncryptionKey', () => {
     process.env.ENCRYPTION_KEY = '0'.repeat(32);
     expect(() => getEncryptionKey()).toThrow();
   });
+
+  it('should throw if ENCRYPTION_KEY contains non-hex characters', () => {
+    process.env.ENCRYPTION_KEY = 'z'.repeat(64);
+    expect(() => getEncryptionKey()).toThrow(
+      'ENCRYPTION_KEY must be a 64-character hex string (32 bytes)'
+    );
+  });
 });
