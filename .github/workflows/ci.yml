@@ -109,13 +109,17 @@ jobs:
               echo "Error: .env file not found"
               exit 1
             fi
+            echo ".env file found"
 
             # ENCRYPTION_KEY is required for admin-managed API keys.
             # Generate it once if missing/invalid, then keep it stable for future decrypts.
-            current_encryption_key="$(grep -E '^ENCRYPTION_KEY=' .env | tail -1 | cut -d= -f2- || true)"
+            current_encryption_key="$(awk '/^ENCRYPTION_KEY=/{value=$0; sub(/^ENCRYPTION_KEY=/, "", value)} END{print value}' .env)"
+            current_encryption_key="${current_encryption_key%$'\r'}"
             current_encryption_key="${current_encryption_key%\"}"
             current_encryption_key="${current_encryption_key#\"}"
-            if ! printf '%s' "$current_encryption_key" | grep -Eq '^[0-9a-fA-F]{64}$'; then
+            if printf '%s' "$current_encryption_key" | grep -Eq '^[0-9a-fA-F]{64}$'; then
+              echo "ENCRYPTION_KEY is configured"
+            else
               new_encryption_key="$(openssl rand -hex 32)"
               if grep -qE '^ENCRYPTION_KEY=' .env; then
                 sed -i.bak "s/^ENCRYPTION_KEY=.*/ENCRYPTION_KEY=$new_encryption_key/" .env
@@ -125,10 +129,15 @@ jobs:
               fi
               echo "Generated ENCRYPTION_KEY in .env"
             fi
-            
+            docker compose config >/dev/null
+            echo "Docker Compose config validated"
+
             # Docker 이미지 빌드 및 실행
+            echo "Stopping existing containers"
             docker compose down
+            echo "Building Docker images"
             docker compose build --no-cache
+            echo "Starting containers"
             docker compose up -d
             
             # 상태 확인
