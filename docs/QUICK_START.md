@@ -272,7 +272,7 @@ lsof -i :3000
 ```yaml
 web:
   ports:
-    - '3001:3000' # 외부:내부
+    - "3001:3000"  # 외부:내부
 ```
 
 ### 관리자 API 키 등록 실패
@@ -327,7 +327,7 @@ Docker Desktop 설정에서 메모리 할당 증가:
 ```yaml
 worker:
   environment:
-    - WORKER_CONCURRENCY=4 # 동시 처리 작업 수
+    - WORKER_CONCURRENCY=4  # 동시 처리 작업 수
 ```
 
 ### 이미지 캐시 정리

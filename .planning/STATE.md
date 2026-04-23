@@ -4,7 +4,7 @@ milestone: v1.0
 milestone_name: milestone
 status: planning
 stopped_at: v1.0 milestone archived — ready for next milestone planning
-last_updated: "2026-04-23T03:27:09.282Z"
+last_updated: "2026-04-23T06:16:56Z"
 last_activity: 2026-04-23
 progress:
   total_phases: 6
@@ -137,6 +137,7 @@ None yet.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 1 | admin 대시보드 흰배경 흰글자 색상 수정 | 2026-03-12 | 7238c61 | [1-admin](./quick/1-admin/) |
+| 2 | Mac 서버 ENCRYPTION_KEY 배포 누락 및 admin 대시보드 빈 상태 수정 | 2026-04-23 | 6de9087 | [260423-l20-mac-encryption-key-api-admin-dashboard](./quick/260423-l20-mac-encryption-key-api-admin-dashboard/) |
 
 ## Deferred Items
 
