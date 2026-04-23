@@ -1,0 +1,4 @@
+interface:
+  display_name: "Mockup IP Change"
+  short_description: "캐릭터 IP 교체 목업 프롬프트 설계"
+  default_prompt: "Use $mockup-ip-change to design a GPT Image 2 prompt for replacing a product character IP while preserving structure."

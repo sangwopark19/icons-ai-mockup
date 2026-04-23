@@ -1,0 +1,4 @@
+interface:
+  display_name: "Mockup Sketch Realization"
+  short_description: "2D 스케치를 실사 제품 목업 프롬프트로 변환"
+  default_prompt: "Use $mockup-sketch-realization to turn a 2D sketch into a production-ready GPT Image 2 product mockup prompt."
