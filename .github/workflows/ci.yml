@@ -57,11 +57,40 @@ jobs:
     if: github.ref == 'refs/heads/main'
     
     steps:
+      - name: Check deployment configuration
+        env:
+          TS_OAUTH_CLIENT_ID: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          TS_OAUTH_SECRET: ${{ secrets.TS_OAUTH_SECRET }}
+          MAC_SSH_KEY: ${{ secrets.MAC_SSH_KEY }}
+          MAC_HOST: ${{ vars.MAC_HOST }}
+          MAC_USERNAME: ${{ vars.MAC_USERNAME }}
+        run: |
+          missing=0
+          for name in TS_OAUTH_CLIENT_ID TS_OAUTH_SECRET MAC_SSH_KEY MAC_HOST MAC_USERNAME; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is not configured"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Verify Tailscale connectivity
+        run: |
+          tailscale status
+          timeout 20s tailscale ping "${{ vars.MAC_HOST }}"
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.MAC_HOST }}
-          username: ${{ secrets.MAC_USERNAME }}
+          host: ${{ vars.MAC_HOST }}
+          username: ${{ vars.MAC_USERNAME }}
           key: ${{ secrets.MAC_SSH_KEY }}
           script: |
             cd ~/projects/mockup-ai-v10-C
