@@ -2,6 +2,16 @@
 
 제품 기획 초기단계에서 실제 제품과 유사한 비주얼 목업을 빠르게 생성하는 AI 기반 목업 생성 도구입니다.
 
+## 📖 사용자 가이드
+
+> **처음 사용하시나요?** 아래 문서를 먼저 확인하세요!
+
+| 문서 | 대상 | 설명 |
+|------|------|------|
+| **[Tailscale 접속 가이드](docs/TAILSCALE_ACCESS_GUIDE.md)** | **모든 사용자 (필독)** | VPN 설치 및 접속 방법 |
+| **[사용자 가이드](docs/USER_GUIDE.md)** | 디자이너/일반 사용자 | 프로그램 사용법, 기능 설명, FAQ |
+| **[빠른 시작 가이드](docs/QUICK_START.md)** | 관리자/설치 담당자 | 설치, 배포, 운영 방법 |
+
 ## 📌 주요 기능
 
 ### 1. IP 변경
@@ -104,16 +114,41 @@ REALESRGAN_PATH="/usr/local/bin/realesrgan-ncnn-vulkan"
 
 ## 🐳 Docker 배포
 
-```bash
-# 개발 환경 (DB만)
-docker-compose up -d postgres redis
+### 간편 배포 (권장)
 
-# 프로덕션 빌드 및 실행
-docker-compose --profile production up -d
+```bash
+# 1. 환경 변수 설정
+cp .env.example .env
+# .env 파일에 GEMINI_API_KEY와 JWT_SECRET 설정
+
+# 2. 전체 스택 실행
+docker compose up -d --build
+
+# 3. 접속
+# 웹: http://localhost:3000
+# API: http://localhost:4000
 ```
 
-## 📚 개발 문서
+> 자세한 배포 방법은 **[빠른 시작 가이드](docs/QUICK_START.md)** 를 참조하세요.
 
+### 개발 환경
+
+```bash
+# DB만 Docker로 실행
+docker compose up -d postgres redis
+
+# 로컬에서 개발 서버 실행
+pnpm dev
+```
+
+## 📚 문서
+
+### 사용자 문서
+- **[Tailscale 접속 가이드](docs/TAILSCALE_ACCESS_GUIDE.md)** - VPN 설치 및 접속 방법 (모든 사용자 필독)
+- **[사용자 가이드](docs/USER_GUIDE.md)** - 디자이너를 위한 상세 사용 설명서
+- **[빠른 시작 가이드](docs/QUICK_START.md)** - 설치 및 배포 가이드
+
+### 개발 문서
 - [PRD (제품 요구사항)](docs/PRD.md)
 - [TRD (기술 요구사항)](docs/TRD.md)
 - [ERD (데이터베이스 설계)](docs/ERD.md)

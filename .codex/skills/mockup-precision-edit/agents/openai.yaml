@@ -1,0 +1,4 @@
+interface:
+  display_name: "Mockup Precision Edit"
+  short_description: "부분 수정과 스타일 복사를 위한 목업 프롬프트"
+  default_prompt: "Use $mockup-precision-edit to build a tightly scoped GPT Image 2 edit prompt that preserves everything except the requested change."

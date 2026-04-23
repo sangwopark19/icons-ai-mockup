@@ -8,6 +8,7 @@ interface User {
   id: string;
   email: string;
   name: string;
+  role?: string;
 }
 
 /**
@@ -48,8 +49,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       // 액션
       setUser: (user) => set({ user }),
 
-      setTokens: (accessToken, refreshToken) =>
-        set({ accessToken, refreshToken }),
+      setTokens: (accessToken, refreshToken) => set({ accessToken, refreshToken }),
 
       login: (user, accessToken, refreshToken) =>
         set({

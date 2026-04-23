@@ -70,9 +70,48 @@ export const GenerationOptionsSchema = z.object({
   preserveStructure: z.boolean().default(false),
   transparentBackground: z.boolean().default(false),
   outputCount: z.number().int().min(1).max(4).default(2),
+  preserveHardware: z.boolean().default(false),
+  fixedBackground: z.boolean().default(true),
+  fixedViewpoint: z.boolean().default(true),
+  removeShadows: z.boolean().default(false),
+  userInstructions: z.string().max(2000).optional(),
+  hardwareSpecInput: z.string().max(2000).optional(),
+  hardwareSpecs: z
+    .object({
+      items: z.array(
+        z.object({
+          type: z.enum(['zipper', 'ring', 'buckle', 'patch', 'button', 'other']),
+          material: z.string(),
+          color: z.string(),
+          position: z.string(),
+          size: z.string().optional(),
+        })
+      ),
+    })
+    .optional(),
 });
 
 export type GenerationOptions = z.infer<typeof GenerationOptionsSchema>;
+
+// ===================
+// V2 추가 타입
+// ===================
+
+export interface ThoughtSignatureData {
+  textSignature?: string;
+  imageSignatures: string[];
+  createdAt: Date;
+}
+
+export interface HardwareSpec {
+  items: Array<{
+    type: 'zipper' | 'ring' | 'buckle' | 'patch' | 'button' | 'other';
+    material: string;
+    color: string;
+    position: string;
+    size?: string;
+  }>;
+}
 
 export const CreateGenerationSchema = z.object({
   projectId: z.string().uuid(),

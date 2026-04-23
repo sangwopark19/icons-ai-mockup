@@ -117,11 +117,7 @@ export class ProjectService {
   /**
    * 프로젝트 수정
    */
-  async update(
-    id: string,
-    userId: string,
-    input: UpdateProjectInput
-  ): Promise<Project | null> {
+  async update(id: string, userId: string, input: UpdateProjectInput): Promise<Project | null> {
     // 소유권 확인
     const existing = await this.findById(id, userId);
     if (!existing) return null;

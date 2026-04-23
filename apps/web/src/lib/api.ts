@@ -13,6 +13,7 @@ interface RequestOptions extends RequestInit {
  */
 async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
   const { token, ...fetchOptions } = options;
+  const method = fetchOptions.method ?? 'GET';
 
   const headers: HeadersInit = {
     ...options.headers,
@@ -68,7 +69,7 @@ export const authApi = {
     return request<{
       success: true;
       data: {
-        user: { id: string; email: string; name: string };
+        user: { id: string; email: string; name: string; role?: string };
         accessToken: string;
         refreshToken: string;
       };
@@ -88,7 +89,7 @@ export const authApi = {
   me: async (token: string) => {
     return request<{
       success: true;
-      data: { user: { id: string; email: string; name: string } };
+      data: { user: { id: string; email: string; name: string; role?: string } };
     }>('/api/auth/me', { token });
   },
 
@@ -169,4 +170,256 @@ export const imageApi = {
   },
 };
 
-export default { authApi, projectApi, imageApi };
+/**
+ * API 키 타입
+ */
+export interface AdminApiKey {
+  id: string;
+  alias: string;
+  maskedKey: string;
+  isActive: boolean;
+  callCount: number;
+  lastUsedAt: string | null;
+  createdAt: string;
+}
+
+/**
+ * 관리자 API 타입
+ */
+export interface DashboardStats {
+  userCount: number;
+  generationCount: number;
+  failedJobCount: number;
+  queueDepth: number;
+  storageBytes: number;
+  activeApiKeys: { alias: string; callCount: number } | null;
+  userCountYesterday: number;
+  generationCountYesterday: number;
+  failedJobCountYesterday: number;
+}
+
+export interface HourlyChartPoint {
+  hour: string;
+  count: number;
+}
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  lastLoginAt: string | null;
+}
+
+export interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface AdminGeneration {
+  id: string;
+  mode: string;
+  status: string;
+  errorMessage: string | null;
+  retryCount: number;
+  promptData: unknown;
+  options: unknown;
+  createdAt: string;
+  userEmail: string;
+}
+
+export interface AdminImage {
+  id: string;
+  generationId: string;
+  filePath: string;
+  thumbnailPath: string | null;
+  type: string;
+  width: number;
+  height: number;
+  fileSize: number;
+  createdAt: string;
+  userEmail: string;
+  projectName: string;
+}
+
+export interface StatusCounts {
+  pending: number;
+  processing: number;
+  completed: number;
+  failed: number;
+}
+
+/**
+ * 관리자 관련 API
+ */
+export const adminApi = {
+  getDashboardStats: (token: string) =>
+    request<{ success: true; data: DashboardStats }>('/api/admin/dashboard/stats', { token }),
+
+  getFailureChart: (token: string) =>
+    request<{ success: true; data: HourlyChartPoint[] }>('/api/admin/dashboard/chart', { token }),
+
+  listUsers: (
+    token: string,
+    params?: { page?: number; email?: string; role?: string; status?: string }
+  ) => {
+    const searchParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined) searchParams.set(k, String(v));
+      });
+    }
+    const qs = searchParams.toString();
+    return request<{ success: true; data: AdminUser[]; pagination: Pagination }>(
+      `/api/admin/users${qs ? '?' + qs : ''}`,
+      { token }
+    );
+  },
+
+  updateUserStatus: (token: string, id: string, status: 'active' | 'suspended') =>
+    request<{ success: true; data: AdminUser }>(`/api/admin/users/${id}/status`, {
+      method: 'PATCH',
+      token,
+      body: JSON.stringify({ status }),
+    }),
+
+  updateUserRole: (token: string, id: string, role: 'admin' | 'user') =>
+    request<{ success: true; data: AdminUser }>(`/api/admin/users/${id}/role`, {
+      method: 'PATCH',
+      token,
+      body: JSON.stringify({ role }),
+    }),
+
+  softDeleteUser: (token: string, id: string) =>
+    request<{ success: true; message: string }>(`/api/admin/users/${id}`, {
+      method: 'DELETE',
+      token,
+    }),
+
+  listGenerations: (
+    token: string,
+    params?: { page?: number; limit?: number; status?: string; email?: string }
+  ) => {
+    const searchParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined) searchParams.set(k, String(v));
+      });
+    }
+    const qs = searchParams.toString();
+    return request<{
+      success: true;
+      data: AdminGeneration[];
+      pagination: Pagination;
+      statusCounts: Record<string, number>;
+    }>(`/api/admin/generations${qs ? '?' + qs : ''}`, { token });
+  },
+
+  retryGeneration: (token: string, id: string) =>
+    request<{ success: true; data: AdminGeneration }>(`/api/admin/generations/${id}/retry`, {
+      method: 'POST',
+      token,
+    }),
+
+  listImages: (
+    token: string,
+    params?: {
+      page?: number;
+      limit?: number;
+      email?: string;
+      projectId?: string;
+      startDate?: string;
+      endDate?: string;
+    }
+  ) => {
+    const searchParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined) searchParams.set(k, String(v));
+      });
+    }
+    const qs = searchParams.toString();
+    return request<{ success: true; data: AdminImage[]; pagination: Pagination }>(
+      `/api/admin/content/images${qs ? '?' + qs : ''}`,
+      { token }
+    );
+  },
+
+  countImages: (
+    token: string,
+    params?: {
+      email?: string;
+      projectId?: string;
+      startDate?: string;
+      endDate?: string;
+    }
+  ) => {
+    const searchParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined) searchParams.set(k, String(v));
+      });
+    }
+    const qs = searchParams.toString();
+    return request<{ success: true; data: { count: number } }>(
+      `/api/admin/content/images/count${qs ? '?' + qs : ''}`,
+      { token }
+    );
+  },
+
+  deleteImage: (token: string, id: string) =>
+    request<{ success: true; message: string }>(`/api/admin/content/images/${id}`, {
+      method: 'DELETE',
+      token,
+    }),
+
+  bulkDeleteImages: (
+    token: string,
+    params: {
+      email?: string;
+      projectId?: string;
+      startDate?: string;
+      endDate?: string;
+    }
+  ) =>
+    request<{ success: true; data: { deletedCount: number } }>('/api/admin/content/images', {
+      method: 'DELETE',
+      token,
+      body: JSON.stringify(params),
+    }),
+
+  listContentProjects: (token: string) =>
+    request<{ success: true; data: Array<{ id: string; name: string }> }>(
+      '/api/admin/content/projects',
+      { token }
+    ),
+
+  listApiKeys: (token: string) =>
+    request<{ success: true; data: AdminApiKey[] }>('/api/admin/api-keys', { token }),
+
+  createApiKey: (token: string, data: { alias: string; apiKey: string }) =>
+    request<{ success: true; data: AdminApiKey }>('/api/admin/api-keys', {
+      method: 'POST',
+      token,
+      body: JSON.stringify(data),
+    }),
+
+  deleteApiKey: (token: string, id: string) =>
+    request<{ success: true; message: string }>(`/api/admin/api-keys/${id}`, {
+      method: 'DELETE',
+      token,
+    }),
+
+  activateApiKey: (token: string, id: string) =>
+    request<{ success: true; data: AdminApiKey }>(`/api/admin/api-keys/${id}/activate`, {
+      method: 'PATCH',
+      token,
+    }),
+};
+
+export default { authApi, projectApi, imageApi, adminApi };

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/stores/auth.store';
@@ -42,15 +42,23 @@ export default function GenerationResultPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editPrompt, setEditPrompt] = useState('');
   const [isEditing, setIsEditing] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+
+  // Interval 관리를 위한 ref
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  // 경쟁 조건 방지를 위한 로딩 플래그
+  const isLoadingRef = useRef(false);
 
   /**
    * 생성 상태 조회
    */
   const fetchGeneration = useCallback(async () => {
-    if (!accessToken) return;
+    // 이미 요청 중이거나 토큰이 없으면 중단
+    if (!accessToken || isLoadingRef.current) return;
 
+    isLoadingRef.current = true;
     try {
       const response = await fetch(`${API_URL}/api/generations/${genId}`, {
         headers: {
@@ -58,7 +66,25 @@ export default function GenerationResultPage() {
         },
       });
 
+      // 401 에러 시 자동 로그아웃 및 로그인 페이지 리다이렉트
+      if (response.status === 401) {
+        console.error('인증 실패: 자동 로그아웃 처리');
+        setIsPolling(false);
+        // 인증 정보 클리어
+        const { logout } = useAuthStore.getState();
+        logout();
+        // 로그인 페이지로 리다이렉트
+        router.push('/login');
+        return;
+      }
+
+      // 기타 HTTP 에러 처리
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
       const data = await response.json();
+
       if (data.success) {
         setGeneration(data.data);
 
@@ -77,19 +103,46 @@ export default function GenerationResultPage() {
       }
     } catch (error) {
       console.error('생성 상태 조회 실패:', error);
+
+      // 인증 에러, 네트워크 에러 등 심각한 에러 시 폴링 중지
+      if (
+        error instanceof Error &&
+        (error.message.includes('인증') ||
+          error.message.includes('401') ||
+          error.message.includes('Network'))
+      ) {
+        setIsPolling(false);
+      }
+    } finally {
+      // 로딩 플래그 해제
+      isLoadingRef.current = false;
     }
-  }, [accessToken, genId]);
+  }, [accessToken, genId, router]);
 
   // 폴링
   useEffect(() => {
+    // 기존 interval 정리
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+
     if (!authLoading && isAuthenticated) {
+      // 즉시 한 번 실행
       fetchGeneration();
 
+      // 새 interval 시작
       if (isPolling) {
-        const interval = setInterval(fetchGeneration, 2000);
-        return () => clearInterval(interval);
+        intervalRef.current = setInterval(fetchGeneration, 2000);
       }
     }
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
   }, [authLoading, isAuthenticated, isPolling, fetchGeneration]);
 
   // 인증 체크
@@ -196,9 +249,39 @@ export default function GenerationResultPage() {
   };
 
   /**
-   * 다시 생성
+   * 동일 조건 재생성
    */
-  const handleRegenerate = () => {
+  const handleRegenerateWithSameInputs = async () => {
+    if (!accessToken) return;
+
+    setIsRegenerating(true);
+    try {
+      const response = await fetch(`${API_URL}/api/generations/${genId}/regenerate`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        router.push(`/projects/${projectId}/generations/${data.data.id}`);
+        return;
+      }
+
+      alert(data.error?.message || '동일 조건 재생성에 실패했습니다');
+    } catch (error) {
+      console.error('동일 조건 재생성 실패:', error);
+      alert('동일 조건 재생성에 실패했습니다');
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
+  /**
+   * 조건 수정
+   */
+  const handleModifyConditions = () => {
     // 모드에 따라 해당 페이지로 이동
     if (generation?.mode === 'ip_change') {
       router.push(`/projects/${projectId}/ip-change`);
@@ -207,6 +290,15 @@ export default function GenerationResultPage() {
     } else {
       router.back();
     }
+  };
+
+  /**
+   * 스타일 복사
+   */
+  const handleStyleCopy = (copyTarget: 'ip-change' | 'new-product') => {
+    const styleRef = generation?.id ?? genId;
+    const query = new URLSearchParams({ styleRef, copyTarget });
+    router.push(`/projects/${projectId}/ip-change?${query.toString()}`);
   };
 
   if (authLoading) {
@@ -333,11 +425,33 @@ export default function GenerationResultPage() {
               >
                 📚 히스토리에 저장
               </Button>
+              <Button
+                variant="secondary"
+                className="w-full"
+                onClick={() => handleStyleCopy('ip-change')}
+              >
+                🎨 스타일 복사 (IP 변경)
+              </Button>
+              <Button
+                variant="secondary"
+                className="w-full"
+                onClick={() => handleStyleCopy('new-product')}
+              >
+                🧩 스타일 복사 (새 제품 적용)
+              </Button>
               {saveMessage && (
                 <p className="text-center text-sm text-[var(--text-secondary)]">{saveMessage}</p>
               )}
-              <Button variant="ghost" className="w-full" onClick={handleRegenerate}>
-                🔄 다시 생성
+              <Button
+                variant="ghost"
+                className="w-full"
+                onClick={handleRegenerateWithSameInputs}
+                isLoading={isRegenerating}
+              >
+                🔁 동일 조건 재생성
+              </Button>
+              <Button variant="ghost" className="w-full" onClick={handleModifyConditions}>
+                🛠️ 조건 수정
               </Button>
             </div>
           </div>

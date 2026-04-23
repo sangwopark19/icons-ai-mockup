@@ -14,9 +14,6 @@ build
 *.tsbuildinfo
 
 # 환경 변수
-.env
-.env.local
-.env.*.local
 .env*
 
 # 로그
@@ -43,7 +40,8 @@ data/generations
 data/upscaled
 data/characters
 
-# Docker 볼륨
+# Docker
+docker-compose.override.yml
 postgres_data
 redis_data
 
@@ -51,4 +49,4 @@ redis_data
 apps/api/data
 
 .cursorignore
-.taskmaster/
+# .taskmaster/

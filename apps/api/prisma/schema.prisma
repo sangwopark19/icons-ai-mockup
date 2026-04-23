@@ -14,15 +14,34 @@ datasource db {
 // 사용자 관련
 // ===================
 
+/// 사용자 역할 열거형
+enum UserRole {
+  user
+  admin
+
+  @@map("user_role")
+}
+
+/// 사용자 상태 열거형
+enum UserStatus {
+  active
+  suspended
+  deleted
+
+  @@map("user_status")
+}
+
 /// 사용자 테이블
 model User {
-  id           String    @id @default(uuid())
-  email        String    @unique
-  passwordHash String    @map("password_hash")
+  id           String     @id @default(uuid())
+  email        String     @unique
+  passwordHash String     @map("password_hash")
   name         String
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
-  lastLoginAt  DateTime? @map("last_login_at")
+  role         UserRole   @default(user)
+  status       UserStatus @default(active)
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+  lastLoginAt  DateTime?  @map("last_login_at")
 
   sessions Session[]
   projects Project[]
@@ -119,14 +138,21 @@ model Generation {
   createdAt     DateTime         @default(now()) @map("created_at")
   completedAt   DateTime?        @map("completed_at")
 
-  project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  ipCharacter IPCharacter?     @relation(fields: [ipCharacterId], references: [id], onDelete: SetNull)
-  sourceImage GeneratedImage?  @relation("SourceImage", fields: [sourceImageId], references: [id], onDelete: SetNull)
-  images      GeneratedImage[] @relation("GenerationImages")
+  thoughtSignatures Json?   @map("thought_signatures")
+  styleReferenceId  String? @map("style_reference_id")
+  userInstructions  String? @map("user_instructions")
+
+  project        Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  ipCharacter    IPCharacter?     @relation(fields: [ipCharacterId], references: [id], onDelete: SetNull)
+  sourceImage    GeneratedImage?  @relation("SourceImage", fields: [sourceImageId], references: [id], onDelete: SetNull)
+  images         GeneratedImage[] @relation("GenerationImages")
+  styleReference Generation?      @relation("StyleReference", fields: [styleReferenceId], references: [id])
+  styleFollowers Generation[]     @relation("StyleReference")
 
   @@index([projectId, createdAt(sort: Desc)])
   @@index([status])
   @@index([ipCharacterId])
+  @@index([styleReferenceId])
   @@map("generations")
 }
 
@@ -185,4 +211,23 @@ model ImageHistory {
   @@index([imageId, createdAt(sort: Desc)])
   @@index([parentHistoryId])
   @@map("image_history")
+}
+
+// ===================
+// API Key 관련
+// ===================
+
+/// Gemini API 키 테이블
+model ApiKey {
+  id           String    @id @default(uuid())
+  alias        String
+  encryptedKey String    @map("encrypted_key")
+  maskedKey    String    @map("masked_key")
+  isActive     Boolean   @default(false) @map("is_active")
+  callCount    Int       @default(0) @map("call_count")
+  lastUsedAt   DateTime? @map("last_used_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@index([isActive])
+  @@map("api_keys")
 }

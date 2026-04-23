@@ -1,0 +1,1131 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": "1",
+        "title": "Project Setup and Environment Configuration",
+        "description": "Initialize the project structure, set up development environment, and configure necessary dependencies for the AI mockup generation system",
+        "details": "Create a new project with proper folder structure (frontend, backend, AI services). Set up package.json with dependencies including React/Next.js for frontend, Node.js/Express for backend, and AI service integrations (OpenAI DALL-E, Stable Diffusion, or similar). Configure environment variables for API keys, database connections, and file storage. Set up version control with Git and establish coding standards.",
+        "testStrategy": "Verify all dependencies install correctly, environment variables load properly, and basic server starts without errors. Test API connectivity to AI services.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-15T06:26:31.851Z"
+      },
+      {
+        "id": "2",
+        "title": "Database Schema Design and Setup",
+        "description": "Design and implement database schema for user accounts, projects, image history, and metadata storage",
+        "details": "Create database schema with tables: users (id, email, password_hash, created_at), projects (id, user_id, name, created_at), image_history (id, project_id, original_image_url, generated_images, selected_image, prompt_data, created_at), generation_logs (id, user_id, input_params, output_results, processing_time). Use PostgreSQL or MongoDB based on scalability needs. Implement proper indexing for query optimization.",
+        "testStrategy": "Test database connection, verify all CRUD operations work correctly, validate foreign key constraints, and test data integrity with sample data.",
+        "priority": "high",
+        "dependencies": [
+          "1"
+        ],
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-15T06:26:31.853Z"
+      },
+      {
+        "id": "3",
+        "title": "User Authentication System",
+        "description": "Implement email/password based user registration, login, and session management system",
+        "details": "Create user registration endpoint with email validation and password hashing using bcrypt. Implement login system with JWT tokens or session-based authentication. Add password reset functionality via email. Create middleware for route protection and user session validation. Implement logout functionality with proper session cleanup.",
+        "testStrategy": "Test user registration with valid/invalid emails, verify password hashing, test login/logout flows, validate session persistence, and test unauthorized access prevention.",
+        "priority": "high",
+        "dependencies": [
+          "2"
+        ],
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-15T06:26:31.854Z"
+      },
+      {
+        "id": "4",
+        "title": "File Upload and Storage System",
+        "description": "Implement secure file upload system for images with cloud storage integration",
+        "details": "Set up file upload endpoints supporting multiple image formats (JPEG, PNG, WebP). Implement file validation (size limits, format checking, malware scanning). Integrate with cloud storage (AWS S3, Google Cloud Storage, or similar) for scalable image storage. Create file management utilities for upload, download, and deletion. Implement image preprocessing for optimization.",
+        "testStrategy": "Test file upload with various formats and sizes, verify cloud storage integration, test file validation rules, and ensure proper error handling for failed uploads.",
+        "priority": "high",
+        "dependencies": [
+          "1",
+          "2"
+        ],
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-15T06:26:31.854Z"
+      },
+      {
+        "id": "5",
+        "title": "AI Service Integration Layer",
+        "description": "Create abstraction layer for AI image generation services with support for multiple providers",
+        "details": "Design service interface that can work with multiple AI providers (OpenAI DALL-E, Stable Diffusion, Midjourney API). Implement prompt engineering for character IP transformation and sketch-to-realistic conversion. Create retry logic for failed generations (max 3 attempts as specified). Add response parsing and error handling for different AI service formats. Implement rate limiting and quota management.",
+        "testStrategy": "Test integration with at least one AI service, verify prompt generation works correctly, test retry mechanism, and validate response parsing for both success and error cases.",
+        "priority": "high",
+        "dependencies": [
+          "4"
+        ],
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-15T06:26:31.855Z"
+      },
+      {
+        "id": "6",
+        "title": "Project Management System",
+        "description": "Implement project creation, management, and organization features for user workflow",
+        "details": "Create project CRUD operations (create, read, update, delete). Implement project listing with pagination and search functionality. Add project metadata management (name, description, creation date). Create project-based image history organization. Implement project sharing settings and access controls for future team features.",
+        "testStrategy": "Test project creation, listing, updating, and deletion. Verify project-based data isolation between users and validate proper access controls.",
+        "priority": "medium",
+        "dependencies": [
+          "3"
+        ],
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-15T06:26:31.855Z"
+      },
+      {
+        "id": "7",
+        "title": "Character IP Transformation Feature (Function A)",
+        "description": "Implement core feature for changing character IP in existing product images",
+        "details": "Create endpoint for IP transformation that accepts original product image and new character IP image. Implement prompt engineering to maintain product structure while replacing character elements. Add validation to ensure character proportions and product physical structure are preserved. Create preprocessing to analyze input images and extract relevant features. Implement post-processing to ensure quality standards are met.",
+        "testStrategy": "Test with various product categories (mugs, plushies, figures) and different character IPs. Verify product structure preservation, character proportion maintenance, and output quality consistency.",
+        "priority": "high",
+        "dependencies": [
+          "5",
+          "6"
+        ],
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-15T06:26:31.856Z"
+      },
+      {
+        "id": "8",
+        "title": "Sketch to Realistic Conversion Feature (Function B)",
+        "description": "Implement 2D sketch to 3D realistic product mockup conversion functionality",
+        "details": "Create endpoint for sketch-to-realistic conversion accepting 2D drawings and optional reference images for texture/material. Implement advanced prompt engineering to maintain design details while adding realistic textures and lighting. Add support for material reference images (ceramic, plastic, metal, fabric). Create preprocessing to analyze sketch characteristics and apply appropriate realistic rendering styles.",
+        "testStrategy": "Test with hand-drawn sketches of various product types, verify design detail preservation, test material reference application, and validate realistic rendering quality.",
+        "priority": "high",
+        "dependencies": [
+          "5",
+          "6"
+        ],
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-15T06:26:31.857Z"
+      },
+      {
+        "id": "9",
+        "title": "Dual Image Generation and Selection System",
+        "description": "Implement system to generate 2 images per request and allow user selection of preferred result",
+        "details": "Modify AI service calls to generate exactly 2 variations per request. Create UI components for side-by-side image comparison and selection. Implement selection persistence in database. Add functionality to regenerate if neither result is satisfactory. Create batch processing for efficient dual generation.",
+        "testStrategy": "Verify exactly 2 images are generated per request, test selection functionality, validate selected image storage, and test regeneration capability.",
+        "priority": "medium",
+        "dependencies": [
+          "7",
+          "8"
+        ],
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-15T06:26:31.858Z"
+      },
+      {
+        "id": "10",
+        "title": "Image History Management System (Function C)",
+        "description": "Implement comprehensive history management for saving, organizing, and retrieving generated images",
+        "details": "Create history storage system linked to projects and users. Implement save functionality for selected images with metadata (generation parameters, timestamps, user notes). Add history browsing with filtering and search capabilities. Create bulk operations for history management (delete multiple, export). Implement history-based regeneration using saved parameters.",
+        "testStrategy": "Test image saving to history, verify history retrieval and filtering, test bulk operations, and validate history-based regeneration functionality.",
+        "priority": "medium",
+        "dependencies": [
+          "9"
+        ],
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-15T06:26:31.859Z"
+      },
+      {
+        "id": "11",
+        "title": "Partial Modification Feature (Function D)",
+        "description": "Implement targeted modification system for specific parts of generated images using natural language prompts",
+        "details": "Create prompt-based modification system that accepts natural language instructions (e.g., 'change only the color to red', 'move character slightly left'). Implement image masking and inpainting techniques to modify only specified areas. Add validation to ensure unchanged areas remain identical. Create prompt parsing to identify modification targets and preserve non-target areas.",
+        "testStrategy": "Test various modification prompts, verify only requested areas change, validate preservation of unchanged areas, and test modification accuracy against user intent.",
+        "priority": "medium",
+        "dependencies": [
+          "10"
+        ],
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-15T06:26:31.860Z"
+      },
+      {
+        "id": "12",
+        "title": "Image Enhancement and Export System",
+        "description": "Implement image upscaling to 2K resolution and transparent background removal features",
+        "details": "Integrate AI upscaling service (Real-ESRGAN, ESRGAN, or similar) for 2K resolution enhancement. Implement background removal using AI segmentation (U2-Net, RemBG, or similar). Create export functionality with multiple format options (PNG with transparency, JPEG, WebP). Add batch processing for multiple image enhancement. Implement quality validation for upscaled images.",
+        "testStrategy": "Test upscaling quality and processing time (target <10 seconds), verify transparent background removal accuracy, test various export formats, and validate batch processing functionality.",
+        "priority": "medium",
+        "dependencies": [
+          "11"
+        ],
+        "status": "deferred",
+        "subtasks": [],
+        "updatedAt": "2026-01-15T06:28:28.683Z"
+      },
+      {
+        "id": "13",
+        "title": "Frontend User Interface Development",
+        "description": "Develop modern, intuitive web interface for all system features with responsive design",
+        "details": "Create React/Next.js frontend with components for: project dashboard, image upload interface, generation controls, dual image selection, history browser, and user settings. Implement responsive design for desktop and tablet use. Add drag-and-drop file upload, progress indicators for generation, and real-time status updates. Create modern, clean design following Material-UI or similar design system.",
+        "testStrategy": "Test UI responsiveness across devices, verify all user interactions work correctly, test file upload UX, and validate accessibility compliance (WCAG 2.1 AA).",
+        "priority": "medium",
+        "dependencies": [
+          "12"
+        ],
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-15T06:26:31.860Z"
+      },
+      {
+        "id": "14",
+        "title": "Performance Optimization and Caching",
+        "description": "Implement caching strategies, performance monitoring, and optimization for 30-second generation target",
+        "details": "Implement Redis caching for frequently accessed data and generated images. Add CDN integration for static assets and generated images. Create performance monitoring with metrics tracking (generation time, success rate, user engagement). Implement database query optimization and connection pooling. Add image compression and lazy loading for better performance.",
+        "testStrategy": "Test generation time meets <30 second target, verify caching effectiveness, monitor system performance under load, and validate CDN integration.",
+        "priority": "medium",
+        "dependencies": [
+          "13"
+        ],
+        "status": "deferred",
+        "subtasks": [],
+        "updatedAt": "2026-01-15T06:28:28.686Z"
+      },
+      {
+        "id": "15",
+        "title": "Quality Assurance and Production Deployment",
+        "description": "Comprehensive testing, security hardening, and production deployment setup",
+        "details": "Implement comprehensive test suite (unit, integration, end-to-end tests). Add security measures (input validation, SQL injection prevention, XSS protection, rate limiting). Set up production environment with proper monitoring, logging, and alerting. Create deployment pipeline with CI/CD. Implement backup strategies for user data and generated content. Add error tracking and performance monitoring.",
+        "testStrategy": "Run full test suite with >90% coverage, perform security penetration testing, validate production deployment, and test disaster recovery procedures.",
+        "priority": "high",
+        "dependencies": [
+          "14"
+        ],
+        "status": "deferred",
+        "subtasks": [],
+        "updatedAt": "2026-01-15T06:28:28.687Z"
+      },
+      {
+        "id": "16",
+        "title": "Create CORS middleware with dynamic origin validation",
+        "description": "Create a new CORS middleware file that supports multiple network environments (LAN, Tailscale VPN, WiFi) with dynamic origin validation and comprehensive logging",
+        "details": "Create `apps/api/src/middleware/cors.js` file with getCorsOptions function that includes:\n- Allowed origins array covering all network environments (172.30.1.x, 100.x.x.x, 221.147.112.x, localhost)\n- Dynamic origin validation callback with logging\n- Support for credentials, proper HTTP methods (GET, POST, PUT, DELETE, PATCH, OPTIONS)\n- Preflight request handling with 200 status\n- Error handling for blocked origins\n- Console logging for debugging ([CORS] messages)\n\nImplementation:\n```javascript\nconst getCorsOptions = () => {\n  const allowedOrigins = [\n    'http://localhost:3000',\n    'http://127.0.0.1:3000',\n    'http://172.30.1.42:3000',\n    'http://172.30.1.40:3000',\n    'http://100.69.75.47:3000',\n    'http://175.193.199.147:3000',\n    'http://221.147.112.147:3000'\n  ];\n  \n  return {\n    origin: (origin, callback) => {\n      console.log(`[CORS] Incoming request from origin: ${origin}`);\n      if (!origin || allowedOrigins.includes(origin)) {\n        console.log(`[CORS] ✅ ALLOWED: ${origin}`);\n        callback(null, true);\n      } else {\n        console.warn(`[CORS] ❌ BLOCKED: ${origin}`);\n        callback(new Error('CORS policy violation: Origin not allowed'));\n      }\n    },\n    credentials: true,\n    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],\n    allowedHeaders: ['Content-Type', 'Authorization'],\n    exposedHeaders: ['Content-Range', 'X-Content-Range'],\n    optionsSuccessStatus: 200,\n    maxAge: 3600\n  };\n};\n```",
+        "testStrategy": "Test the middleware by making OPTIONS requests from different origins using curl commands. Verify console logs show correct CORS messages. Test with valid origins (172.30.1.40:3000, 100.69.75.47:3000) expecting 200 responses and proper headers. Test with invalid origins expecting CORS errors.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "cancelled",
+        "subtasks": [],
+        "updatedAt": "2026-01-15T06:46:29.542Z"
+      },
+      {
+        "id": "17",
+        "title": "Integrate CORS middleware into Express application",
+        "description": "Modify the main Express application file to use the new dynamic CORS middleware and add proper error handling for CORS violations",
+        "details": "Update `apps/api/src/index.js` (or main.ts) to:\n- Import the getCorsOptions function from the middleware\n- Replace existing static CORS configuration with dynamic version\n- Add CORS middleware before all other routes\n- Implement error handler for CORS violations\n\nImplementation:\n```javascript\nconst express = require('express');\nconst cors = require('cors');\nconst { getCorsOptions } = require('./middleware/cors');\n\nconst app = express();\n\n// Apply dynamic CORS configuration\napp.use(cors(getCorsOptions()));\n\n// Other middleware\napp.use(express.json());\napp.use(express.urlencoded({ extended: true }));\n\n// API routes\nconst authRouter = require('./routes/auth');\napp.use('/api/auth', authRouter);\n\n// CORS error handler\napp.use((err, req, res, next) => {\n  if (err.message === 'CORS policy violation: Origin not allowed') {\n    return res.status(403).json({ \n      error: 'CORS: Your origin is not allowed',\n      origin: req.headers.origin \n    });\n  }\n  next(err);\n});\n```\n\nEnsure the CORS middleware is applied before all routes and API endpoints.",
+        "testStrategy": "Start the development server with `pnpm dev` and verify console shows CORS initialization messages. Test API endpoints from browser developer tools to confirm CORS headers are present in responses. Check that preflight OPTIONS requests return 200 status with proper Access-Control headers.",
+        "priority": "high",
+        "dependencies": [
+          "16"
+        ],
+        "status": "cancelled",
+        "subtasks": [],
+        "updatedAt": "2026-01-15T06:46:29.546Z"
+      },
+      {
+        "id": "18",
+        "title": "Update environment configuration files",
+        "description": "Update .env and docker-compose.yml files to support the new CORS configuration with environment variables for allowed origins",
+        "details": "Update configuration files:\n\n1. Update `apps/api/.env`:\n```env\n# Existing configuration\nDATABASE_URL=postgresql://user:password@db:5432/icons_ai\nNODE_ENV=development\nPORT=4000\n\n# CORS configuration (optional for runtime changes)\nALLOWED_ORIGINS=http://localhost:3000,http://172.30.1.42:3000,http://100.69.75.47:3000,http://221.147.112.147:3000\n```\n\n2. Update `docker-compose.yml`:\n```yaml\nservices:\n  api:\n    build:\n      context: .\n      dockerfile: ./apps/api/Dockerfile\n    container_name: icons-ai-backend\n    ports:\n      - \"4000:4000\"\n    environment:\n      - NODE_ENV=production\n      - ALLOWED_ORIGINS=http://172.30.1.42:3000,http://100.69.75.47:3000,http://175.193.199.147:3000,http://221.147.112.147:3000,http://localhost:3000\n      - DATABASE_URL=postgresql://postgres:password@postgres:5432/icons_ai\n      - PORT=4000\n    networks:\n      - app_network\n    depends_on:\n      - postgres\n    restart: unless-stopped\n    healthcheck:\n      test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:4000/api/health\"]\n      interval: 30s\n      timeout: 10s\n      retries: 3\n```\n\nEnsure environment variables are properly mapped and accessible to the application.",
+        "testStrategy": "Verify environment variables are loaded correctly by logging process.env.ALLOWED_ORIGINS in the application. Test Docker container startup with `docker-compose up -d` and check logs for proper environment variable loading. Confirm the application can read and use the configured origins.",
+        "priority": "medium",
+        "dependencies": [
+          "17"
+        ],
+        "status": "cancelled",
+        "subtasks": [],
+        "updatedAt": "2026-01-15T06:46:29.547Z"
+      },
+      {
+        "id": "19",
+        "title": "Implement comprehensive network testing across all environments",
+        "description": "Create and execute comprehensive tests across all network environments (LAN, Tailscale VPN, WiFi) to validate CORS functionality",
+        "details": "Implement comprehensive testing strategy:\n\n1. **Automated CORS Testing Script**:\n```bash\n#!/bin/bash\n# Test valid origins\nfor origin in \"http://172.30.1.40:3000\" \"http://100.69.75.47:3000\" \"http://221.147.112.147:3000\"; do\n  echo \"Testing: $origin\"\n  curl -s -X OPTIONS \\\n    -H \"Origin: $origin\" \\\n    -H \"Access-Control-Request-Method: POST\" \\\n    http://172.30.1.42:4000/api/auth/login \\\n    | grep \"Access-Control-Allow-Origin\"\ndone\n\n# Test invalid origin\necho \"Testing invalid origin: http://evil.com:3000\"\ncurl -s -X OPTIONS \\\n  -H \"Origin: http://evil.com:3000\" \\\n  -H \"Access-Control-Request-Method: POST\" \\\n  http://172.30.1.42:4000/api/auth/login \\\n  -w \"\\nHTTP Status: %{http_code}\\n\"\n```\n\n2. **Network Environment Tests**:\n- Test from LAN (172.30.1.40:3000) → API (172.30.1.42:4000)\n- Test from Tailscale (100.69.75.47:3000) → API (172.30.1.42:4000)\n- Test from WiFi (221.147.112.147:3000) → API (172.30.1.42:4000)\n\n3. **Browser Integration Tests**:\n- Login functionality from each network\n- Session persistence with credentials\n- DevTools verification of CORS headers\n\n4. **Docker Environment Testing**:\n- Build and run containers: `docker-compose build && docker-compose up -d`\n- Monitor logs: `docker-compose logs -f api`\n- Verify CORS messages in container logs",
+        "testStrategy": "Execute the automated testing script and verify all valid origins return proper CORS headers while invalid origins are blocked. Test actual login functionality from browser on each network environment. Verify Docker logs show CORS validation messages. Confirm Response Headers in DevTools contain correct Access-Control-Allow-Origin values matching the request origin.",
+        "priority": "high",
+        "dependencies": [
+          "18"
+        ],
+        "status": "cancelled",
+        "subtasks": [],
+        "updatedAt": "2026-01-15T06:46:29.548Z"
+      },
+      {
+        "id": "20",
+        "title": "Implement monitoring, logging and rollback procedures",
+        "description": "Set up comprehensive monitoring, logging system for CORS requests and establish rollback procedures for quick recovery if issues arise",
+        "details": "Implement monitoring and rollback capabilities:\n\n1. **Enhanced Logging System**:\n```javascript\n// Add to CORS middleware\napp.use((req, res, next) => {\n  const origin = req.headers.origin;\n  if (origin) {\n    console.log(`[METRICS] CORS request from: ${origin} to ${req.path}`);\n    // Optional: Send to monitoring service (Datadog, New Relic)\n  }\n  next();\n});\n```\n\n2. **Rollback Script** (`rollback-cors.sh`):\n```bash\n#!/bin/bash\necho \"Rolling back CORS changes...\"\n\n# Restore original files\ngit checkout -- apps/api/src/index.js\ngit checkout -- docker-compose.yml\n\n# Remove CORS middleware\nrm -f apps/api/src/middleware/cors.js\n\n# Restart Docker services\ndocker-compose down\ndocker-compose up -d\n\necho \"Rollback completed. Check logs:\"\ndocker-compose logs -f api\n```\n\n3. **Health Check Endpoint**:\n```javascript\napp.get('/api/health', (req, res) => {\n  res.json({\n    status: 'healthy',\n    cors: 'enabled',\n    timestamp: new Date().toISOString(),\n    allowedOrigins: process.env.ALLOWED_ORIGINS?.split(',') || 'hardcoded'\n  });\n});\n```\n\n4. **Documentation Updates**:\n- Create troubleshooting guide\n- Document network expansion procedures\n- Establish monitoring alerts for CORS failures\n\n5. **Future Scalability**:\n- Regex-based origin matching for subnet ranges\n- Environment-specific origin lists\n- Dynamic origin registration API",
+        "testStrategy": "Test rollback script in development environment to ensure it properly restores previous state. Verify health check endpoint returns correct CORS status. Monitor application logs for CORS-related entries and confirm they provide sufficient debugging information. Test the monitoring system by making requests from various origins and verifying log entries are created with proper timestamps and origin information.",
+        "priority": "medium",
+        "dependencies": [
+          "19"
+        ],
+        "status": "cancelled",
+        "subtasks": [],
+        "updatedAt": "2026-01-15T06:46:29.549Z"
+      },
+      {
+        "id": "21",
+        "title": "CORS 설정 파일 수정 (config/index.ts)",
+        "description": "Fastify 백엔드의 config/index.ts 파일을 수정하여 모든 사내 네트워크 IP를 허용하는 CORS 설정을 구현",
+        "details": "apps/api/src/config/index.ts 파일에서 ALLOWED_ORIGINS 배열에 모든 사내 네트워크 IP (유선 LAN 172.30.1.x, Tailscale VPN 100.x.x.x, 무선 WiFi 175.193.199.x, 221.147.112.x)를 하드코딩으로 추가. 환경변수 CORS_ORIGIN에서 쉼표로 구분된 추가 origin을 동적으로 병합하는 parseCorsOrigins 함수 구현. 기존 corsOrigin (단일) → corsOrigins (배열)로 변경하여 다중 origin 지원.",
+        "testStrategy": "로컬 개발 환경에서 pnpm dev 실행 후 config.corsOrigins 배열에 모든 네트워크 IP가 포함되는지 console.log로 확인. 환경변수 CORS_ORIGIN 설정 시 하드코딩된 목록과 병합되는지 검증.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-20T08:26:48.093Z"
+      },
+      {
+        "id": "22",
+        "title": "Fastify 서버 CORS 미들웨어 설정",
+        "description": "apps/api/src/server.ts에서 @fastify/cors 플러그인을 동적 origin 검증 콜백 함수로 수정하여 다중 네트워크 환경 지원",
+        "details": "@fastify/cors의 origin 옵션을 콜백 함수로 변경하여 요청의 Origin 헤더를 config.corsOrigins 배열과 비교. origin이 없는 요청(same-site, 모바일 앱)은 허용, 신뢰 목록에 있는 origin은 허용, 그 외는 차단. CORS 요청 로그 출력 기능 추가 ([CORS] ✅ ALLOWED: 또는 ❌ BLOCKED:). credentials: true, methods: GET,POST,PUT,DELETE,PATCH,OPTIONS, allowedHeaders: Content-Type,Authorization 설정.",
+        "testStrategy": "curl -X OPTIONS -H 'Origin: http://172.30.1.40:3000' http://localhost:4000/api/auth/login -v 명령으로 preflight 요청 테스트. Response Headers에 Access-Control-Allow-Origin이 요청 origin과 일치하는지 확인. 허용되지 않은 origin(http://evil.com:3000)으로 요청 시 CORS 에러 발생 확인.",
+        "priority": "high",
+        "dependencies": [
+          "21"
+        ],
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-20T08:26:48.100Z"
+      },
+      {
+        "id": "23",
+        "title": "환경 설정 파일 업데이트",
+        "description": "루트 .env 파일과 docker-compose.yml에 CORS_ORIGIN 환경변수를 추가하여 모든 사내 네트워크 IP 지원",
+        "details": "루트 .env 파일에 CORS_ORIGIN=http://localhost:3000,http://172.30.1.42:3000,http://100.69.75.47:3000 추가. docker-compose.yml의 api 서비스 environment 섹션에 CORS_ORIGIN 환경변수를 쉼표로 구분된 모든 네트워크 IP로 설정. NEXT_PUBLIC_API_URL 환경변수도 실제 서버 IP로 설정하여 프론트엔드에서 올바른 API URL 사용.",
+        "testStrategy": "docker-compose up -d 실행 후 docker-compose logs api로 환경변수가 올바르게 로드되는지 확인. config.corsOrigins 배열에 환경변수의 origin들이 병합되어 출력되는지 로그 확인.",
+        "priority": "medium",
+        "dependencies": [
+          "22"
+        ],
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-20T08:26:48.107Z"
+      },
+      {
+        "id": "24",
+        "title": "네트워크별 CORS 접근 테스트",
+        "description": "유선 LAN, Tailscale VPN, 무선 WiFi 등 모든 사내 네트워크 환경에서 CORS 정책이 올바르게 작동하는지 검증",
+        "details": "4가지 네트워크 환경에서 테스트 수행: 1) 유선 LAN (172.30.1.40:3000 → 172.30.1.42:4000), 2) Tailscale VPN (100.69.75.47:3000), 3) 무선 WiFi (221.147.112.147:3000), 4) 다른 층 무선 (175.193.199.147:3000). 각 환경에서 curl OPTIONS 요청과 실제 브라우저 로그인 테스트 수행. DevTools Network 탭에서 Response Headers 확인.",
+        "testStrategy": "자동화된 테스트 스크립트로 각 origin에 대해 curl -X OPTIONS 요청 실행하여 Access-Control-Allow-Origin 헤더 확인. 브라우저에서 각 네트워크 IP로 접근하여 로그인 페이지에서 실제 인증 요청 성공 여부 확인. docker-compose logs api에서 [CORS] ✅ ALLOWED: 메시지 출력 확인.",
+        "priority": "high",
+        "dependencies": [
+          "23"
+        ],
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-20T08:27:28.201Z"
+      },
+      {
+        "id": "25",
+        "title": "CORS 정책 모니터링 및 문서화",
+        "description": "CORS 요청 로깅, 에러 핸들링, 롤백 계획 수립 및 팀원 공유를 위한 문서화 완료",
+        "details": "프로덕션 환경에서 CORS 요청 메트릭 모니터링 설정. 허용되지 않은 origin 요청에 대한 적절한 에러 응답 (403 Forbidden) 구현. 향후 네트워크 추가 시 절차 정의 (정규표현식 기반 매칭 또는 ALLOWED_ORIGINS 배열 업데이트). 롤백 계획 수립 및 디버깅 체크리스트 작성. 팀원들에게 변경사항 공유 및 사용법 안내.",
+        "testStrategy": "유효하지 않은 origin(http://evil.com:3000)으로 요청 시 403 에러와 적절한 에러 메시지 반환 확인. 로그에 차단된 요청 정보가 기록되는지 확인. 완료 체크리스트의 모든 항목이 검증되었는지 최종 확인. 다른 개발자가 문서를 보고 동일한 설정을 재현할 수 있는지 검토.",
+        "priority": "medium",
+        "dependencies": [
+          "24"
+        ],
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-20T08:27:28.204Z"
+      },
+      {
+        "id": "26",
+        "title": "Database Schema Migration for V2 Features",
+        "description": "Add new columns to the Generation model to support thoughtSignatures, styleReferenceId, and userInstructions for V2 functionality",
+        "details": "Modify apps/api/prisma/schema.prisma to add three new fields: thoughtSignatures (Json?), styleReferenceId (String?), and userInstructions (String?). Add self-referencing relation for StyleReference. Create and run migration with 'npx prisma migrate dev --name add_v2_fields'. Ensure backward compatibility with existing Generation records.",
+        "testStrategy": "Verify migration runs successfully, check that existing data remains intact, test that new fields accept null values, and validate the StyleReference relation works correctly",
+        "priority": "high",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Update Prisma Schema with New Generation Fields",
+            "description": "Modify the Generation model in schema.prisma to add three new optional fields for V2 functionality",
+            "dependencies": [],
+            "details": "In apps/api/prisma/schema.prisma, add thoughtSignatures (Json?), styleReferenceId (String?), and userInstructions (String?) fields to the Generation model. Ensure all fields are optional to maintain backward compatibility with existing records.",
+            "status": "done",
+            "testStrategy": "Validate schema syntax with Prisma CLI and ensure field definitions are correct",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-20T10:11:25.856Z"
+          },
+          {
+            "id": 2,
+            "title": "Add StyleReference Self-Referencing Relation",
+            "description": "Create StyleReference model with self-referencing relation to support style inheritance [Updated: 1/20/2026]",
+            "dependencies": [
+              1
+            ],
+            "details": "Add StyleReference model to schema.prisma with fields for id, name, referenceData, and optional parentStyleId for self-referencing. Add corresponding relation field in Generation model to link styleReferenceId to StyleReference.id.\n<info added on 2026-01-20T10:11:47.572Z>\nStyleReference model implementation changed - now using Generation self-referencing relation instead of separate model. Generation model includes styleReference field pointing to another Generation record and styleFollowers for reverse relation, eliminating need for separate StyleReference table.\n</info added on 2026-01-20T10:11:47.572Z>",
+            "status": "done",
+            "testStrategy": "Verify relation syntax is correct and test that self-referencing queries work properly",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-20T10:11:25.858Z"
+          },
+          {
+            "id": 3,
+            "title": "Generate and Review Migration File",
+            "description": "Create database migration file for the new schema changes using Prisma migrate",
+            "dependencies": [
+              2
+            ],
+            "details": "Run 'npx prisma migrate dev --name add_v2_fields' to generate migration file. Review the generated SQL to ensure it correctly adds new columns with proper nullable constraints and creates StyleReference table with foreign key relationships.",
+            "status": "done",
+            "testStrategy": "Inspect generated migration SQL for correctness and ensure no data loss operations are included",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-20T10:11:25.859Z"
+          },
+          {
+            "id": 4,
+            "title": "Execute Migration and Verify Database State",
+            "description": "Apply the migration to the database and verify all changes are correctly implemented",
+            "dependencies": [
+              3
+            ],
+            "details": "Execute the migration against the development database. Verify that new columns exist in Generation table, StyleReference table is created with proper constraints, and existing Generation records remain intact with null values in new fields.",
+            "status": "done",
+            "testStrategy": "Query database directly to confirm schema changes, test inserting records with new fields, and verify existing data integrity",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-20T10:11:25.861Z"
+          },
+          {
+            "id": 5,
+            "title": "Test Backward Compatibility and New Field Operations",
+            "description": "Comprehensive testing to ensure existing functionality works and new fields operate correctly",
+            "dependencies": [
+              4
+            ],
+            "details": "Test that existing Generation queries and mutations continue to work without modification. Test creating new Generation records with and without the new V2 fields. Verify StyleReference relations work correctly including self-referencing queries.",
+            "status": "done",
+            "testStrategy": "Run existing test suite to ensure no regressions, create unit tests for new field operations, and test StyleReference CRUD operations with parent-child relationships",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-20T10:11:25.862Z"
+          }
+        ],
+        "updatedAt": "2026-01-20T10:11:25.862Z"
+      },
+      {
+        "id": "27",
+        "title": "Extend Shared Types and Schemas",
+        "description": "Update shared type definitions to include V2 options and interfaces for thoughtSignature management",
+        "details": "In packages/shared/src/types/index.ts, extend GenerationOptionsSchema to include preserveHardware, fixedBackground, fixedViewpoint, and removeShadows boolean fields. Add ThoughtSignatureData interface with textSignature, imageSignatures array, and createdAt fields. Add HardwareSpec interface for detailed hardware preservation specifications.",
+        "testStrategy": "Validate all new schema fields with Zod validation, test type inference works correctly, and ensure backward compatibility with existing option structures",
+        "priority": "high",
+        "dependencies": [
+          "26"
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Extend GenerationOptionsSchema with V2 boolean fields",
+            "description": "Add new boolean fields to the existing GenerationOptionsSchema for V2 functionality",
+            "dependencies": [],
+            "details": "In packages/shared/src/types/index.ts, extend the GenerationOptionsSchema to include four new boolean fields: preserveHardware, fixedBackground, fixedViewpoint, and removeShadows. Use Zod schema validation for each field with appropriate default values.",
+            "status": "done",
+            "testStrategy": "Validate Zod schema accepts boolean values, test default value assignment, and verify type inference works correctly",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-20T10:11:26.191Z"
+          },
+          {
+            "id": 2,
+            "title": "Create ThoughtSignatureData interface",
+            "description": "Define interface for thoughtSignature data structure with required fields",
+            "dependencies": [
+              1
+            ],
+            "details": "Add ThoughtSignatureData interface with textSignature (string), imageSignatures (array of image signature objects), and createdAt (Date) fields. Ensure proper TypeScript typing for all fields and export the interface.",
+            "status": "done",
+            "testStrategy": "Test type checking works correctly, verify interface can be imported in other modules, and validate field types match expected data structures",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-20T10:11:26.193Z"
+          },
+          {
+            "id": 3,
+            "title": "Create HardwareSpec interface",
+            "description": "Define interface for detailed hardware preservation specifications",
+            "dependencies": [
+              2
+            ],
+            "details": "Add HardwareSpec interface with fields for hardware preservation details such as device type, screen specifications, and preservation constraints. Include proper TypeScript typing and documentation for each field.",
+            "status": "done",
+            "testStrategy": "Validate interface structure matches hardware preservation requirements, test type inference, and ensure compatibility with existing hardware-related code",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-20T10:11:26.195Z"
+          },
+          {
+            "id": 4,
+            "title": "Update type exports and imports",
+            "description": "Ensure all new types and interfaces are properly exported from the shared package",
+            "dependencies": [
+              3
+            ],
+            "details": "Update the main index.ts export file to include all new interfaces and schema extensions. Verify that GenerationOptionsSchema, ThoughtSignatureData, and HardwareSpec are all properly exported and can be imported by dependent packages.",
+            "status": "done",
+            "testStrategy": "Test imports work correctly in API and web packages, verify no circular dependencies, and confirm all exports are accessible",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-20T10:11:26.197Z"
+          },
+          {
+            "id": 5,
+            "title": "Validate backward compatibility and schema migration",
+            "description": "Ensure new schema changes maintain backward compatibility with existing code",
+            "dependencies": [
+              4
+            ],
+            "details": "Test that existing GenerationOptions usage continues to work with the extended schema. Verify that optional new fields don't break existing API calls and that default values are properly handled when new fields are not provided.",
+            "status": "done",
+            "testStrategy": "Run existing tests to ensure no regressions, test API calls with and without new fields, and verify default value handling works correctly across all dependent services",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-20T10:11:26.198Z"
+          }
+        ],
+        "updatedAt": "2026-01-20T10:11:26.198Z"
+      },
+      {
+        "id": "28",
+        "title": "Implement System Instruction Templates",
+        "description": "Create modular System Instruction templates for different V2 constraints (viewpoint, background, shadows, hardware preservation)",
+        "details": "In apps/api/src/services/gemini.service.ts, create CONSTRAINT_TEMPLATES object with templates for viewpoint fixing, background control, shadow removal, hardware preservation, and user priority instructions. Implement buildIPChangePrompt method that conditionally includes templates based on GenerationOptions. Follow Gemini 3 best practices by NOT modifying temperature (keep default 1.0) and using System Instructions for consistency control.",
+        "testStrategy": "Test each template generates appropriate constraints, verify conditional inclusion works correctly, and validate that user instructions get HIGHEST priority in the final prompt",
+        "priority": "medium",
+        "dependencies": [
+          "27"
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create CONSTRAINT_TEMPLATES object structure",
+            "description": "Define the modular template structure for different V2 constraints in gemini.service.ts",
+            "dependencies": [],
+            "details": "Create CONSTRAINT_TEMPLATES object with separate template properties for viewpoint fixing, background control, shadow removal, hardware preservation, and user priority instructions. Each template should be a string constant with clear constraint language following Gemini 3 best practices.",
+            "status": "done",
+            "testStrategy": "Verify each template contains appropriate constraint language and follows consistent formatting patterns",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-20T10:11:26.630Z"
+          },
+          {
+            "id": 2,
+            "title": "Implement viewpoint fixing template",
+            "description": "Create specific system instruction template for maintaining consistent viewpoint across generations",
+            "dependencies": [
+              1
+            ],
+            "details": "Define viewpoint constraint template that instructs the model to maintain camera angle, perspective, and framing from the original image. Include specific language about preserving front/side/back view orientations and zoom levels.",
+            "status": "done",
+            "testStrategy": "Test that viewpoint template generates consistent camera angles and perspectives across different product types",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-20T10:11:26.632Z"
+          },
+          {
+            "id": 3,
+            "title": "Implement background and shadow control templates",
+            "description": "Create system instruction templates for background preservation and shadow removal constraints",
+            "dependencies": [
+              1
+            ],
+            "details": "Define separate templates for background control (maintaining original background elements) and shadow removal (eliminating or reducing shadows while preserving lighting). Templates should include specific instructions about environmental consistency.",
+            "status": "done",
+            "testStrategy": "Verify background template maintains original environments and shadow template effectively removes shadows without affecting overall lighting",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-20T10:11:26.634Z"
+          },
+          {
+            "id": 4,
+            "title": "Implement hardware preservation template",
+            "description": "Create detailed system instruction template for preserving hardware elements like zippers, rings, and buckles",
+            "dependencies": [
+              1
+            ],
+            "details": "Define comprehensive hardware preservation template with MUST NOT rules for modifying zippers, metal rings, buckles, and leather patches. Include specific language about maintaining original hardware colors, positions, and specifications.",
+            "status": "done",
+            "testStrategy": "Test hardware preservation with various product types to ensure zippers, metal components, and other hardware maintain original specifications",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-20T10:11:26.636Z"
+          },
+          {
+            "id": 5,
+            "title": "Implement buildIPChangePrompt method with conditional template inclusion",
+            "description": "Create method that conditionally includes constraint templates based on GenerationOptions",
+            "dependencies": [
+              2,
+              3,
+              4
+            ],
+            "details": "Implement buildIPChangePrompt method that examines GenerationOptions flags and conditionally includes relevant constraint templates. Ensure user priority instructions get HIGHEST priority in final prompt. Follow Gemini 3 best practices by keeping default temperature of 1.0 and using System Instructions for consistency control.",
+            "status": "done",
+            "testStrategy": "Test conditional inclusion works correctly for different option combinations and verify user instructions receive highest priority in the final prompt structure",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-20T10:11:26.638Z"
+          }
+        ],
+        "updatedAt": "2026-01-20T10:11:26.638Z"
+      },
+      {
+        "id": "29",
+        "title": "Add ThoughtSignature Extraction and Management",
+        "description": "Implement thoughtSignature extraction from Gemini responses and storage for style copying functionality",
+        "details": "Add extractSignatures method to GeminiService that parses response.candidates[0].content.parts for thoughtSignature fields. Store textSignature from first part and imageSignatures from parts with inlineData. Implement buildConversationHistory method for Chat mode with signature preservation. Handle signature validation and fallback for missing signatures.",
+        "testStrategy": "Test signature extraction from various response formats, verify proper storage in database, and validate conversation history construction maintains signature continuity",
+        "priority": "medium",
+        "dependencies": [
+          "28"
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement extractSignatures method in GeminiService",
+            "description": "Create method to parse Gemini response candidates and extract thoughtSignature fields from response parts",
+            "dependencies": [],
+            "details": "Add extractSignatures method to GeminiService that parses response.candidates[0].content.parts array. Extract textSignature from the first part and imageSignatures from parts containing inlineData. Handle cases where thoughtSignature fields may be missing or malformed.",
+            "status": "done",
+            "testStrategy": "Test with various Gemini response formats including responses with and without thoughtSignature fields, verify proper extraction of both text and image signatures",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-20T10:11:27.055Z"
+          },
+          {
+            "id": 2,
+            "title": "Implement signature storage functionality",
+            "description": "Create database storage mechanism for extracted thoughtSignatures with proper data validation",
+            "dependencies": [
+              1
+            ],
+            "details": "Design and implement database schema for storing textSignature and imageSignatures. Create service methods to save extracted signatures to database with proper validation. Ensure signatures are linked to the correct conversation or generation session.",
+            "status": "done",
+            "testStrategy": "Test signature storage with various data types, verify database constraints work correctly, and validate data integrity",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-20T10:11:27.057Z"
+          },
+          {
+            "id": 3,
+            "title": "Build buildConversationHistory method for Chat mode",
+            "description": "Implement conversation history construction that preserves thoughtSignatures across chat interactions",
+            "dependencies": [
+              2
+            ],
+            "details": "Create buildConversationHistory method that reconstructs conversation flow while maintaining signature continuity. Ensure signatures from previous interactions are properly included in new requests to maintain style consistency in Chat mode.",
+            "status": "done",
+            "testStrategy": "Test conversation history building with multiple chat turns, verify signature preservation across interactions, and validate proper conversation flow",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-20T10:11:27.059Z"
+          },
+          {
+            "id": 4,
+            "title": "Implement signature validation and error handling",
+            "description": "Add comprehensive validation for thoughtSignature data and implement fallback mechanisms",
+            "dependencies": [
+              1
+            ],
+            "details": "Create validation logic for thoughtSignature format and content. Implement error handling for malformed signatures and fallback strategies when signatures are missing. Add logging for signature extraction issues and recovery mechanisms.",
+            "status": "done",
+            "testStrategy": "Test validation with invalid signature formats, verify fallback mechanisms work correctly, and ensure system continues functioning when signatures are unavailable",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-20T10:11:27.060Z"
+          },
+          {
+            "id": 5,
+            "title": "Integrate signature management with style copying functionality",
+            "description": "Connect thoughtSignature extraction and storage with the existing style copying feature [Updated: 1/20/2026]",
+            "dependencies": [
+              3,
+              4
+            ],
+            "details": "Integrate the signature extraction and management system with the style copying functionality. Ensure extracted signatures can be used for style replication in new generations. Update existing style copying logic to utilize stored thoughtSignatures for improved consistency.\n<info added on 2026-01-20T10:12:05.588Z>\n현재 스타일 복사 기능(태스크 31) 완료 대기 중으로 인해 통합 작업이 보류된 상태입니다. 태스크 31 완료 후 thoughtSignature 시스템과의 통합을 진행할 예정입니다.\n</info added on 2026-01-20T10:12:05.588Z>",
+            "status": "done",
+            "testStrategy": "Test end-to-end style copying using extracted signatures, verify style consistency across generations, and validate integration with existing style copying features",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-20T10:15:27.644Z"
+          }
+        ],
+        "updatedAt": "2026-01-20T10:15:27.644Z"
+      },
+      {
+        "id": "30",
+        "title": "Implement Regeneration Logic with Input Preservation",
+        "description": "Create regenerate endpoint that reuses identical inputs from previous generation to produce new outputs",
+        "details": "In apps/api/src/services/generation.service.ts, add regenerate method that extracts promptData and options from original Generation record and creates new generation with identical inputs. Add POST /api/generations/:id/regenerate endpoint in generation.routes.ts. Ensure original generation remains unchanged while creating new generation with same inputs but fresh outputs.",
+        "testStrategy": "Verify regeneration uses exact same inputs as original, confirm new generation is created with pending status, and test that original generation data remains unmodified",
+        "priority": "medium",
+        "dependencies": [
+          "29"
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Add regenerate method to GenerationService",
+            "description": "Implement regenerate method in generation.service.ts that extracts promptData and options from original Generation record",
+            "dependencies": [],
+            "details": "Create regenerate method in apps/api/src/services/generation.service.ts that takes a generation ID, retrieves the original Generation record, extracts promptData and options, and creates a new generation with identical inputs but fresh outputs. Ensure original generation remains unchanged.",
+            "status": "done",
+            "testStrategy": "Unit test to verify method extracts correct promptData and options from original generation, creates new generation with same inputs, and leaves original generation unmodified",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-20T10:11:27.811Z"
+          },
+          {
+            "id": 2,
+            "title": "Create POST /api/generations/:id/regenerate endpoint",
+            "description": "Add regenerate endpoint to generation.routes.ts that handles regeneration requests",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement POST /api/generations/:id/regenerate endpoint in apps/api/src/routes/generation.routes.ts that validates the generation ID exists, calls the regenerate service method, and returns the new generation with pending status.",
+            "status": "done",
+            "testStrategy": "Integration test to verify endpoint accepts valid generation IDs, returns 404 for non-existent IDs, and successfully creates new generation with same inputs",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-20T10:11:27.813Z"
+          },
+          {
+            "id": 3,
+            "title": "Implement input preservation validation",
+            "description": "Add validation logic to ensure regenerated generations use identical inputs from original",
+            "dependencies": [
+              1
+            ],
+            "details": "Create validation functions that compare promptData and options between original and regenerated generations to ensure exact input preservation. Add checks for all input fields including prompts, constraints, and generation parameters.",
+            "status": "done",
+            "testStrategy": "Test that validates regenerated generation has identical promptData and options as original, with deep object comparison for nested properties",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-20T10:18:06.649Z"
+          },
+          {
+            "id": 4,
+            "title": "Add error handling for regeneration edge cases",
+            "description": "Implement comprehensive error handling for regeneration failures and edge cases",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Add error handling for cases where original generation doesn't exist, has corrupted data, or regeneration service fails. Include proper HTTP status codes and error messages for different failure scenarios.",
+            "status": "done",
+            "testStrategy": "Test error scenarios including non-existent generation IDs, corrupted original data, and service failures to ensure proper error responses and logging",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-20T10:19:07.151Z"
+          },
+          {
+            "id": 5,
+            "title": "Add regeneration tracking and metadata",
+            "description": "Implement tracking system to link regenerated generations to their original source",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Add metadata fields to track regeneration relationships, including originalGenerationId reference and regeneration timestamp. Ensure regenerated generations maintain link to original for audit and debugging purposes.",
+            "status": "done",
+            "testStrategy": "Verify regenerated generations contain proper metadata linking to original, test query capabilities for finding all regenerations of a source generation",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-20T10:19:57.751Z"
+          }
+        ],
+        "updatedAt": "2026-01-20T10:19:57.751Z"
+      },
+      {
+        "id": "31",
+        "title": "Implement Style Copy Functionality",
+        "description": "Create style copying feature using thoughtSignature and Chat mode for consistent design transfer",
+        "details": "Add generateWithStyleCopy method to GeminiService using Chat mode with thoughtSignature preservation. Implement copyStyle method in GenerationService that retrieves previous generation's signatures and applies them to new requests. Add POST /api/generations/:id/copy-style endpoint. Use conversation history approach with signature inclusion for maintaining design consistency across different characters or products.",
+        "testStrategy": "Test style copying maintains visual consistency, verify Chat mode integration works correctly, and validate that signature-based style transfer produces expected results",
+        "priority": "medium",
+        "dependencies": [
+          "30"
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Add generateWithStyleCopy method to GeminiService",
+            "description": "Implement the core method in GeminiService that handles style copying using Chat mode with thoughtSignature preservation",
+            "dependencies": [],
+            "details": "Create generateWithStyleCopy method in apps/api/src/services/gemini.service.ts that uses Chat mode instead of regular generation. The method should accept a sourceGenerationId parameter to retrieve the original thoughtSignature and incorporate it into the conversation history for style consistency.",
+            "status": "done",
+            "testStrategy": "Unit test the method with mock generation data, verify Chat mode is properly initialized, and confirm thoughtSignature is correctly preserved in conversation context",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-20T10:15:27.004Z"
+          },
+          {
+            "id": 2,
+            "title": "Implement copyStyle method in GenerationService",
+            "description": "Create the service layer method that orchestrates the style copying process by retrieving signatures and applying them to new requests",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement copyStyle method in GenerationService that retrieves the thoughtSignature from a previous generation by ID, validates the source generation exists, and calls the GeminiService generateWithStyleCopy method with the preserved signature data and new generation parameters.",
+            "status": "done",
+            "testStrategy": "Test with valid and invalid generation IDs, verify signature retrieval works correctly, and confirm error handling for missing source generations",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-20T10:15:27.006Z"
+          },
+          {
+            "id": 3,
+            "title": "Create POST /api/generations/:id/copy-style endpoint",
+            "description": "Add the REST API endpoint that exposes the style copying functionality to frontend clients",
+            "dependencies": [
+              2
+            ],
+            "details": "Create new POST endpoint at /api/generations/:id/copy-style that accepts the source generation ID as a URL parameter and new generation parameters in the request body. The endpoint should validate input parameters, call GenerationService.copyStyle, and return the new generation with copied style.",
+            "status": "done",
+            "testStrategy": "Test endpoint with valid generation IDs and parameters, verify proper HTTP status codes for success/error cases, and validate response format matches expected generation object structure",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-20T10:15:27.008Z"
+          },
+          {
+            "id": 4,
+            "title": "Implement conversation history approach with signature inclusion",
+            "description": "Develop the conversation history mechanism that maintains thoughtSignature context across Chat mode interactions",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement conversation history management that includes the original thoughtSignature as part of the Chat mode conversation context. This should structure the conversation to include the style signature as a system message or early conversation turn to maintain design consistency across different characters or products.",
+            "status": "done",
+            "testStrategy": "Test conversation history structure maintains signature context, verify Chat mode properly processes the signature information, and validate style consistency across multiple generation attempts",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-20T10:15:27.010Z"
+          },
+          {
+            "id": 5,
+            "title": "Add comprehensive integration testing for style copy feature",
+            "description": "Create end-to-end tests that validate the complete style copying workflow from API to generation output",
+            "dependencies": [
+              3,
+              4
+            ],
+            "details": "Implement integration tests that cover the full style copying flow: create a source generation with specific style characteristics, use the copy-style endpoint to generate new content, and verify that visual consistency is maintained. Include tests for different product types and character variations to ensure robust style transfer.\n<info added on 2026-01-20T10:20:40.562Z>\n현재 통합 테스트 실행이 차단된 상태입니다. 테스트를 위해 필요한 인증 토큰과 테스트 데이터(기존 생성 레코드, 이미지, thoughtSignature)가 제공되지 않았으며, 테스트 계정이나 시드 데이터도 없어 실행이 불가능합니다. 테스트 진행을 위해서는 유효한 테스트 계정/시드 또는 구체적인 테스트 시나리오가 제공되어야 합니다.\n</info added on 2026-01-20T10:20:40.562Z>\n<info added on 2026-01-20T11:08:28.861Z>\n통합 테스트 진행 상황 업데이트: 스타일 참조 생성 후 copy-style API 호출이 성공적으로 완료되었습니다. 새로운 generationId 6ecade96-a436-4ebc-b174-2ebf253e995a가 생성되었으며, 데이터베이스에서 status=completed, style_reference_id가 참조ID로 설정되고, thought_signatures가 정상적으로 저장된 것을 확인했습니다. 다만 API 상태 재확인 단계는 토큰 만료로 인해 미완료 상태입니다.\n</info added on 2026-01-20T11:08:28.861Z>",
+            "status": "done",
+            "testStrategy": "Execute full workflow tests with real generation data, compare visual outputs for style consistency using automated image analysis or manual review processes, and validate that signature-based style transfer produces expected results across various use cases",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-20T11:08:29.488Z"
+          }
+        ],
+        "updatedAt": "2026-01-20T11:08:29.488Z"
+      },
+      {
+        "id": "32",
+        "title": "Extend IP Change Page with V2 Options",
+        "description": "Add new UI controls for hardware preservation, background/viewpoint fixing, shadow removal, and user instructions input",
+        "details": "In apps/web/src/app/projects/[id]/ip-change/page.tsx, add state variables for new V2 options (preserveHardware, fixedBackground, fixedViewpoint, removeShadows, userInstructions). Add checkbox controls for each option with appropriate default values. Add textarea for user instructions with 2000 character limit. Update generation request body to include new options in the API call.",
+        "testStrategy": "Test all new UI controls function correctly, verify form validation for user instructions length, and confirm API requests include all new option fields",
+        "priority": "medium",
+        "dependencies": [
+          "31"
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Add state variables for V2 options",
+            "description": "Create React state variables for the new V2 generation options in the IP change page component",
+            "dependencies": [],
+            "details": "In apps/web/src/app/projects/[id]/ip-change/page.tsx, add useState hooks for preserveHardware (boolean, default false), fixedBackground (boolean, default false), fixedViewpoint (boolean, default false), removeShadows (boolean, default false), and userInstructions (string, default empty). Import necessary React hooks if not already imported.",
+            "status": "done",
+            "testStrategy": "Verify all state variables initialize with correct default values and can be updated properly",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-21T01:04:40.802Z"
+          },
+          {
+            "id": 2,
+            "title": "Create checkbox controls for boolean options",
+            "description": "Add UI checkbox controls for hardware preservation, background fixing, viewpoint fixing, and shadow removal options",
+            "dependencies": [
+              1
+            ],
+            "details": "Add four checkbox input elements with proper labels for preserveHardware ('Preserve Hardware'), fixedBackground ('Fix Background'), fixedViewpoint ('Fix Viewpoint'), and removeShadows ('Remove Shadows'). Each checkbox should be controlled by its respective state variable with onChange handlers to update state. Group checkboxes in a logical UI section with appropriate styling.",
+            "status": "done",
+            "testStrategy": "Test each checkbox toggles its corresponding state variable correctly and displays proper checked/unchecked states",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-21T01:04:40.804Z"
+          },
+          {
+            "id": 3,
+            "title": "Add textarea for user instructions input",
+            "description": "Create a textarea component for user instructions with character limit validation",
+            "dependencies": [
+              1
+            ],
+            "details": "Add a textarea element for userInstructions with a 2000 character limit. Include character counter display showing current/max characters. Add onChange handler to update userInstructions state with validation to prevent exceeding the limit. Style the textarea appropriately and add a descriptive label explaining its purpose for custom generation instructions.",
+            "status": "done",
+            "testStrategy": "Verify character limit enforcement works correctly, character counter updates in real-time, and textarea properly updates state",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-21T01:04:40.807Z"
+          },
+          {
+            "id": 4,
+            "title": "Update generation request body with new options",
+            "description": "Modify the API call to include all new V2 options in the generation request payload",
+            "dependencies": [
+              1,
+              2,
+              3
+            ],
+            "details": "Update the generation request function to include preserveHardware, fixedBackground, fixedViewpoint, removeShadows, and userInstructions in the request body sent to the API. Ensure the request structure matches the expected API schema and all boolean values are properly serialized. Update any TypeScript interfaces if needed for the request payload.",
+            "status": "done",
+            "testStrategy": "Verify API requests include all new option fields with correct values and data types match API expectations",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-21T01:04:40.808Z"
+          },
+          {
+            "id": 5,
+            "title": "Add form validation and UI polish",
+            "description": "Implement form validation for the new controls and add proper styling and user experience enhancements",
+            "dependencies": [
+              2,
+              3,
+              4
+            ],
+            "details": "Add form validation to ensure userInstructions doesn't exceed 2000 characters and provide user feedback for validation errors. Add proper spacing, grouping, and styling for the new UI controls to maintain consistency with existing page design. Include helpful tooltips or descriptions for each option to guide users. Ensure proper tab order and accessibility attributes.",
+            "status": "done",
+            "testStrategy": "Test form validation prevents submission with invalid data, verify UI styling is consistent with design system, and confirm accessibility standards are met",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-21T01:04:40.810Z"
+          }
+        ],
+        "updatedAt": "2026-01-21T02:35:31.596Z"
+      },
+      {
+        "id": "33",
+        "title": "Update Generation Results Page with V2 Actions",
+        "description": "Add new action buttons for style copying, regeneration with same inputs, and modify-then-regenerate workflows",
+        "details": "In apps/web/src/app/projects/[id]/generations/[genId]/page.tsx, add handleRegenerateWithSameInputs function that calls the regenerate endpoint. Add handleStyleCopy function that navigates to IP change page with styleRef query parameter. Split existing regeneration button into 'Same Conditions Regenerate' and 'Modify Conditions' buttons. Add style copy buttons for IP change and new product application.",
+        "testStrategy": "Test regeneration maintains user on results page with new generation, verify style copy navigation includes proper query parameters, and confirm all button actions trigger correct API calls",
+        "priority": "medium",
+        "dependencies": [
+          "32"
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement handleRegenerateWithSameInputs function",
+            "description": "Create function to handle regeneration with same inputs and maintain user on results page",
+            "dependencies": [],
+            "details": "Add handleRegenerateWithSameInputs function in page.tsx that calls the regenerate endpoint with existing generation parameters. Ensure the function maintains the user on the current results page and updates with new generation data.",
+            "status": "pending",
+            "testStrategy": "Test that regeneration maintains user on results page with new generation and verify correct API endpoint is called",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement handleStyleCopy function with navigation",
+            "description": "Create function to handle style copying and navigate to IP change page with styleRef parameter",
+            "dependencies": [],
+            "details": "Add handleStyleCopy function that navigates to the IP change page with styleRef query parameter. The function should extract style information from current generation and pass it as a query parameter for the destination page.",
+            "status": "pending",
+            "testStrategy": "Verify style copy navigation includes proper query parameters and navigates to correct IP change page",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Split existing regeneration button into two separate buttons",
+            "description": "Replace single regeneration button with 'Same Conditions Regenerate' and 'Modify Conditions' buttons",
+            "dependencies": [
+              1
+            ],
+            "details": "Remove the existing regeneration button and replace it with two separate buttons: 'Same Conditions Regenerate' that calls handleRegenerateWithSameInputs, and 'Modify Conditions' that navigates to the modification workflow.",
+            "status": "pending",
+            "testStrategy": "Test that both buttons are properly displayed and trigger their respective functions correctly",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Add style copy button for IP change workflow",
+            "description": "Create style copy button that initiates IP change workflow with current generation style",
+            "dependencies": [
+              2
+            ],
+            "details": "Add a style copy button specifically for IP change workflow that calls handleStyleCopy function. The button should be clearly labeled and positioned appropriately within the action buttons section.",
+            "status": "pending",
+            "testStrategy": "Confirm style copy button for IP change triggers correct navigation with proper styleRef parameter",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Add style copy button for new product application",
+            "description": "Create style copy button for applying current style to new product generation",
+            "dependencies": [
+              2
+            ],
+            "details": "Add a style copy button for new product application that uses handleStyleCopy function to navigate to new product creation with current style reference. Position button logically with other action buttons.",
+            "status": "pending",
+            "testStrategy": "Verify new product style copy button navigates correctly and passes style information for new product application",
+            "parentId": "undefined"
+          }
+        ],
+        "updatedAt": "2026-01-21T06:03:26.938Z"
+      },
+      {
+        "id": "34",
+        "title": "Implement Hardware Preservation Logic",
+        "description": "Add specialized prompting logic to preserve hardware details like zippers, rings, and buckles during IP changes",
+        "details": "Extend System Instruction templates with detailed Hardware Preservation Matrix that locks zipper colors/positions, metal ring specifications, buckle forms, and leather patch locations. Implement optional HardwareSpec input parsing for user-specified hardware details. Add hardware preservation constraints to prompt building logic with MUST NOT rules for hardware modification.",
+        "testStrategy": "Test hardware preservation with various product types, verify that zippers and metal components maintain original specifications, and validate user-specified hardware details are properly preserved",
+        "priority": "medium",
+        "dependencies": [
+          "33"
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create Hardware Preservation Matrix Template",
+            "description": "Design and implement the Hardware Preservation Matrix template with detailed specifications for different hardware types",
+            "dependencies": [],
+            "details": "Create a comprehensive template structure that defines preservation rules for zippers (colors, positions, styles), metal rings (specifications, finishes, sizes), buckles (forms, materials, mechanisms), and leather patches (locations, textures, colors). This matrix will serve as the foundation for hardware preservation logic.",
+            "status": "pending",
+            "testStrategy": "Test template covers all major hardware types and verify matrix structure is properly formatted for prompt integration",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement HardwareSpec Input Parser",
+            "description": "Create parsing logic to handle optional user-specified hardware details input",
+            "dependencies": [
+              1
+            ],
+            "details": "Develop a parser that can interpret user-provided hardware specifications and convert them into the Hardware Preservation Matrix format. Include validation for supported hardware types, error handling for invalid inputs, and default fallback behaviors when specifications are incomplete.",
+            "status": "pending",
+            "testStrategy": "Test parser with various input formats, validate error handling for malformed inputs, and verify proper conversion to matrix format",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Extend System Instruction Templates",
+            "description": "Integrate Hardware Preservation Matrix into existing System Instruction template system",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Modify the CONSTRAINT_TEMPLATES object in gemini.service.ts to include hardware preservation templates. Ensure the hardware preservation template can be conditionally included based on GenerationOptions and integrates seamlessly with existing constraint templates.",
+            "status": "pending",
+            "testStrategy": "Test template integration with existing system, verify conditional inclusion works correctly, and validate template formatting",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Implement Hardware Preservation Constraints",
+            "description": "Add hardware preservation constraints to prompt building logic with MUST NOT modification rules",
+            "dependencies": [
+              3
+            ],
+            "details": "Enhance the buildIPChangePrompt method to include hardware preservation constraints that explicitly prevent modification of specified hardware elements. Implement MUST NOT rules that lock hardware specifications during IP changes and ensure these constraints have appropriate priority in the final prompt.",
+            "status": "pending",
+            "testStrategy": "Test constraints prevent hardware modifications during IP changes and verify MUST NOT rules are properly enforced in generated prompts",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Validate Hardware Preservation Across Product Types",
+            "description": "Comprehensive testing of hardware preservation logic across different product categories",
+            "dependencies": [
+              4
+            ],
+            "details": "Test the complete hardware preservation system with various product types including bags, jackets, shoes, and accessories. Verify that zippers maintain colors and positions, metal components preserve specifications, and user-specified hardware details are accurately preserved during IP changes.",
+            "status": "pending",
+            "testStrategy": "Test with multiple product types, verify hardware elements remain unchanged during IP modifications, and validate user-specified hardware preservation works correctly",
+            "parentId": "undefined"
+          }
+        ]
+      },
+      {
+        "id": "35",
+        "title": "Integration Testing and Performance Optimization",
+        "description": "Conduct end-to-end testing of all V2 features and optimize performance for thoughtSignature storage and retrieval",
+        "details": "Create comprehensive E2E tests covering regeneration workflows, style copying scenarios, hardware preservation cases, and user instruction handling. Test backward compatibility with V1 generations. Optimize database queries for thoughtSignature retrieval and implement proper indexing. Validate API response times remain under 30 seconds for all generation types. Test error handling for missing signatures and fallback behaviors.",
+        "testStrategy": "Run full test suite covering all V2 scenarios, measure API performance under load, verify backward compatibility with existing data, and validate error handling for edge cases like missing thoughtSignatures",
+        "priority": "medium",
+        "dependencies": [
+          "34"
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create comprehensive E2E test suite for V2 features",
+            "description": "Develop end-to-end tests covering all V2 functionality including regeneration workflows, style copying, and hardware preservation",
+            "dependencies": [],
+            "details": "Implement automated E2E tests using testing framework (Jest/Cypress) to cover regeneration workflows, style copying scenarios, hardware preservation cases, and user instruction handling. Create test data fixtures and mock AI service responses for consistent testing.",
+            "status": "pending",
+            "testStrategy": "Run test suite in CI/CD pipeline, verify all test scenarios pass, and validate test coverage meets 90% threshold",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement backward compatibility testing with V1 generations",
+            "description": "Create tests to ensure V2 system works correctly with existing V1 generation data and workflows",
+            "dependencies": [
+              1
+            ],
+            "details": "Design and implement tests that verify V2 features can handle existing V1 generation data without breaking functionality. Test migration scenarios, data format compatibility, and ensure V1 users can seamlessly transition to V2 features.",
+            "status": "pending",
+            "testStrategy": "Test with real V1 production data samples, verify no data corruption occurs, and validate all V1 features remain functional",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Optimize database queries and implement thoughtSignature indexing",
+            "description": "Improve database performance for thoughtSignature storage and retrieval operations through query optimization and proper indexing",
+            "dependencies": [],
+            "details": "Analyze current database queries for thoughtSignature operations, implement proper indexing strategies for frequently accessed fields, optimize JOIN operations, and add database connection pooling. Create composite indexes for complex queries involving thoughtSignature retrieval.",
+            "status": "pending",
+            "testStrategy": "Measure query execution times before and after optimization, run load tests to verify performance improvements, and monitor database metrics under stress",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Validate API response times and performance benchmarks",
+            "description": "Test and validate that all API endpoints meet the 30-second response time requirement across different generation types",
+            "dependencies": [
+              3
+            ],
+            "details": "Implement performance testing suite to measure API response times for all generation types including regeneration, style copying, and hardware preservation. Set up monitoring to track response times under various load conditions and ensure 95th percentile remains under 30 seconds.",
+            "status": "pending",
+            "testStrategy": "Use load testing tools like Artillery or JMeter to simulate concurrent users, measure response times across different scenarios, and validate performance meets SLA requirements",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Test error handling and fallback behaviors for missing signatures",
+            "description": "Implement comprehensive testing for error scenarios including missing thoughtSignatures and validate fallback mechanisms",
+            "dependencies": [
+              2
+            ],
+            "details": "Create test cases for various error scenarios including missing thoughtSignatures, corrupted data, AI service failures, and network timeouts. Implement and test fallback behaviors, graceful degradation, and proper error messaging to users. Ensure system remains stable under error conditions.",
+            "status": "pending",
+            "testStrategy": "Simulate various failure scenarios, verify error messages are user-friendly, test fallback mechanisms work correctly, and ensure no data loss occurs during error conditions",
+            "parentId": "undefined"
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "version": "1.0.0",
+      "lastModified": "2026-01-21T06:03:26.938Z",
+      "taskCount": 35,
+      "completedCount": 25,
+      "tags": [
+        "master"
+      ]
+    }
+  }
+}
