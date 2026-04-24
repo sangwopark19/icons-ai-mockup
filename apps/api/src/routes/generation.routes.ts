@@ -8,6 +8,8 @@ import { generationService } from '../services/generation.service.js';
 const CreateGenerationSchema = z.object({
   projectId: z.string().uuid(),
   mode: z.enum(['ip_change', 'sketch_to_real']),
+  provider: z.enum(['gemini', 'openai']).optional(),
+  providerModel: z.string().min(1).optional(),
   sourceImagePath: z.string().optional(),
   characterId: z.string().uuid().optional(),
   characterImagePath: z.string().optional(), // 직접 업로드된 캐릭터 이미지 경로
@@ -74,6 +76,8 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
           id: generation.id,
           status: generation.status,
           mode: generation.mode,
+          provider: generation.provider,
+          providerModel: generation.providerModel,
           createdAt: generation.createdAt,
         },
       });
@@ -115,6 +119,8 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
         id: generation.id,
         status: generation.status,
         mode: generation.mode,
+        provider: generation.provider,
+        providerModel: generation.providerModel,
         options: userInstructions ? { ...options, userInstructions } : options,
         errorMessage: generation.errorMessage,
         createdAt: generation.createdAt,
@@ -182,6 +188,8 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
         data: {
           id: generation.id,
           status: generation.status,
+          provider: generation.provider,
+          providerModel: generation.providerModel,
         },
       });
     } catch (error) {
@@ -214,7 +222,12 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
       const generation = await generationService.copyStyle(user.id, id, body);
       return reply.code(201).send({
         success: true,
-        data: { id: generation.id, status: generation.status },
+        data: {
+          id: generation.id,
+          status: generation.status,
+          provider: generation.provider,
+          providerModel: generation.providerModel,
+        },
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : '스타일 복사에 실패했습니다';
@@ -272,6 +285,8 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
         data: generations.map((g) => ({
           id: g.id,
           mode: g.mode,
+          provider: g.provider,
+          providerModel: g.providerModel,
           createdAt: g.createdAt,
           selectedImage: g.images[0] || null,
           character: g.ipCharacter

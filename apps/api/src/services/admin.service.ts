@@ -408,6 +408,8 @@ export class AdminService {
       userId: generation.project.userId,
       projectId: generation.projectId,
       mode: generation.mode as 'ip_change' | 'sketch_to_real',
+      provider: generation.provider,
+      providerModel: generation.providerModel,
       sourceImagePath: promptData.sourceImagePath as string | undefined,
       characterImagePath: promptData.characterImagePath as string | undefined,
       textureImagePath: promptData.textureImagePath as string | undefined,

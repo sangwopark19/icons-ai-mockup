@@ -1,10 +1,16 @@
 import { prisma } from '../lib/prisma.js';
-import { addGenerationJob, GenerationJobData } from '../lib/queue.js';
+import { addGenerationJob } from '../lib/queue.js';
 import { Prisma, type Generation, type GeneratedImage } from '@prisma/client';
-import type { ThoughtSignatureData } from '@mockup-ai/shared/types';
+import type { GenerationProvider, ThoughtSignatureData } from '@mockup-ai/shared/types';
 import fs from 'fs/promises';
 import path from 'path';
 import { config } from '../config/index.js';
+
+const DEFAULT_GENERATION_PROVIDER: GenerationProvider = 'gemini';
+const DEFAULT_PROVIDER_MODELS: Record<GenerationProvider, string> = {
+  gemini: 'gemini-3-pro-image-preview',
+  openai: 'gpt-image-2',
+};
 
 /**
  * 생성 요청 입력 타입
@@ -12,6 +18,8 @@ import { config } from '../config/index.js';
 interface CreateGenerationInput {
   projectId: string;
   mode: 'ip_change' | 'sketch_to_real';
+  provider?: GenerationProvider;
+  providerModel?: string;
   styleReferenceId?: string;
   sourceImagePath?: string;
   characterId?: string;
@@ -45,6 +53,16 @@ interface CreateGenerationInput {
 }
 
 type HardwareSpecOption = NonNullable<CreateGenerationInput['options']>['hardwareSpecs'];
+
+function resolveGenerationProvider(input: CreateGenerationInput): {
+  provider: GenerationProvider;
+  providerModel: string;
+} {
+  const provider = input.provider ?? DEFAULT_GENERATION_PROVIDER;
+  const providerModel = input.providerModel?.trim() || DEFAULT_PROVIDER_MODELS[provider];
+
+  return { provider, providerModel };
+}
 
 /**
  * 생성 서비스
@@ -81,6 +99,7 @@ export class GenerationService {
 
     const userInstructions = input.options?.userInstructions?.trim();
     const hardwareSpecInput = input.options?.hardwareSpecInput?.trim();
+    const { provider, providerModel } = resolveGenerationProvider(input);
 
     // 생성 기록 저장
     const generation = await prisma.generation.create({
@@ -90,6 +109,8 @@ export class GenerationService {
         sourceImageId: null, // 나중에 업데이트
         mode: input.mode,
         status: 'pending',
+        provider,
+        providerModel,
         styleReferenceId: input.styleReferenceId || null,
         userInstructions: userInstructions || null,
         promptData: {
@@ -120,6 +141,8 @@ export class GenerationService {
       userId,
       projectId: input.projectId,
       mode: input.mode,
+      provider,
+      providerModel,
       styleReferenceId: input.styleReferenceId,
       sourceImagePath: input.sourceImagePath,
       characterImagePath,
@@ -241,6 +264,8 @@ export class GenerationService {
     const regenerationInput = {
       projectId: original.projectId,
       mode: original.mode,
+      provider: original.provider,
+      providerModel: original.providerModel,
       sourceImagePath: promptData.sourceImagePath as string | undefined,
       characterId: original.ipCharacterId || undefined,
       characterImagePath: promptData.characterImagePath as string | undefined,
@@ -365,6 +390,8 @@ export class GenerationService {
     return this.create(userId, {
       projectId: original.projectId,
       mode: original.mode,
+      provider: original.provider,
+      providerModel: original.providerModel,
       styleReferenceId: original.id,
       sourceImagePath: input.sourceImagePath || (promptData.sourceImagePath as string | undefined),
       characterId: original.ipCharacterId || undefined,
