@@ -49,12 +49,32 @@ const parseThoughtSignatures = (value: unknown): ThoughtSignatureData[] => {
 const generationWorker = new Worker<GenerationJobData>(
   'generation',
   async (job: Job<GenerationJobData>) => {
-    const { generationId, userId, projectId, mode, options } = job.data;
+    const { generationId, userId, projectId, options } = job.data;
     console.log(`🚀 생성 작업 시작: ${generationId}`);
 
     try {
+      const generation = await generationService.getById(userId, generationId);
+      if (!generation) {
+        throw new Error('생성 기록을 찾을 수 없습니다');
+      }
+
+      if (job.data.provider !== generation.provider) {
+        throw new Error('저장된 provider와 큐 provider가 일치하지 않아 작업을 실행할 수 없습니다.');
+      }
+
+      if (job.data.providerModel !== generation.providerModel) {
+        throw new Error('저장된 providerModel과 큐 providerModel이 일치하지 않습니다.');
+      }
+
+      const provider = generation.provider;
+      const mode = generation.mode;
+
+      if (provider === 'openai') {
+        throw new Error('OpenAI 이미지 런타임은 아직 지원되지 않습니다.');
+      }
+
       // DB에서 활성 API 키 조회 (작업별 1회, 캐싱 없음 — CONTEXT.md 정책)
-      const { id: activeKeyId, key: activeApiKey } = await adminService.getActiveApiKey();
+      const { id: activeKeyId, key: activeApiKey } = await adminService.getActiveApiKey(provider);
 
       // 상태를 processing으로 업데이트
       await generationService.updateStatus(generationId, 'processing');
@@ -79,7 +99,6 @@ const generationWorker = new Worker<GenerationJobData>(
         textureImageBase64 = buffer.toString('base64');
       }
 
-      // Gemini API 호출
       let generatedImages: Buffer[];
       let thoughtSignatures: ThoughtSignatureData[] = [];
 
@@ -121,7 +140,7 @@ const generationWorker = new Worker<GenerationJobData>(
             },
           ];
 
-          await adminService.incrementCallCount(activeKeyId);
+          await adminService.incrementCallCount(provider, activeKeyId);
           const result = await geminiService.generateWithStyleCopy(
             activeApiKey,
             (reference.promptData as any)?.userPrompt || '원본 스타일 생성 요청',
@@ -145,7 +164,7 @@ const generationWorker = new Worker<GenerationJobData>(
           generatedImages = result.images;
           thoughtSignatures = result.signatures;
         } else {
-          await adminService.incrementCallCount(activeKeyId);
+          await adminService.incrementCallCount(provider, activeKeyId);
           const result = await geminiService.generateIPChange(
             activeApiKey,
             sourceImageBase64,
@@ -171,7 +190,7 @@ const generationWorker = new Worker<GenerationJobData>(
           throw new Error('스케치 이미지가 필요합니다');
         }
 
-        await adminService.incrementCallCount(activeKeyId);
+        await adminService.incrementCallCount(provider, activeKeyId);
         const result = await geminiService.generateSketchToReal(
           activeApiKey,
           sourceImageBase64,

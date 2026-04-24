@@ -24,12 +24,17 @@ function formatDate(dateStr: string): string {
     .replace('.', '');
 }
 
+function getProviderLabel(provider: AdminGeneration['provider']): string {
+  return provider === 'openai' ? 'OpenAI' : 'Gemini';
+}
+
 export default function GenerationDetailModal({
   generation,
   onClose,
   onRetry,
 }: GenerationDetailModalProps) {
   const [retrying, setRetrying] = useState(false);
+  const [showSupportInfo, setShowSupportInfo] = useState(false);
 
   useEffect(() => {
     if (!generation) return;
@@ -42,7 +47,25 @@ export default function GenerationDetailModal({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [generation, onClose]);
 
+  useEffect(() => {
+    setShowSupportInfo(false);
+  }, [generation?.id]);
+
   if (!generation) return null;
+
+  const supportFields = [
+    { label: 'Provider', value: getProviderLabel(generation.provider) },
+    { label: 'Model', value: generation.providerModel },
+    { label: 'OpenAI Request ID', value: generation.openaiRequestId },
+    { label: 'OpenAI Response ID', value: generation.openaiResponseId },
+    { label: 'OpenAI Image Call ID', value: generation.openaiImageCallId },
+    { label: 'OpenAI Revised Prompt', value: generation.openaiRevisedPrompt },
+  ].filter((field) => Boolean(field.value));
+
+  const copySupportValue = async (label: string, value: string) => {
+    await navigator.clipboard?.writeText(value);
+    console.log(`${label} copied`);
+  };
 
   const handleRetry = async () => {
     setRetrying(true);
@@ -59,15 +82,12 @@ export default function GenerationDetailModal({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-lg shadow-xl p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
+        className="mx-4 max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between mb-4">
+        <div className="mb-4 flex items-center justify-between">
           <h3 className="text-lg font-semibold text-gray-900">생성 작업 상세</h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
+          <button onClick={onClose} className="text-gray-400 transition-colors hover:text-gray-600">
             <svg
               className="h-5 w-5"
               xmlns="http://www.w3.org/2000/svg"
@@ -88,34 +108,46 @@ export default function GenerationDetailModal({
         <div className="space-y-4">
           {/* Error message */}
           {generation.errorMessage && (
-            <div className="rounded-lg bg-red-50 border border-red-200 p-4">
-              <p className="text-sm font-semibold text-red-700 mb-1">에러 메시지</p>
-              <p className="text-sm text-red-600 break-words">{generation.errorMessage}</p>
+            <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+              <p className="mb-1 text-sm font-semibold text-red-700">에러 메시지</p>
+              <p className="break-words text-sm text-red-600">{generation.errorMessage}</p>
             </div>
           )}
 
           {/* Metadata grid */}
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <p className="text-gray-500 text-xs font-medium uppercase tracking-wide mb-1">
+              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-500">
                 사용자
               </p>
               <p className="text-gray-900">{generation.userEmail}</p>
             </div>
             <div>
-              <p className="text-gray-500 text-xs font-medium uppercase tracking-wide mb-1">
+              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-500">
                 생성 모드
               </p>
               <p className="text-gray-900">{generation.mode}</p>
             </div>
             <div>
-              <p className="text-gray-500 text-xs font-medium uppercase tracking-wide mb-1">
+              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-500">
+                Provider
+              </p>
+              <p className="text-gray-900">{getProviderLabel(generation.provider)}</p>
+            </div>
+            <div>
+              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-500">
+                Model
+              </p>
+              <p className="break-words text-gray-900">{generation.providerModel}</p>
+            </div>
+            <div>
+              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-500">
                 재시도 횟수
               </p>
               <p className="text-gray-900">{generation.retryCount}</p>
             </div>
             <div>
-              <p className="text-gray-500 text-xs font-medium uppercase tracking-wide mb-1">
+              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-500">
                 생성일
               </p>
               <p className="text-gray-900">{formatDate(generation.createdAt)}</p>
@@ -124,38 +156,70 @@ export default function GenerationDetailModal({
 
           {/* Options JSON */}
           <div>
-            <p className="text-gray-500 text-xs font-medium uppercase tracking-wide mb-1">
+            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-500">
               생성 옵션
             </p>
-            <pre className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-700 overflow-x-auto whitespace-pre-wrap break-words">
+            <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700">
               {JSON.stringify(generation.options, null, 2)}
             </pre>
           </div>
 
           {/* Prompt data JSON */}
           <div>
-            <p className="text-gray-500 text-xs font-medium uppercase tracking-wide mb-1">
+            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-500">
               프롬프트 데이터
             </p>
-            <pre className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-700 overflow-x-auto whitespace-pre-wrap break-words">
+            <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700">
               {JSON.stringify(generation.promptData, null, 2)}
             </pre>
+          </div>
+
+          {/* Safe support metadata */}
+          <div className="rounded-lg border border-gray-200 bg-gray-50">
+            <button
+              type="button"
+              onClick={() => setShowSupportInfo((value) => !value)}
+              className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold text-gray-900"
+            >
+              <span>지원 정보</span>
+              <span className="text-xs text-gray-500">{showSupportInfo ? '접기' : '펼치기'}</span>
+            </button>
+            {showSupportInfo && (
+              <div className="space-y-3 border-t border-gray-200 px-4 py-3">
+                {supportFields.map((field) => (
+                  <div key={field.label} className="grid gap-2 sm:grid-cols-[160px_1fr_auto]">
+                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                      {field.label}
+                    </p>
+                    <p className="break-words text-sm text-gray-800">{field.value}</p>
+                    <button
+                      type="button"
+                      onClick={() => copySupportValue(field.label, String(field.value))}
+                      className="h-8 rounded border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 hover:bg-gray-100"
+                      aria-label={`${field.label} 복사`}
+                    >
+                      복사
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-200">
+        <div className="mt-6 flex justify-end gap-3 border-t border-gray-200 pt-4">
           <button
             onClick={onClose}
             disabled={retrying}
-            className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50"
           >
             닫기
           </button>
           <button
             onClick={handleRetry}
             disabled={retrying}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {retrying && (
               <svg

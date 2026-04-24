@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: planning
-stopped_at: v1.0 milestone archived — ready for next milestone planning
-last_updated: "2026-04-23T06:16:56Z"
-last_activity: 2026-04-23
+milestone: v1.1
+milestone_name: OpenAI GPT Image 2 Dual Provider
+status: "Phase 07 shipped — PR #2"
+stopped_at: Phase 07 complete; ready to plan Phase 8
+last_updated: "2026-04-24T05:51:12.088Z"
+last_activity: 2026-04-24
 progress:
-  total_phases: 6
-  completed_phases: 6
-  total_plans: 18
-  completed_plans: 18
-  percent: 100
+  total_phases: 4
+  completed_phases: 1
+  total_plans: 4
+  completed_plans: 4
+  percent: 25
 ---
 
 # Project State
@@ -20,23 +20,23 @@ progress:
 
 See: .planning/PROJECT.md (updated 2026-04-23)
 
-**Core value:** 관리자가 한 곳에서 시스템 전체 현황을 파악하고 사용자/콘텐츠/API 키를 관리할 수 있어야 한다.
-**Current focus:** Planning next milestone
+**Core value:** 사용자가 원하는 제품 목업을 구조와 디테일을 잃지 않고 빠르게 생성하고 비교할 수 있어야 한다.
+**Current focus:** Phase 8 — openai-ip-change-parity
 
 ## Current Position
 
-Phase: none active
-Plan: none active
-Status: v1.0 archived; ready for `$gsd-new-milestone`
-Last activity: 2026-04-23
+Phase: 8
+Plan: Not started
+Status: Phase 07 shipped — PR #2
+Last activity: 2026-04-24
 
-Progress: [██████████] 100%
+Progress: [███░░░░░░░] 25%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 0
+- Total plans completed: 4
 - Average duration: —
 - Total execution time: 0 hours
 
@@ -44,7 +44,7 @@ Progress: [██████████] 100%
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 07 | 4 | - | - |
 
 **Recent Trend:**
 
@@ -72,6 +72,10 @@ Progress: [██████████] 100%
 | Phase 04-api-key-management P05 | 2 | 1 tasks | 0 files |
 | Phase 04-api-key-management P05 | 2 | 2 tasks | 0 files |
 | Phase 05-dashboard-active-key-wiring P01 | 5 | 2 tasks | 3 files |
+| Phase 07-provider-foundation-and-key-separation P01 | 9 min | 3 tasks | 6 files |
+| Phase 07-provider-foundation-and-key-separation P02 | 11 min | 2 tasks | 3 files |
+| Phase 07-provider-foundation-and-key-separation P03 | 6 min | 3 tasks | 5 files |
+| Phase 07-provider-foundation-and-key-separation P04 | 7 min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -121,6 +125,16 @@ Progress: [██████████] 100%
 - [Phase 04-api-key-management]: Phase 4 declared complete after human visual verification of /admin/api-keys — KEY-01 through KEY-06 all satisfied
 - [Phase 05-dashboard-active-key-wiring]: subtitle prop renders in same bottom slot as delta — only shows when delta is absent, preserving card layout
 - [Phase 05-dashboard-active-key-wiring]: callCount used as primary KPI value for active key; delta not passed since cumulative counts are not meaningful as day-over-day delta
+- Generation.provider defaults to gemini and providerModel defaults to gemini-3-pro-image-preview for existing records.
+- Queue provider/providerModel fields are required copied routing data, not a replacement for the database generation record.
+- Explicit OpenAI create requests default providerModel to gpt-image-2 until the runtime supplies a more precise model.
+- Admin key routes require explicit provider input so UI/API key management cannot operate on the wrong provider lane.
+- Gemini remains the default provider for internal backend callers until worker/edit paths are fully provider-aware in Phase 07-04.
+- Admin API key UI uses Gemini/OpenAI tabs; provider is inherited from the selected tab rather than user-entered.
+- Dashboard active key state renders Gemini and OpenAI as separate KPI cards using activeApiKeysByProvider.
+- Worker jobs validate that the queued provider matches the persisted Generation.provider before any runtime dispatch.
+- OpenAI generation jobs intentionally fail with an explicit unsupported-runtime error until Phase 08 adds the image runtime.
+- Admin monitoring exposes safe provider/model/OpenAI support identifiers while keeping providerTrace backend-only.
 
 ### Pending Todos
 
@@ -138,6 +152,7 @@ None yet.
 |---|-------------|------|--------|-----------|
 | 1 | admin 대시보드 흰배경 흰글자 색상 수정 | 2026-03-12 | 7238c61 | [1-admin](./quick/1-admin/) |
 | 2 | Mac 서버 ENCRYPTION_KEY 배포 누락 및 admin 대시보드 빈 상태 수정 | 2026-04-23 | 6de9087 | [260423-l20-mac-encryption-key-api-admin-dashboard](./quick/260423-l20-mac-encryption-key-api-admin-dashboard/) |
+| 3 | Mac 서버 로그인 만료 시간 1일 및 자동 refresh 처리 | 2026-04-24 | e41c6ba | [260424-eex-auth-session-refresh](./quick/260424-eex-auth-session-refresh/) |
 
 ## Deferred Items
 
@@ -151,6 +166,8 @@ Items acknowledged and deferred at milestone close on 2026-04-23:
 
 ## Session Continuity
 
-Last session: 2026-03-12T06:04:31.277Z
-Stopped at: v1.0 milestone archived — ready for next milestone planning
-Resume file: .planning/MILESTONES.md
+Last session: 2026-04-24T03:05:00.000Z
+Stopped at: Phase 07 complete; ready to plan Phase 8
+Resume file: None
+
+**Planned Phase:** 07 (provider-foundation-and-key-separation) — 4 plans — 2026-04-24T01:01:02.467Z

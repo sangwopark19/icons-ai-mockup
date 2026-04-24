@@ -66,6 +66,9 @@ export type GenerationMode = z.infer<typeof GenerationModeEnum>;
 export const GenerationStatusEnum = z.enum(['pending', 'processing', 'completed', 'failed']);
 export type GenerationStatus = z.infer<typeof GenerationStatusEnum>;
 
+export const GenerationProviderEnum = z.enum(['gemini', 'openai']);
+export type GenerationProvider = z.infer<typeof GenerationProviderEnum>;
+
 export const GenerationOptionsSchema = z.object({
   preserveStructure: z.boolean().default(false),
   transparentBackground: z.boolean().default(false),
@@ -116,6 +119,8 @@ export interface HardwareSpec {
 export const CreateGenerationSchema = z.object({
   projectId: z.string().uuid(),
   mode: GenerationModeEnum,
+  provider: GenerationProviderEnum.optional(),
+  providerModel: z.string().min(1).optional(),
   sourceImageId: z.string().uuid().optional(),
   characterId: z.string().uuid().optional(),
   prompt: z.string().max(2000).optional(),
@@ -124,19 +129,32 @@ export const CreateGenerationSchema = z.object({
 
 export type CreateGenerationInput = z.infer<typeof CreateGenerationSchema>;
 
-export const GenerationSchema = z.object({
+export const InternalGenerationSchema = z.object({
   id: z.string().uuid(),
   projectId: z.string().uuid(),
   ipCharacterId: z.string().uuid().nullable(),
   sourceImageId: z.string().uuid().nullable(),
   mode: GenerationModeEnum,
   status: GenerationStatusEnum,
+  provider: GenerationProviderEnum,
+  providerModel: z.string().min(1),
+  providerTrace: z.record(z.unknown()).nullable(),
   promptData: z.record(z.unknown()),
   options: GenerationOptionsSchema,
   retryCount: z.number().int(),
   errorMessage: z.string().nullable(),
   createdAt: z.coerce.date(),
   completedAt: z.coerce.date().nullable(),
+  openaiRequestId: z.string().nullable(),
+  openaiResponseId: z.string().nullable(),
+  openaiImageCallId: z.string().nullable(),
+  openaiRevisedPrompt: z.string().nullable(),
+});
+
+export type InternalGeneration = z.infer<typeof InternalGenerationSchema>;
+
+export const GenerationSchema = InternalGenerationSchema.omit({
+  providerTrace: true,
 });
 
 export type Generation = z.infer<typeof GenerationSchema>;

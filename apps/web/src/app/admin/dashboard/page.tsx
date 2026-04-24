@@ -91,6 +91,7 @@ export default function DashboardPage() {
             <KpiSkeleton />
             <KpiSkeleton />
             <KpiSkeleton />
+            <KpiSkeleton />
           </>
         ) : (
           <>
@@ -124,10 +125,32 @@ export default function DashboardPage() {
               format="bytes"
             />
             <KpiCard
-              label="활성 API 키"
-              value={stats.activeApiKeys ? stats.activeApiKeys.callCount : '없음'}
+              label="Gemini 활성 키"
+              value={
+                stats.activeApiKeysByProvider.gemini
+                  ? stats.activeApiKeysByProvider.gemini.callCount
+                  : '없음'
+              }
               icon={<Key className="h-5 w-5" />}
-              subtitle={stats.activeApiKeys ? `키: ${stats.activeApiKeys.alias}` : '활성 키 미설정'}
+              subtitle={
+                stats.activeApiKeysByProvider.gemini
+                  ? `키: ${stats.activeApiKeysByProvider.gemini.alias}`
+                  : '활성 키 미설정'
+              }
+            />
+            <KpiCard
+              label="OpenAI 활성 키"
+              value={
+                stats.activeApiKeysByProvider.openai
+                  ? stats.activeApiKeysByProvider.openai.callCount
+                  : '없음'
+              }
+              icon={<Key className="h-5 w-5" />}
+              subtitle={
+                stats.activeApiKeysByProvider.openai
+                  ? `키: ${stats.activeApiKeysByProvider.openai.alias}`
+                  : '활성 키 미설정'
+              }
             />
           </>
         )}

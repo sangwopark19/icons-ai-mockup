@@ -1,17 +1,24 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import type { AdminProvider } from '@/lib/api';
+
+function getProviderLabel(provider: AdminProvider): string {
+  return provider === 'openai' ? 'OpenAI' : 'Gemini';
+}
 
 interface AddKeyModalProps {
   isOpen: boolean;
+  provider: AdminProvider;
   onClose: () => void;
   onSubmit: (alias: string, apiKey: string) => Promise<void>;
 }
 
-export function AddKeyModal({ isOpen, onClose, onSubmit }: AddKeyModalProps) {
+export function AddKeyModal({ isOpen, provider, onClose, onSubmit }: AddKeyModalProps) {
   const [alias, setAlias] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [loading, setLoading] = useState(false);
+  const providerLabel = getProviderLabel(provider);
 
   useEffect(() => {
     if (!isOpen) {
@@ -49,13 +56,13 @@ export function AddKeyModal({ isOpen, onClose, onSubmit }: AddKeyModalProps) {
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4"
+        className="mx-4 w-full max-w-md rounded-lg bg-white p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">API 키 추가</h3>
+        <h3 className="mb-4 text-lg font-semibold text-gray-900">{providerLabel} API 키 추가</h3>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="mb-1 block text-sm font-medium text-gray-700">
               키 별칭 <span className="text-red-500">*</span>
             </label>
             <input
@@ -65,11 +72,11 @@ export function AddKeyModal({ isOpen, onClose, onSubmit }: AddKeyModalProps) {
               placeholder="키 별칭"
               required
               disabled={loading}
-              className="w-full h-10 px-3 rounded-lg border border-gray-300 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              className="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="mb-1 block text-sm font-medium text-gray-700">
               API 키 <span className="text-red-500">*</span>
             </label>
             <input
@@ -79,7 +86,7 @@ export function AddKeyModal({ isOpen, onClose, onSubmit }: AddKeyModalProps) {
               placeholder="API 키 입력"
               required
               disabled={loading}
-              className="w-full h-10 px-3 rounded-lg border border-gray-300 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              className="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
             />
           </div>
           <div className="flex justify-end gap-3 pt-2">
@@ -87,14 +94,14 @@ export function AddKeyModal({ isOpen, onClose, onSubmit }: AddKeyModalProps) {
               type="button"
               onClick={onClose}
               disabled={loading}
-              className="inline-flex items-center justify-center h-10 px-4 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 transition-colors"
+              className="inline-flex h-10 items-center justify-center rounded-lg bg-gray-100 px-4 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50"
             >
               취소
             </button>
             <button
               type="submit"
               disabled={loading || !alias.trim() || !apiKey.trim()}
-              className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none transition-colors"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:pointer-events-none disabled:opacity-50"
             >
               {loading && (
                 <svg

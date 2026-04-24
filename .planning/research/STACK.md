@@ -1,157 +1,217 @@
-# Stack Research
+# Technology Stack
 
-**Domain:** Admin panel extension for existing Next.js + Fastify monorepo (AI mockup generation app)
-**Researched:** 2026-03-10
-**Confidence:** MEDIUM — charting ecosystem has active React 19 compatibility issues requiring workarounds; all other areas are HIGH
+**Project:** MockupAI dual-provider image runtime (`Gemini` + `OpenAI GPT Image 2`)
+**Researched:** 2026-04-23
+**Scope:** 기존 Gemini 구현을 유지한 채 OpenAI를 두 번째 provider로 추가하는 데 필요한 stack 변화만 정리
+**Overall confidence:** HIGH
 
-## Context
+## Executive Recommendation
 
-This is an additive milestone. The existing stack is locked:
-- Next.js 16.1.0 + React 19.0.0 + Tailwind CSS 4.0.0
-- Fastify 5.1.0 + Prisma 6.2.0 + BullMQ 5.31.0
-- pnpm 9.15.0 monorepo with Turbo 2.3.0
-- shadcn/ui component pattern (CVA + tailwind-merge + clsx already installed)
-- TanStack React Query 5.62.0 already in place
+이 milestone은 새 framework를 도입하는 작업이 아니다. 기존 monorepo stack인 `Next.js 16 + Fastify 5 + Prisma + PostgreSQL + Redis + BullMQ + Sharp`는 그대로 유지하고, `apps/api`에 공식 `openai` Node SDK를 추가한 뒤 provider-aware routing, provider-aware API key storage, provider-aware generation metadata 저장을 넣는 것이 맞다.
 
-No new framework decisions needed. Research focuses only on admin-specific additions.
+핵심은 "Gemini 교체"가 아니라 "OpenAI 병렬 추가"다. 따라서 `gemini.service.ts`를 혼합 provider 서비스로 키우지 말고, `openai-image.service.ts`를 별도로 추가하고 worker와 admin API key 관리만 provider-aware로 확장해야 한다.
 
----
+OpenAI 쪽 첫 구현은 현재 worker 구조와 맞는 `Image API` 중심이 맞다. 즉 `ip_change`, `sketch_to_real`, one-shot `partial edit`는 `images.edit()`로 시작하고, `style copy`처럼 Gemini의 `thoughtSignature`에 기대던 흐름만 선택적으로 `Responses API`로 추가한다. OpenAI 공식 문서는 단발 이미지 생성/편집에는 `Image API`, 대화형 반복 편집에는 `Responses API`를 권장한다.
+
+## Repo-Specific Constraints Driving The Stack
+
+- `apps/api/src/worker.ts`는 현재 `geminiService`와 단일 활성 API key를 하드코딩한다.
+- `apps/api/src/routes/edit.routes.ts`도 부분 수정을 항상 Gemini로 보낸다.
+- `apps/api/prisma/schema.prisma`의 `ApiKey`는 provider 구분이 없고, `Generation`도 provider/model 추적 컬럼이 없다.
+- `Generation.thoughtSignatures`는 Gemini 전용 상태다. OpenAI state를 여기에 억지로 넣으면 안 된다.
+- 현재 repo에는 OpenAI용 transparent background 후처리 stack이 없다. Gemini의 transparent 지원과 동일하게 취급하면 안 된다.
 
 ## Recommended Stack
 
-### Core Technologies
+### Must-Have Additions
 
-| Technology | Version | Purpose | Why Recommended |
-|------------|---------|---------|-----------------|
-| shadcn/ui | latest CLI (no pinned npm version — copy-paste model) | Admin UI primitives: tables, dialogs, dropdowns, badges, forms | Already installed pattern in this project (CVA + tailwind-merge + clsx). Tailwind v4 + React 19 fully supported as of Feb 2025. Copy-paste model means no breaking upgrades. |
-| @tanstack/react-table | 8.21.3 | Headless table engine for user list, content list, API key list | Already a TanStack shop (React Query 5.x installed). Headless means full Tailwind styling control. shadcn/ui data table is built on top of it. React 19 compatible. v9 is alpha — do not use. |
-| recharts | 2.15.1 (pinned, NOT 3.x) | Charts for dashboard: usage stats, API key usage, queue metrics | shadcn/ui chart components are built on Recharts 2.x. Recharts 3.x has an active blank-chart regression with React 19 (issue #6857, reported Jan 2026, unresolved as of Mar 2026). Pin to 2.15.1. |
-| react-is | 19.0.0 | Required peer dep fix for Recharts 2.x + React 19 | Recharts internally uses react-is but pins an old version. Must install react-is@19.0.0 and add pnpm override so Recharts picks up the correct version. Without this, charts render blank. |
-| @bull-board/api + @bull-board/fastify | 6.20.3 | BullMQ queue monitoring dashboard embedded in Fastify | Official Fastify adapter exists. Exposes a pre-built UI at a configurable path (e.g. `/admin/queues`). Zero custom UI work needed for queue visibility. Actively maintained (published 9 days ago as of research date). |
+| Category | Technology | Version | Purpose | Why |
+|----------|------------|---------|---------|-----|
+| API SDK | `openai` | `6.x` stable, current `6.34.0` on 2026-04-23 | OpenAI Images / Responses 호출 | 공식 JS/TS SDK다. `request ID`, retries, timeout, file upload helpers를 제공해서 현재 `Node 22 + Fastify` backend에 가장 자연스럽다. |
+| Service split | `apps/api/src/services/openai-image.service.ts` | repo file addition | OpenAI 전용 image runtime | `gemini.service.ts`를 provider 혼합 blob으로 만들지 않고, worker dispatch를 단순하게 유지한다. |
+| Provider contract | `ImageProvider` enum in `packages/shared` | repo type addition | request/response/admin payload에 provider 명시 | 생성, 재생성, 편집, 스타일 복사, admin API key 관리가 모두 provider-aware가 되어야 한다. |
+| DB schema | `ApiKey.provider`, `Generation.provider`, `Generation.providerModel`, `Generation.providerTrace` | Prisma schema addition | provider별 key 선택, provider별 재생성/디버깅/히스토리 추적 | 현재 schema로는 OpenAI 요청을 같은 데이터 모델 안에서 안전하게 구분할 수 없다. |
+| Worker dispatch | provider router in `apps/api/src/worker.ts` | repo runtime addition | Gemini/OpenAI 서비스 분기 | 큐와 worker는 그대로 쓰되, job payload에 provider를 넣고 dispatch만 분기하는 것이 가장 작은 변화다. |
 
-### Supporting Libraries
+### Recommended Data Model Changes
 
-| Library | Version | Purpose | When to Use |
-|---------|---------|---------|-------------|
-| @tanstack/react-query | 5.62.0 (already installed) | Server state for admin data fetching — users list, content list, stats | Use for all admin API calls. Provides loading/error states, pagination, refetch intervals for live queue status polling. |
-| react-hook-form | 7.54.0 (already installed) | Forms in admin panel: API key creation, user role changes | Already installed. Use with zod + @hookform/resolvers for admin forms. |
-| zod | 3.24.1 (already installed) | Schema validation for admin form inputs | Already installed. Use for API key forms, user management inputs. |
-| sonner | latest | Toast notifications for admin actions (ban user, delete content, switch API key) | shadcn/ui deprecated its `toast` component in favor of `sonner` as of Feb 2025. Use sonner directly. |
-| lucide-react | 0.468.0 (already installed) | Admin UI icons | Already installed. |
+| Model | Change | Required | Why |
+|-------|--------|----------|-----|
+| `ApiKey` | `provider` enum 추가 (`gemini`, `openai`) | Yes | 현재는 활성 키가 전역 1개라서 OpenAI와 Gemini를 동시에 운영할 수 없다. |
+| `ApiKey` | provider별 활성 상태 관리 | Yes | "활성 키 1개"가 아니라 "provider당 활성 키 1개"가 되어야 worker가 올바른 키를 가져온다. |
+| `Generation` | `provider` enum 추가 | Yes | regenerate, edit, history, admin 모니터링에서 원본 provider를 유지해야 한다. |
+| `Generation` | `providerModel` string 추가 | Yes | 어떤 모델로 생성됐는지 저장해야 같은 provider/model로 재생성이 가능하다. |
+| `Generation` | `providerTrace` JSON 추가 | Yes | OpenAI `request_id`, `response.id`, `revised_prompt`, `image_generation_call_id`, endpoint type를 저장할 곳이 필요하다. |
+| `Generation` | 기존 `thoughtSignatures` 유지 | Yes, backward compatibility | Gemini 히스토리를 깨지 않고 유지해야 한다. 단, OpenAI state는 여기에 저장하지 않는다. |
 
-### Development Tools
+**Recommended `providerTrace` shape**
 
-| Tool | Purpose | Notes |
-|------|---------|-------|
-| Prisma 6.2.0 (already installed) | Schema migration for `role` field on User, new `ApiKey` table | Run `prisma migrate dev` for role enum addition and API key table. |
-| pnpm overrides in root package.json | Force react-is@19.0.0 for Recharts compatibility | Must be at workspace root under `"pnpm": { "overrides": { "react-is": "$react-is" } }` |
+```ts
+type ProviderTrace = {
+  endpoint: 'images.edit' | 'images.generate' | 'responses.create';
+  imageModel: 'gpt-image-2';
+  transportModel?: 'gpt-5.4';
+  requestId?: string;
+  responseId?: string;
+  previousResponseId?: string;
+  imageGenerationCallIds?: string[];
+  revisedPrompt?: string;
+};
+```
 
----
+이 구조면 OpenAI 전용 디버깅 정보는 보존하면서 Gemini 전용 `thoughtSignatures`와 충돌하지 않는다.
+
+### Runtime Integration Points
+
+| File / Area | Change | Why it matters |
+|-------------|--------|----------------|
+| `apps/api/package.json` | `openai` 추가 | 공식 SDK 없이는 multipart image edits, Responses API, request ID 추적을 직접 구현해야 한다. |
+| `apps/api/src/config/index.ts` | `OPENAI_API_KEY` optional, `OPENAI_LOG` optional, `OPENAI_TIMEOUT_MS` optional, `OPENAI_MAX_RETRIES` optional | 운영 디버깅과 smoke test에 필요하다. 단, primary key source는 DB여야 한다. |
+| `apps/api/src/services/admin.service.ts` | `list/create/activate/getActive`를 provider-aware로 변경 | 현재 `getActiveApiKey()`는 Gemini 전용이다. OpenAI 추가 후에도 이 구조를 그대로 두면 잘못된 키를 쓴다. |
+| `apps/api/src/lib/queue.ts` | `GenerationJobData.provider` 추가 | worker가 어떤 service를 호출할지 job 단위로 알아야 한다. |
+| `apps/api/src/worker.ts` | `geminiService` 직접 호출 대신 provider dispatch | 같은 BullMQ queue를 유지하면서 provider만 분기한다. |
+| `apps/api/src/routes/generation.routes.ts` | create/copy-style/regenerate payload에 provider 추가 | 재생성과 스타일 복사는 원본 provider를 따라가야 한다. |
+| `apps/api/src/routes/edit.routes.ts` | edit도 generation.provider 기반으로 분기 | 현재는 Gemini 하드코딩이라 OpenAI 생성 결과를 수정할 수 없다. |
+| `packages/shared/src/types/index.ts` | provider enum과 DTO 확장 | web/api/admin panel이 같은 contract를 공유해야 한다. |
+
+### Buffer/File Handling Recommendation
+
+OpenAI `images.edit()`는 현재 Gemini처럼 base64 중심 설계로 맞추는 것보다, worker가 `Buffer`를 읽고 provider service가 각자 변환하도록 바꾸는 편이 낫다.
+
+- Gemini service: `Buffer -> base64`
+- OpenAI service: `Buffer -> toFile(...)` 또는 `fs.ReadStream`
+
+즉 worker를 provider-neutral하게 만들고, 변환은 provider service 내부로 내리는 것이 맞다. 지금처럼 worker에서 모든 이미지를 무조건 base64로 바꾸면 OpenAI 쪽에서 다시 파일 객체로 감싸야 해서 비효율적이다.
+
+### OpenAI Endpoint Mapping For This Repo
+
+| Feature | OpenAI endpoint | Must/Optional | Why |
+|---------|-----------------|---------------|-----|
+| `ip_change` | `client.images.edit()` | Must | 현재 worker가 single-pass, image-reference 중심이라 가장 잘 맞는다. |
+| `sketch_to_real` | `client.images.edit()` | Must | sketch를 anchor image로 두고 texture reference를 추가하기 쉽다. |
+| one-shot `partial edit` | `client.images.edit()` | Must | 현재 edit route가 대화형이 아니라 단발 요청이다. |
+| `style copy` for OpenAI | `client.responses.create()` + `image_generation` tool | Optional in first rollout, but recommended next | Gemini `thoughtSignature` 대체가 필요하고, OpenAI는 `previous_response_id`와 image generation call linkage를 공식 지원한다. |
+
+## Environment And Config
+
+### Must-Have Config Changes
+
+| Env / Config | Required | Purpose | Recommendation |
+|--------------|----------|---------|----------------|
+| `OPENAI_API_KEY` | Optional for runtime, useful for local smoke test | 초기 검증/비상 fallback | 운영 기본값으로 쓰지 말고 admin-managed DB key가 주 경로가 되게 한다. |
+| `OPENAI_TIMEOUT_MS` | Optional | 큰 이미지 편집 요청 타임아웃 제어 | 기본값 `60000` 권장 |
+| `OPENAI_MAX_RETRIES` | Optional | transient error retry | 기본값 `2` 권장 |
+| `OPENAI_LOG` | Optional | SDK 로그 제어 | 기본값 `warn`, production에서 `debug` 금지 |
+
+### Key Management Recommendation
+
+이 repo는 이미 Gemini key를 DB에 암호화 저장하는 방향이 검증돼 있다. OpenAI도 같은 방식을 따라야 한다.
+
+- `ENCRYPTION_KEY`는 그대로 재사용
+- 새 provider를 위해 별도 암호화 라이브러리를 추가할 필요 없음
+- admin UI/API는 key CRUD 시 `provider`를 받도록 확장
+- "현재 활성 키" UI도 provider별로 1개씩 표시
+
+## Storage And Observability Implications
+
+### Keep As-Is
+
+| Area | Decision | Why |
+|------|----------|-----|
+| file storage | 기존 `UPLOAD_DIR` + `uploadService` 유지 | OpenAI 추가 때문에 새 blob storage가 필요한 상황이 아니다. |
+| image post-processing | 기존 `Sharp` 유지 | 썸네일/파일 저장 처리로 충분하다. |
+| queue | 기존 BullMQ `generation` queue 유지 | provider별 queue 분리는 복잡도만 늘리고 이득이 작다. |
+| admin app structure | 기존 `/admin` 유지 | 별도 OpenAI 운영 앱은 불필요하다. |
+
+### Must Store Or Log For OpenAI
+
+- `provider`
+- `providerModel`
+- OpenAI `_request_id`
+- OpenAI `response.id` if Responses API used
+- `revised_prompt` if returned
+- `image_generation_call_id` if Responses API used
+- 실패한 요청의 endpoint type (`images.edit` or `responses.create`)
+
+이 정보는 admin/debug용으로 중요하다. OpenAI 공식 SDK는 request ID와 logging controls를 제공하므로, 새 observability product를 붙일 필요 없이 기존 server logging과 DB metadata 저장으로 충분하다.
+
+## Optional Additions
+
+| Addition | Add only if | Why it is optional |
+|----------|-------------|--------------------|
+| `openai-files.service.ts` helper | Responses API에서 file ID 재사용 흐름을 실제로 구현할 때 | 초기 rollout은 local file -> `images.edit()`가 더 단순하다. |
+| OpenAI style-copy persistence UX | OpenAI `style copy`를 Gemini와 동등하게 제공할 때 | first rollout의 table-stakes는 아니다. |
+| transparent background post-process pipeline | OpenAI 결과에도 투명 배경을 유지해야 할 때 | 현재 repo에는 이 파이프라인이 없다. 별도 phase로 빼는 게 맞다. |
+
+## What NOT To Add
+
+| Avoid | Why | Use instead |
+|-------|-----|-------------|
+| Separate OpenAI microservice | 현재 monorepo 규모에 과하다 | 기존 `apps/api` 안에 service file 추가 |
+| Separate BullMQ queue for OpenAI | 운영 복잡도만 늘어난다 | 같은 queue + provider field |
+| Mixed `gemini.service.ts` mega-service | provider 로직이 서로 오염된다 | `openai-image.service.ts` 분리 |
+| Env-only OpenAI key management in production | 이미 DB-encrypted key management가 존재한다 | provider-aware `ApiKey` table reuse |
+| New storage backend (`S3`, `R2`, vector DB`) | 이 milestone과 무관하다 | 현재 local storage 유지 |
+| New HTTP client (`axios`, `got`, raw `fetch`) for OpenAI | 공식 SDK가 더 적합하다 | `openai` SDK 사용 |
+| Universal Responses API rewrite | 현재 worker는 single-pass다 | first rollout은 `images.edit()` 중심 |
+| OpenAI transparent background request parameter | `gpt-image-2`는 transparent background를 지원하지 않는다 | OpenAI에서는 옵션 비활성화하거나 별도 후처리 phase로 분리 |
+| Gemini `thoughtSignature` emulation for OpenAI | 공식적으로 같은 개념이 없다 | `providerTrace`에 `response.id` / `previous_response_id` / call IDs 저장 |
+| New frontend UI framework | provider selector와 badge는 기존 UI stack으로 충분하다 | 현재 `apps/web` stack 유지 |
 
 ## Installation
 
 ```bash
-# In apps/web — admin UI additions
-pnpm add recharts@2.15.1 react-is@19.0.0 sonner
-
-# In apps/api — queue monitoring UI
-pnpm add @bull-board/api @bull-board/fastify
-
-# shadcn/ui components (copy-paste via CLI, not npm install)
-# Run from apps/web:
-npx shadcn@latest add chart table badge dialog select
+# API app only
+pnpm --filter @mockup-ai/api add openai@^6.34.0
 ```
 
-**Root package.json pnpm override (required for Recharts + React 19):**
-```json
-{
-  "pnpm": {
-    "overrides": {
-      "react-is": "$react-is"
-    }
-  }
-}
-```
+추가 npm 패키지는 필수 아님. 이번 rollout의 핵심 변화는 dependency 수보다 schema, config, worker dispatch, provider metadata 저장 구조다.
 
----
+## Version Guidance
 
-## Alternatives Considered
+| Package | Recommendation | Notes |
+|---------|----------------|-------|
+| `openai` | stable `6.x` | 2026-04-23 기준 latest는 `6.34.0` 확인. 이후 설치 시에도 stable major 유지 권장 |
+| `Node.js` | keep `22 LTS` | 현재 repo engine과 충돌 없음 |
+| `Prisma` | keep existing major | 이번 milestone은 ORM 교체가 아니라 schema 확장 작업 |
+| `BullMQ` | keep existing major | queue topology 변경 불필요 |
 
-| Recommended | Alternative | When to Use Alternative |
-|-------------|-------------|-------------------------|
-| Recharts 2.15.1 (pinned) | Recharts 3.x | Only when Recharts team resolves React 19 blank-chart regression (issue #6857). Check before upgrading. |
-| Recharts 2.15.1 (pinned) | Victory, Nivo, Chart.js via react-chartjs-2 | If Recharts becomes unmaintainable. Victory has React 19 support. Nivo is feature-rich but heavier. Chart.js adds canvas vs SVG context switch. Not worth switching since shadcn/ui chart components are already Recharts-based. |
-| @bull-board/fastify | Custom queue status API endpoint | If Bull Board UI is too opinionated or adds too much bundle. Custom polling API is simpler but loses retry/remove job UI. Bull Board adds value for admin use. |
-| TanStack Table v8 | AG Grid Community | Only if tables need 100k+ row virtual scrolling. AG Grid is heavier and has a different license model. For admin panels with <10k rows, TanStack Table + react-virtual is sufficient. |
-| shadcn/ui copy-paste pattern | Tremor | Tremor is built on Recharts + Radix and provides pre-assembled chart+card components. But this project already has a shadcn/ui foundation. Mixing two component systems adds complexity. |
-| Next.js middleware for /admin RBAC | next-auth / clerk | This project uses a custom JWT system on Fastify. Adding next-auth would duplicate the auth layer. Use Next.js `middleware.ts` to read the existing JWT from cookies/headers and check `role === 'admin'`. |
+## Rollout Notes
 
----
-
-## What NOT to Use
-
-| Avoid | Why | Use Instead |
-|-------|-----|-------------|
-| Recharts 3.x | Active blank-chart regression with React 19 as of Jan 2026 (issue #6857). Downgrading to 3.3 is the only documented workaround, but shadcn/ui chart components are built on 2.x. | Recharts 2.15.1 with react-is pnpm override |
-| Admin framework (AdminJS, React Admin, Refine) | Introduces a full framework on top of an existing Next.js app. Routing, auth, and data layer would conflict with the existing system. Significant lock-in. | Custom /admin routes in Next.js with shadcn/ui + TanStack Table |
-| Separate Next.js app for admin | Out of scope per PROJECT.md. Duplicates auth, build config, and deployment complexity. | /admin/* routes in the existing apps/web Next.js app |
-| localStorage for admin JWT | XSS vulnerability. The existing app already uses a cookie/header approach for JWT. | HTTP-only cookie or Authorization header pattern (match existing auth store) |
-| TanStack Table v9 alpha | Pre-release (v9.0.0-alpha.17 as of Mar 2026). API is unstable. | TanStack Table v8.21.3 |
-| shadcn/ui toast component | Deprecated in Feb 2025 in favor of sonner | sonner |
-
----
-
-## Stack Patterns by Variant
-
-**For the dashboard stats page:**
-- Use shadcn/ui Chart (Recharts 2.15.1 wrapper) for usage graphs
-- Use shadcn/ui Card for metric tiles (total users, jobs today, storage used)
-- Use TanStack React Query with `refetchInterval: 30000` for live queue status polling
-
-**For user management, content management, API key tables:**
-- Use TanStack Table v8 for headless table logic (sorting, filtering, pagination)
-- Use shadcn/ui Table primitives for rendering
-- Use TanStack React Query for server-side data fetching
-- Implement server-side pagination — do not fetch all rows client-side
-
-**For queue monitoring:**
-- Mount @bull-board/fastify at `/admin/queues` in Fastify
-- Protect the route with an admin-only Fastify preHandler hook (check JWT role)
-- Iframe or redirect from Next.js /admin to the Bull Board URL
-
-**For /admin route protection in Next.js:**
-- Use `middleware.ts` at the app root
-- Decode the JWT (verify signature with JWT_SECRET)
-- Check `payload.role === 'admin'`
-- Redirect to `/` or `/403` if not admin
-- This runs at the edge — no server round-trip needed
-
----
-
-## Version Compatibility
-
-| Package A | Compatible With | Notes |
-|-----------|-----------------|-------|
-| recharts@2.15.1 | React 19.0.0 | Requires react-is@19.0.0 pnpm override. Without override, charts render blank. |
-| @tanstack/react-table@8.21.3 | React 19.0.0 | Fully compatible. React Compiler compatibility is not guaranteed but React Compiler is not used in this project. |
-| @bull-board/fastify@6.20.3 | Fastify 5.x, BullMQ 5.x | Check peer deps on install — bull-board 6.x explicitly supports BullMQ 5.x. |
-| shadcn/ui (CLI latest) | Tailwind CSS 4.0.0, React 19.0.0 | Full support since Feb 2025. OKLCH colors, tw-animate-css, no forwardRef. |
-| sonner | React 19.0.0 | Designed for React 18+. React 19 compatible. |
-
----
+- OpenAI GPT Image 모델 사용 전 조직 검증이 필요할 수 있다.
+- OpenAI `Responses API`에서 top-level `model`은 `gpt-image-2`가 아니라 `gpt-5.4` 같은 text-capable model이어야 한다.
+- `gpt-image-2`는 transparent background를 지원하지 않는다.
+- mask 기반 edit를 나중에 붙일 경우 mask와 원본은 같은 포맷/크기여야 하고 alpha channel이 필요하다.
 
 ## Sources
 
-- [Recharts issue #6857 — blank chart with React 19.2.3](https://github.com/recharts/recharts/issues/6857) — confirmed active regression, unresolved Jan 2026 (LOW-MEDIUM confidence on current fix status)
-- [Fix for Recharts + React 19 — pnpm override approach](https://www.bstefanski.com/blog/recharts-empty-chart-react-19) — MEDIUM confidence (2.x-specific fix, verified approach)
-- [Recharts 3.0 migration guide](https://github.com/recharts/recharts/wiki/3.0-migration-guide) — confirms 3.x breaking changes
-- [shadcn/ui Tailwind v4 docs](https://ui.shadcn.com/docs/tailwind-v4) — HIGH confidence (official docs, Feb 2025)
-- [shadcn/ui React 19 docs](https://ui.shadcn.com/docs/react-19) — HIGH confidence (official docs)
-- [TanStack Table releases — v8.21.3 stable, v9 alpha](https://github.com/TanStack/table/releases) — HIGH confidence
-- [TanStack Table React 19 compatibility note](https://tanstack.dev/table/latest/docs/faq) — MEDIUM confidence (React Compiler caveat noted)
-- [@bull-board/fastify npm](https://www.npmjs.com/package/@bull-board/fastify) — HIGH confidence (v6.20.3, actively maintained)
-- [Bull Board GitHub — Fastify adapter confirmed](https://github.com/felixmosh/bull-board) — HIGH confidence
+### Repo inspection
 
----
-*Stack research for: Admin panel — Next.js 16 + Fastify 5 + React 19 + Tailwind 4 monorepo*
-*Researched: 2026-03-10*
+- `apps/api/package.json`
+- `apps/api/src/worker.ts`
+- `apps/api/src/services/gemini.service.ts`
+- `apps/api/src/services/admin.service.ts`
+- `apps/api/src/services/generation.service.ts`
+- `apps/api/src/routes/generation.routes.ts`
+- `apps/api/src/routes/edit.routes.ts`
+- `apps/api/src/lib/queue.ts`
+- `apps/api/src/config/index.ts`
+- `apps/api/prisma/schema.prisma`
+- `packages/shared/src/types/index.ts`
+- `.env.example`
+
+### Official / primary sources
+
+- OpenAI GPT Image 2 model page: https://developers.openai.com/api/docs/models/gpt-image-2
+- OpenAI image generation guide: https://developers.openai.com/api/docs/guides/image-generation
+- OpenAI image generation tool guide: https://developers.openai.com/api/docs/guides/tools-image-generation
+- OpenAI Node SDK repo: https://github.com/openai/openai-node
+- OpenAI npm package page: https://www.npmjs.com/package/openai
+
+### Key verified points from official sources
+
+- `Image API` is the recommended path for single-image generate/edit flows; `Responses API` is recommended for conversational editable experiences.
+- `gpt-image-2` is available on `v1/images/generations` and `v1/images/edits`; current snapshot shown on 2026-04-23 is `gpt-image-2-2026-04-21`.
+- `gpt-image-2` does not currently support transparent backgrounds.
+- Responses image tool uses a mainline model such as `gpt-5.4` at the top level and supports `previous_response_id`.
+- OpenAI Node SDK exposes file upload helpers, request IDs, retry/timeout controls, and logging configuration.

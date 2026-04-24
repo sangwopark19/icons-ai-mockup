@@ -1,10 +1,17 @@
 import { prisma } from '../lib/prisma.js';
-import { addGenerationJob, GenerationJobData } from '../lib/queue.js';
+import { addGenerationJob } from '../lib/queue.js';
 import { Prisma, type Generation, type GeneratedImage } from '@prisma/client';
-import type { ThoughtSignatureData } from '@mockup-ai/shared/types';
+import type { GenerationProvider, ThoughtSignatureData } from '@mockup-ai/shared/types';
 import fs from 'fs/promises';
 import path from 'path';
 import { config } from '../config/index.js';
+import { assertStoragePathWithinPrefixes, uploadService } from './upload.service.js';
+
+const DEFAULT_GENERATION_PROVIDER: GenerationProvider = 'gemini';
+const DEFAULT_PROVIDER_MODELS: Record<GenerationProvider, string> = {
+  gemini: 'gemini-3-pro-image-preview',
+  openai: 'gpt-image-2',
+};
 
 /**
  * 생성 요청 입력 타입
@@ -12,6 +19,8 @@ import { config } from '../config/index.js';
 interface CreateGenerationInput {
   projectId: string;
   mode: 'ip_change' | 'sketch_to_real';
+  provider?: GenerationProvider;
+  providerModel?: string;
   styleReferenceId?: string;
   sourceImagePath?: string;
   characterId?: string;
@@ -46,6 +55,65 @@ interface CreateGenerationInput {
 
 type HardwareSpecOption = NonNullable<CreateGenerationInput['options']>['hardwareSpecs'];
 
+async function validateOwnedStoragePath(
+  value: string | undefined,
+  allowedPrefixes: string[],
+  label: string
+): Promise<string | undefined> {
+  if (!value) return undefined;
+
+  const normalized = assertStoragePathWithinPrefixes(
+    value,
+    allowedPrefixes,
+    `${label} 이미지 경로 권한이 없습니다`
+  );
+
+  if (!(await uploadService.fileExists(normalized))) {
+    throw new Error(`${label} 이미지를 찾을 수 없습니다`);
+  }
+
+  return normalized;
+}
+
+async function validateGenerationImagePaths(
+  userId: string,
+  projectId: string,
+  paths: {
+    sourceImagePath?: string;
+    characterImagePath?: string;
+    textureImagePath?: string;
+  }
+): Promise<{
+  sourceImagePath?: string;
+  characterImagePath?: string;
+  textureImagePath?: string;
+}> {
+  const projectUploadPrefix = `uploads/${userId}/${projectId}`;
+  const characterUploadPrefix = `characters/${userId}`;
+
+  const [sourceImagePath, characterImagePath, textureImagePath] = await Promise.all([
+    validateOwnedStoragePath(paths.sourceImagePath, [projectUploadPrefix], '원본'),
+    validateOwnedStoragePath(paths.characterImagePath, [characterUploadPrefix], '캐릭터'),
+    validateOwnedStoragePath(paths.textureImagePath, [projectUploadPrefix], '텍스처'),
+  ]);
+
+  return { sourceImagePath, characterImagePath, textureImagePath };
+}
+
+function resolveGenerationProvider(input: CreateGenerationInput): {
+  provider: GenerationProvider;
+  providerModel: string;
+} {
+  const provider = input.provider ?? DEFAULT_GENERATION_PROVIDER;
+  const providerModel = input.providerModel?.trim() || DEFAULT_PROVIDER_MODELS[provider];
+
+  if (providerModel !== DEFAULT_PROVIDER_MODELS[provider]) {
+    throw new Error('providerModel이 provider와 일치하지 않습니다');
+  }
+
+  return { provider, providerModel };
+}
+
 /**
  * 생성 서비스
  */
@@ -65,7 +133,7 @@ export class GenerationService {
 
     // 캐릭터 이미지 경로 결정 (IP 변경 모드일 경우)
     let characterImagePath: string | undefined = input.characterImagePath;
-    
+
     // characterId가 제공된 경우 DB에서 가져옴
     if (input.mode === 'ip_change' && input.characterId && !characterImagePath) {
       const character = await prisma.iPCharacter.findFirst({
@@ -81,6 +149,13 @@ export class GenerationService {
 
     const userInstructions = input.options?.userInstructions?.trim();
     const hardwareSpecInput = input.options?.hardwareSpecInput?.trim();
+    const { provider, providerModel } = resolveGenerationProvider(input);
+    const validatedPaths = await validateGenerationImagePaths(userId, input.projectId, {
+      sourceImagePath: input.sourceImagePath,
+      characterImagePath,
+      textureImagePath: input.textureImagePath,
+    });
+    characterImagePath = validatedPaths.characterImagePath;
 
     // 생성 기록 저장
     const generation = await prisma.generation.create({
@@ -90,12 +165,14 @@ export class GenerationService {
         sourceImageId: null, // 나중에 업데이트
         mode: input.mode,
         status: 'pending',
+        provider,
+        providerModel,
         styleReferenceId: input.styleReferenceId || null,
         userInstructions: userInstructions || null,
         promptData: {
-          sourceImagePath: input.sourceImagePath,
+          sourceImagePath: validatedPaths.sourceImagePath,
           characterImagePath,
-          textureImagePath: input.textureImagePath,
+          textureImagePath: validatedPaths.textureImagePath,
           userPrompt: input.prompt,
           regenerationMeta: input.regenerationMeta,
         },
@@ -120,10 +197,12 @@ export class GenerationService {
       userId,
       projectId: input.projectId,
       mode: input.mode,
+      provider,
+      providerModel,
       styleReferenceId: input.styleReferenceId,
-      sourceImagePath: input.sourceImagePath,
+      sourceImagePath: validatedPaths.sourceImagePath,
       characterImagePath,
-      textureImagePath: input.textureImagePath,
+      textureImagePath: validatedPaths.textureImagePath,
       prompt: input.prompt,
       options: {
         preserveStructure: input.options?.preserveStructure ?? false,
@@ -169,25 +248,35 @@ export class GenerationService {
   /**
    * 이미지 선택
    */
-  async selectImage(userId: string, generationId: string, imageId: string): Promise<GeneratedImage | null> {
+  async selectImage(
+    userId: string,
+    generationId: string,
+    imageId: string
+  ): Promise<GeneratedImage | null> {
     const generation = await this.getById(userId, generationId);
     if (!generation) {
       throw new Error('생성 기록을 찾을 수 없습니다');
     }
 
-    // 모든 이미지 선택 해제
-    await prisma.generatedImage.updateMany({
-      where: { generationId },
-      data: { isSelected: false },
-    });
+    return prisma.$transaction(async (tx) => {
+      const image = await tx.generatedImage.findFirst({
+        where: { id: imageId, generationId },
+      });
 
-    // 선택된 이미지 표시
-    const image = await prisma.generatedImage.update({
-      where: { id: imageId },
-      data: { isSelected: true },
-    });
+      if (!image) {
+        return null;
+      }
 
-    return image;
+      await tx.generatedImage.updateMany({
+        where: { generationId },
+        data: { isSelected: false },
+      });
+
+      return tx.generatedImage.update({
+        where: { id: image.id },
+        data: { isSelected: true },
+      });
+    });
   }
 
   /**
@@ -241,6 +330,8 @@ export class GenerationService {
     const regenerationInput = {
       projectId: original.projectId,
       mode: original.mode,
+      provider: original.provider,
+      providerModel: original.providerModel,
       sourceImagePath: promptData.sourceImagePath as string | undefined,
       characterId: original.ipCharacterId || undefined,
       characterImagePath: promptData.characterImagePath as string | undefined,
@@ -258,7 +349,9 @@ export class GenerationService {
         fixedViewpoint: (options.fixedViewpoint as boolean | undefined) ?? false,
         removeShadows: (options.removeShadows as boolean | undefined) ?? false,
         userInstructions:
-          (options.userInstructions as string | undefined) ?? original.userInstructions ?? undefined,
+          (options.userInstructions as string | undefined) ??
+          original.userInstructions ??
+          undefined,
         hardwareSpecInput: (options.hardwareSpecInput as string | undefined) ?? undefined,
         hardwareSpecs: (options.hardwareSpecs as HardwareSpecOption | undefined) ?? undefined,
         outputCount: (options.outputCount as number | undefined) ?? 2,
@@ -365,6 +458,8 @@ export class GenerationService {
     return this.create(userId, {
       projectId: original.projectId,
       mode: original.mode,
+      provider: original.provider,
+      providerModel: original.providerModel,
       styleReferenceId: original.id,
       sourceImagePath: input.sourceImagePath || (promptData.sourceImagePath as string | undefined),
       characterId: original.ipCharacterId || undefined,
@@ -380,7 +475,9 @@ export class GenerationService {
         fixedViewpoint: (options.fixedViewpoint as boolean | undefined) ?? false,
         removeShadows: (options.removeShadows as boolean | undefined) ?? false,
         userInstructions:
-          (options.userInstructions as string | undefined) ?? original.userInstructions ?? undefined,
+          (options.userInstructions as string | undefined) ??
+          original.userInstructions ??
+          undefined,
         hardwareSpecInput: (options.hardwareSpecInput as string | undefined) ?? undefined,
         hardwareSpecs: (options.hardwareSpecs as HardwareSpecOption | undefined) ?? undefined,
         outputCount: (options.outputCount as number | undefined) ?? 2,
@@ -442,7 +539,7 @@ export class GenerationService {
         if (image.thumbnailPath) {
           await fs.unlink(path.join(config.uploadDir, image.thumbnailPath));
         }
-        
+
         // 디렉토리 경로 추출 (첫 번째 이미지에서만)
         if (!generationDir) {
           generationDir = path.dirname(fullPath);

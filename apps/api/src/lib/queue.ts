@@ -9,6 +9,8 @@ export interface GenerationJobData {
   userId: string;
   projectId: string;
   mode: 'ip_change' | 'sketch_to_real';
+  provider: 'gemini' | 'openai';
+  providerModel: string;
   styleReferenceId?: string;
   sourceImagePath?: string;
   characterImagePath?: string;

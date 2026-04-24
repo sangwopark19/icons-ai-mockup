@@ -27,6 +27,16 @@ const STATUS_LABELS: Record<string, string> = {
   failed: '실패',
 };
 
+const PROVIDER_LABELS = {
+  gemini: 'Gemini',
+  openai: 'OpenAI',
+} as const;
+
+const PROVIDER_BADGE_CLASSES = {
+  gemini: 'bg-emerald-100 text-emerald-800',
+  openai: 'bg-sky-100 text-sky-800',
+} as const;
+
 function formatDate(dateStr: string): string {
   const date = new Date(dateStr);
   return new Intl.DateTimeFormat('ko-KR', {
@@ -148,9 +158,7 @@ export default function GenerationTable() {
     try {
       await adminApi.retryGeneration(accessToken, id);
       // Optimistically update status to pending
-      setGenerations((prev) =>
-        prev.map((g) => (g.id === id ? { ...g, status: 'pending' } : g))
-      );
+      setGenerations((prev) => prev.map((g) => (g.id === id ? { ...g, status: 'pending' } : g)));
       await fetchData();
     } catch (err) {
       console.error('Retry failed:', err);
@@ -176,18 +184,15 @@ export default function GenerationTable() {
     <div className="space-y-4">
       {/* Status tabs + search bar */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex gap-1 flex-wrap">
+        <div className="flex flex-wrap gap-1">
           {STATUS_TABS.map((tab) => {
-            const count =
-              tab.value === undefined
-                ? totalCount
-                : (statusCounts[tab.value] ?? 0);
+            const count = tab.value === undefined ? totalCount : (statusCounts[tab.value] ?? 0);
             const isActive = statusFilter === tab.value;
             return (
               <button
                 key={tab.label}
                 onClick={() => handleStatusTabClick(tab.value)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                   isActive
                     ? 'bg-[var(--accent)] text-white'
                     : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
@@ -195,7 +200,7 @@ export default function GenerationTable() {
               >
                 {tab.label}
                 <span
-                  className={`inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full text-xs font-bold ${
+                  className={`inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full px-1 text-xs font-bold ${
                     isActive
                       ? 'bg-white/20 text-white'
                       : 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]'
@@ -214,7 +219,7 @@ export default function GenerationTable() {
             value={emailSearch}
             onChange={(e) => setEmailSearch(e.target.value)}
             onKeyDown={handleEmailSearchKeyDown}
-            className="px-3 py-1.5 text-sm border border-[var(--border-default)] rounded-lg bg-[var(--bg-primary)] text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] min-w-[200px]"
+            className="min-w-[200px] rounded-lg border border-[var(--border-default)] bg-[var(--bg-primary)] px-3 py-1.5 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
           />
         </div>
       </div>
@@ -223,23 +228,26 @@ export default function GenerationTable() {
       <div className="relative overflow-x-auto rounded-lg border border-[var(--border-default)]">
         <table className="w-full border-collapse text-sm">
           <thead>
-            <tr className="bg-[var(--bg-elevated)] border-b border-[var(--border-default)]">
-              <th className="text-left px-4 py-3 font-semibold text-[var(--text-secondary)]">
+            <tr className="border-b border-[var(--border-default)] bg-[var(--bg-elevated)]">
+              <th className="px-4 py-3 text-left font-semibold text-[var(--text-secondary)]">
                 사용자 이메일
               </th>
-              <th className="text-left px-4 py-3 font-semibold text-[var(--text-secondary)]">
+              <th className="px-4 py-3 text-left font-semibold text-[var(--text-secondary)]">
                 모드
               </th>
-              <th className="text-left px-4 py-3 font-semibold text-[var(--text-secondary)]">
+              <th className="px-4 py-3 text-left font-semibold text-[var(--text-secondary)]">
+                Provider
+              </th>
+              <th className="px-4 py-3 text-left font-semibold text-[var(--text-secondary)]">
                 상태
               </th>
-              <th className="text-left px-4 py-3 font-semibold text-[var(--text-secondary)]">
+              <th className="px-4 py-3 text-left font-semibold text-[var(--text-secondary)]">
                 생성일
               </th>
-              <th className="text-left px-4 py-3 font-semibold text-[var(--text-secondary)]">
+              <th className="px-4 py-3 text-left font-semibold text-[var(--text-secondary)]">
                 에러 메시지
               </th>
-              <th className="text-left px-4 py-3 font-semibold text-[var(--text-secondary)]">
+              <th className="px-4 py-3 text-left font-semibold text-[var(--text-secondary)]">
                 액션
               </th>
             </tr>
@@ -247,10 +255,10 @@ export default function GenerationTable() {
           <tbody className="relative">
             {loading && (
               <tr>
-                <td colSpan={6} className="p-0">
-                  <div className="absolute inset-0 bg-white/60 z-10 flex items-center justify-center">
+                <td colSpan={7} className="p-0">
+                  <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60">
                     <svg
-                      className="h-6 w-6 animate-spin text-brand-500"
+                      className="text-brand-500 h-6 w-6 animate-spin"
                       xmlns="http://www.w3.org/2000/svg"
                       fill="none"
                       viewBox="0 0 24 24"
@@ -275,7 +283,7 @@ export default function GenerationTable() {
             )}
             {generations.length === 0 && !loading ? (
               <tr>
-                <td colSpan={6} className="text-center py-12 text-[var(--text-tertiary)]">
+                <td colSpan={7} className="py-12 text-center text-[var(--text-tertiary)]">
                   생성 작업이 없습니다
                 </td>
               </tr>
@@ -283,13 +291,27 @@ export default function GenerationTable() {
               generations.map((gen) => (
                 <tr
                   key={gen.id}
-                  className="border-b border-[var(--border-default)] hover:bg-[var(--bg-elevated)] transition-colors"
+                  className="border-b border-[var(--border-default)] transition-colors hover:bg-[var(--bg-elevated)]"
                 >
                   <td className="px-4 py-3 text-[var(--text-primary)]">{gen.userEmail}</td>
                   <td className="px-4 py-3 text-[var(--text-secondary)]">{gen.mode}</td>
                   <td className="px-4 py-3">
+                    <div className="flex min-w-36 flex-col gap-1">
+                      <span
+                        className={`inline-flex w-fit items-center rounded px-2 py-0.5 text-xs font-medium ${
+                          PROVIDER_BADGE_CLASSES[gen.provider]
+                        }`}
+                      >
+                        {PROVIDER_LABELS[gen.provider]}
+                      </span>
+                      <span className="text-xs text-[var(--text-tertiary)]">
+                        {gen.providerModel}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
                     <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                      className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${
                         STATUS_BADGE_CLASSES[gen.status] ?? 'bg-gray-100 text-gray-700'
                       }`}
                     >
@@ -299,9 +321,9 @@ export default function GenerationTable() {
                   <td className="px-4 py-3 text-[var(--text-secondary)]">
                     {formatDate(gen.createdAt)}
                   </td>
-                  <td className="px-4 py-3 text-[var(--text-secondary)] max-w-[200px]">
+                  <td className="max-w-[200px] px-4 py-3 text-[var(--text-secondary)]">
                     {gen.status === 'failed' && gen.errorMessage ? (
-                      <span className="truncate block text-red-600" title={gen.errorMessage}>
+                      <span className="block truncate text-red-600" title={gen.errorMessage}>
                         {gen.errorMessage.length > 60
                           ? gen.errorMessage.slice(0, 60) + '...'
                           : gen.errorMessage}
@@ -315,14 +337,14 @@ export default function GenerationTable() {
                       <div className="flex gap-2">
                         <button
                           onClick={() => setSelectedGeneration(gen)}
-                          className="px-2 py-1 text-xs font-medium rounded bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                          className="rounded bg-[var(--bg-secondary)] px-2 py-1 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)]"
                         >
                           상세보기
                         </button>
                         <button
                           onClick={() => handleRetry(gen.id)}
                           disabled={retryingIds.has(gen.id)}
-                          className="px-2 py-1 text-xs font-medium rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          className="rounded bg-blue-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           재시도
                         </button>
@@ -338,11 +360,11 @@ export default function GenerationTable() {
 
       {/* Pagination */}
       {pagination.totalPages > 1 && (
-        <div className="flex justify-center items-center gap-1">
+        <div className="flex items-center justify-center gap-1">
           <button
             onClick={() => setPage(page - 1)}
             disabled={page <= 1}
-            className="h-8 w-8 flex items-center justify-center rounded text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="flex h-8 w-8 items-center justify-center rounded text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-elevated)] disabled:cursor-not-allowed disabled:opacity-40"
           >
             &lsaquo;
           </button>
@@ -350,7 +372,7 @@ export default function GenerationTable() {
             p === '...' ? (
               <span
                 key={`ellipsis-${idx}`}
-                className="h-8 w-8 flex items-center justify-center text-sm text-[var(--text-tertiary)]"
+                className="flex h-8 w-8 items-center justify-center text-sm text-[var(--text-tertiary)]"
               >
                 ...
               </span>
@@ -358,7 +380,7 @@ export default function GenerationTable() {
               <button
                 key={p}
                 onClick={() => setPage(p as number)}
-                className={`h-8 w-8 flex items-center justify-center rounded text-sm font-medium transition-colors ${
+                className={`flex h-8 w-8 items-center justify-center rounded text-sm font-medium transition-colors ${
                   p === pagination.page
                     ? 'bg-brand-500 text-white'
                     : 'text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]'
@@ -371,7 +393,7 @@ export default function GenerationTable() {
           <button
             onClick={() => setPage(page + 1)}
             disabled={page >= pagination.totalPages}
-            className="h-8 w-8 flex items-center justify-center rounded text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="flex h-8 w-8 items-center justify-center rounded text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-elevated)] disabled:cursor-not-allowed disabled:opacity-40"
           >
             &rsaquo;
           </button>
