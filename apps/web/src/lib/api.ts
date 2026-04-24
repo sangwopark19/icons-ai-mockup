@@ -304,8 +304,11 @@ export const imageApi = {
 /**
  * API 키 타입
  */
+export type AdminProvider = 'gemini' | 'openai';
+
 export interface AdminApiKey {
   id: string;
+  provider: AdminProvider;
   alias: string;
   maskedKey: string;
   isActive: boolean;
@@ -323,7 +326,7 @@ export interface DashboardStats {
   failedJobCount: number;
   queueDepth: number;
   storageBytes: number;
-  activeApiKeys: { alias: string; callCount: number } | null;
+  activeApiKeysByProvider: Record<AdminProvider, { alias: string; callCount: number } | null>;
   userCountYesterday: number;
   generationCountYesterday: number;
   failedJobCountYesterday: number;
@@ -358,6 +361,12 @@ export interface AdminGeneration {
   status: string;
   errorMessage: string | null;
   retryCount: number;
+  provider: AdminProvider;
+  providerModel: string;
+  openaiRequestId: string | null;
+  openaiResponseId: string | null;
+  openaiImageCallId: string | null;
+  openaiRevisedPrompt: string | null;
   promptData: unknown;
   options: unknown;
   createdAt: string;
@@ -530,27 +539,36 @@ export const adminApi = {
       { token }
     ),
 
-  listApiKeys: (token: string) =>
-    request<{ success: true; data: AdminApiKey[] }>('/api/admin/api-keys', { token }),
+  listApiKeys: (token: string, provider: AdminProvider) =>
+    request<{ success: true; data: AdminApiKey[] }>(
+      `/api/admin/api-keys?provider=${encodeURIComponent(provider)}`,
+      { token }
+    ),
 
-  createApiKey: (token: string, data: { alias: string; apiKey: string }) =>
+  createApiKey: (token: string, data: { provider: AdminProvider; alias: string; apiKey: string }) =>
     request<{ success: true; data: AdminApiKey }>('/api/admin/api-keys', {
       method: 'POST',
       token,
       body: JSON.stringify(data),
     }),
 
-  deleteApiKey: (token: string, id: string) =>
-    request<{ success: true; message: string }>(`/api/admin/api-keys/${id}`, {
-      method: 'DELETE',
-      token,
-    }),
+  deleteApiKey: (token: string, provider: AdminProvider, id: string) =>
+    request<{ success: true; message: string }>(
+      `/api/admin/api-keys/${id}?provider=${encodeURIComponent(provider)}`,
+      {
+        method: 'DELETE',
+        token,
+      }
+    ),
 
-  activateApiKey: (token: string, id: string) =>
-    request<{ success: true; data: AdminApiKey }>(`/api/admin/api-keys/${id}/activate`, {
-      method: 'PATCH',
-      token,
-    }),
+  activateApiKey: (token: string, provider: AdminProvider, id: string) =>
+    request<{ success: true; data: AdminApiKey }>(
+      `/api/admin/api-keys/${id}/activate?provider=${encodeURIComponent(provider)}`,
+      {
+        method: 'PATCH',
+        token,
+      }
+    ),
 };
 
 export default { authApi, projectApi, imageApi, adminApi };
