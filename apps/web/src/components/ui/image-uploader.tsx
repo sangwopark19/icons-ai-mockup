@@ -100,6 +100,27 @@ export function ImageUploader({
   };
 
   /**
+   * 붙여넣기 이미지 처리
+   */
+  const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+    const file = Array.from(e.clipboardData.items)
+      .find((item) => item.kind === 'file' && item.type.startsWith('image/'))
+      ?.getAsFile();
+
+    if (!file) return;
+
+    e.preventDefault();
+
+    const extension = file.type.split('/')[1] || 'png';
+    const pastedFile = new File([file], `pasted-image-${Date.now()}.${extension}`, {
+      type: file.type,
+      lastModified: Date.now(),
+    });
+
+    handleFile(pastedFile);
+  };
+
+  /**
    * 클릭 핸들러
    */
   const handleClick = () => {
@@ -137,10 +158,12 @@ export function ImageUploader({
       )}
 
       <div
+        tabIndex={0}
         onClick={handleClick}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
+        onPaste={handlePaste}
         className={cn(
           'relative flex min-h-[200px] cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-6 transition-all',
           'border-[var(--border-default)] bg-[var(--bg-tertiary)]',
@@ -170,7 +193,7 @@ export function ImageUploader({
             </div>
             <div className="text-center">
               <p className="font-medium text-[var(--text-primary)]">
-                이미지를 드래그하거나 클릭하세요
+                이미지를 드래그하거나 클릭하거나 붙여넣으세요
               </p>
               {description && (
                 <p className="mt-1 text-sm text-[var(--text-tertiary)]">{description}</p>
