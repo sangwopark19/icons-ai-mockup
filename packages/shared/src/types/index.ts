@@ -129,7 +129,7 @@ export const CreateGenerationSchema = z.object({
 
 export type CreateGenerationInput = z.infer<typeof CreateGenerationSchema>;
 
-export const GenerationSchema = z.object({
+export const InternalGenerationSchema = z.object({
   id: z.string().uuid(),
   projectId: z.string().uuid(),
   ipCharacterId: z.string().uuid().nullable(),
@@ -149,6 +149,12 @@ export const GenerationSchema = z.object({
   openaiResponseId: z.string().nullable(),
   openaiImageCallId: z.string().nullable(),
   openaiRevisedPrompt: z.string().nullable(),
+});
+
+export type InternalGeneration = z.infer<typeof InternalGenerationSchema>;
+
+export const GenerationSchema = InternalGenerationSchema.omit({
+  providerTrace: true,
 });
 
 export type Generation = z.infer<typeof GenerationSchema>;

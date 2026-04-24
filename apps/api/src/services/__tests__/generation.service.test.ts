@@ -25,6 +25,13 @@ vi.mock('../../lib/queue.js', () => ({
   addGenerationJob: vi.fn(),
 }));
 
+vi.mock('../../services/upload.service.js', () => ({
+  assertStoragePathWithinPrefixes: vi.fn((relativePath: string) => relativePath),
+  uploadService: {
+    fileExists: vi.fn().mockResolvedValue(true),
+  },
+}));
+
 describe('GenerationService - provider contract', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -44,9 +51,32 @@ describe('GenerationService - provider contract', () => {
         provider: 'gemini',
         providerModel: 'gpt-image-2',
         sourceImagePath: 'uploads/u1/proj1/source.png',
-        characterImagePath: 'uploads/u1/proj1/character.png',
+        characterImagePath: 'characters/u1/character.png',
       })
     ).rejects.toThrow('providerModel이 provider와 일치하지 않습니다');
+
+    expect(vi.mocked(prisma.generation.create)).not.toHaveBeenCalled();
+    expect(vi.mocked(addGenerationJob)).not.toHaveBeenCalled();
+  });
+
+  it('rejects image paths outside the authenticated user/project boundary', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { addGenerationJob } = await import('../../lib/queue.js');
+    const { assertStoragePathWithinPrefixes } = await import('../../services/upload.service.js');
+    const { generationService } = await import('../generation.service.js');
+
+    vi.mocked(prisma.project.findFirst).mockResolvedValue({ id: 'proj1', userId: 'u1' } as any);
+    vi.mocked(assertStoragePathWithinPrefixes).mockImplementationOnce(() => {
+      throw new Error('원본 이미지 경로 권한이 없습니다');
+    });
+
+    await expect(
+      generationService.create('u1', {
+        projectId: 'proj1',
+        mode: 'sketch_to_real',
+        sourceImagePath: 'uploads/other/proj1/source.png',
+      })
+    ).rejects.toThrow('원본 이미지 경로 권한이 없습니다');
 
     expect(vi.mocked(prisma.generation.create)).not.toHaveBeenCalled();
     expect(vi.mocked(addGenerationJob)).not.toHaveBeenCalled();

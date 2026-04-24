@@ -55,8 +55,10 @@ vi.mock('../../lib/queue.js', () => ({
 
 // Mock uploadService
 vi.mock('../../services/upload.service.js', () => ({
+  assertStoragePathWithinPrefixes: vi.fn((relativePath: string) => relativePath),
   uploadService: {
     deleteFile: vi.fn(),
+    fileExists: vi.fn().mockResolvedValue(true),
   },
 }));
 
@@ -434,9 +436,9 @@ const mockGeneration = {
   providerModel: 'gemini-3-pro-image-preview',
   styleReferenceId: 'style-gen1',
   promptData: {
-    sourceImagePath: '/path/to/img.png',
-    characterImagePath: '/path/to/character.png',
-    textureImagePath: '/path/to/texture.png',
+    sourceImagePath: 'uploads/u1/proj1/img.png',
+    characterImagePath: 'characters/u1/character.png',
+    textureImagePath: 'uploads/u1/proj1/texture.png',
     userPrompt: 'retry this prompt',
   },
   options: {
@@ -622,9 +624,9 @@ describe('AdminService - retryGeneration', () => {
         provider: 'gemini',
         providerModel: 'gemini-3-pro-image-preview',
         styleReferenceId: 'style-gen1',
-        sourceImagePath: '/path/to/img.png',
-        characterImagePath: '/path/to/character.png',
-        textureImagePath: '/path/to/texture.png',
+        sourceImagePath: 'uploads/u1/proj1/img.png',
+        characterImagePath: 'characters/u1/character.png',
+        textureImagePath: 'uploads/u1/proj1/texture.png',
         prompt: 'retry this prompt',
         options: expect.objectContaining({
           preserveStructure: true,

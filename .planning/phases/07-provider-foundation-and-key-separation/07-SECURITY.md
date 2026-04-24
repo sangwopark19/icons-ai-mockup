@@ -1,8 +1,8 @@
 ---
 phase: 07
 slug: provider-foundation-and-key-separation
-status: blocked
-threats_open: 3
+status: verified
+threats_open: 0
 asvs_level: 1
 created: 2026-04-24
 ---
@@ -30,13 +30,13 @@ created: 2026-04-24
 
 | Threat ID | Category | Component | Disposition | Mitigation | Status |
 |-----------|----------|-----------|-------------|------------|--------|
-| T-07-01 | Tampering / Information Disclosure | Generation image path ingestion and worker file reads | mitigate | Require ownership/boundary validation or DB-owned upload IDs before paths are persisted and read. Current code still accepts raw path strings and passes them to `uploadService.readFile()`. | open |
+| T-07-01 | Tampering / Information Disclosure | Generation image path ingestion and worker file reads | mitigate | Storage paths are normalized, traversal/absolute paths are rejected, create/retry paths verify authenticated user/project prefixes, and worker reads go through safe storage resolution. | closed |
 | T-07-02 | Tampering / Authorization | Generated image selection | mitigate | `selectImage()` checks `{ id: imageId, generationId }` inside a transaction before clearing and setting selection. | closed |
 | T-07-03 | Availability / Integrity | OpenAI unsupported runtime guard | mitigate | Worker validates provider/model lineage and throws the OpenAI unsupported-runtime error before key lookup, status transition, or file reads. | closed |
 | T-07-04 | Integrity | Admin retry provider/input preservation | mitigate | Admin retry requeues saved provider/model, style reference, prompt, paths, and generation options. | closed |
 | T-07-05 | Integrity | Provider/model mismatch | mitigate | Service rejects provider/model pair mismatches and worker compares queued providerModel to the persisted generation providerModel. | closed |
-| T-07-06 | Elevation of Privilege / Integrity | Provider-scoped active API key exclusivity | mitigate | Application transaction scopes activation by provider, but no database uniqueness constraint prevents concurrent double-active rows. | open |
-| T-07-07 | Information Disclosure | `providerTrace` in shared/client-facing schema | mitigate | Current admin/web generation payloads omit `providerTrace`, but exported shared `GenerationSchema` still includes the backend-only trace field. | open |
+| T-07-06 | Elevation of Privilege / Integrity | Provider-scoped active API key exclusivity | mitigate | Application activation remains provider-scoped, and SQL migration `20260424093000_provider_foundation_security_constraints` adds a partial unique index for one active key per provider. | closed |
+| T-07-07 | Information Disclosure | `providerTrace` in shared/client-facing schema | mitigate | Shared schemas now split `InternalGenerationSchema` from client-safe `GenerationSchema`; `providerTrace` stays internal-only. | closed |
 
 *Status: open · closed*
 *Disposition: mitigate (implementation required) · accept (documented risk) · transfer (third-party)*
@@ -47,13 +47,13 @@ created: 2026-04-24
 
 | Threat ID | Evidence |
 |-----------|----------|
-| T-07-01 | `apps/api/src/routes/generation.routes.ts:13` accepts `sourceImagePath`, `characterImagePath`, and `textureImagePath` as strings; `apps/api/src/services/generation.service.ts:120` persists those values and `apps/api/src/services/generation.service.ts:143` enqueues them; `apps/api/src/worker.ts:87` reads queued paths; `apps/api/src/services/upload.service.ts:231` only joins `baseDir` and the caller-provided relative path. |
-| T-07-02 | `apps/api/src/services/generation.service.ts:204` loads the user-owned generation, then `apps/api/src/services/generation.service.ts:209` wraps selection in a transaction and checks `id` plus `generationId` before update. |
+| T-07-01 | `apps/api/src/services/upload.service.ts:25` normalizes storage paths and rejects absolute/traversal input; `apps/api/src/services/generation.service.ts:58` checks allowed user/project prefixes and file existence before persistence/queueing; `apps/api/src/services/admin.service.ts:149` applies the same checks before retry requeue; `apps/api/src/services/upload.service.ts:287` resolves reads/deletes/filesystem checks under `baseDir`. |
+| T-07-02 | `apps/api/src/services/generation.service.ts:256` loads the user-owned generation, then `apps/api/src/services/generation.service.ts:261` wraps selection in a transaction and checks `id` plus `generationId` before update. |
 | T-07-03 | `apps/api/src/worker.ts:61` validates queued provider, `apps/api/src/worker.ts:65` validates queued providerModel, and `apps/api/src/worker.ts:72` rejects OpenAI before `getActiveApiKey()` at `apps/api/src/worker.ts:77`. |
-| T-07-04 | `apps/api/src/services/admin.service.ts:456` requeues the failed generation with saved provider, providerModel, styleReferenceId, promptData paths, `userPrompt`, and options. |
-| T-07-05 | `apps/api/src/services/generation.service.ts:57` resolves and validates provider/model pairs; `apps/api/src/worker.ts:65` fails jobs whose queued providerModel differs from the DB record. |
-| T-07-06 | `apps/api/src/services/admin.service.ts:685` deactivates and activates keys inside a provider-scoped transaction, but `apps/api/prisma/schema.prisma:247` only declares indexes and not a unique active-key constraint. |
-| T-07-07 | `apps/api/src/services/admin.service.ts:403`, `apps/web/src/lib/api.ts:358`, and `apps/web/src/components/admin/generation-detail-modal.tsx:56` keep current admin payloads/UI trace-safe; `packages/shared/src/types/index.ts:132` still exports `providerTrace` in `GenerationSchema`. |
+| T-07-04 | `apps/api/src/services/admin.service.ts:486` requeues the failed generation with saved provider, providerModel, styleReferenceId, promptData paths, `userPrompt`, and options. |
+| T-07-05 | `apps/api/src/services/generation.service.ts:103` resolves and validates provider/model pairs; `apps/api/src/worker.ts:65` fails jobs whose queued providerModel differs from the DB record. |
+| T-07-06 | `apps/api/src/services/admin.service.ts:715` deactivates and activates keys inside a provider-scoped transaction; `apps/api/prisma/migrations/20260424093000_provider_foundation_security_constraints/migration.sql:27` cleans up duplicate active rows and `apps/api/prisma/migrations/20260424093000_provider_foundation_security_constraints/migration.sql:43` creates `api_keys_one_active_per_provider`. |
+| T-07-07 | `apps/api/src/services/admin.service.ts:427`, `apps/web/src/lib/api.ts:358`, and `apps/web/src/components/admin/generation-detail-modal.tsx:56` keep current admin payloads/UI trace-safe; `packages/shared/src/types/index.ts:132` defines internal persisted generation data and `packages/shared/src/types/index.ts:156` omits `providerTrace` from client-safe `GenerationSchema`. |
 
 ---
 
@@ -70,6 +70,7 @@ No accepted risks.
 | Audit Date | Threats Total | Closed | Open | Run By |
 |------------|---------------|--------|------|--------|
 | 2026-04-24 | 7 | 4 | 3 | Codex gsd-secure-phase |
+| 2026-04-24 | 7 | 7 | 0 | Codex security fix |
 
 ---
 
@@ -78,18 +79,18 @@ No accepted risks.
 | Metric | Count |
 |--------|-------|
 | Threats found | 7 |
-| Closed | 4 |
-| Open | 3 |
+| Closed | 7 |
+| Open | 0 |
 
-## Blocking Follow-Up
+## Closure Notes
 
-Phase advancement is security-blocked until `threats_open: 0`.
+Phase 07 security gate is clear.
 
-| Threat ID | Required Closure |
+| Threat ID | Closure |
 |-----------|------------------|
-| T-07-01 | Validate submitted image paths against authenticated user/project ownership before persisting/enqueueing, or replace path inputs with DB-owned upload/image IDs. |
-| T-07-06 | Add a database-level constraint or migration strategy that enforces one active API key per provider, or explicitly document this as an accepted risk. |
-| T-07-07 | Split internal persisted generation schema from client-safe generation response schema, remove `providerTrace` from exported client-facing schema, or explicitly document this as an accepted risk. |
+| T-07-01 | Implemented path normalization, prefix ownership checks, file existence checks, and storage read resolution under `baseDir`. |
+| T-07-06 | Added idempotent SQL migration with duplicate-active cleanup and a partial unique index on active API keys by provider. |
+| T-07-07 | Split internal/client-safe shared generation schemas so `providerTrace` is no longer part of exported client-safe `GenerationSchema`. |
 
 ---
 
@@ -97,7 +98,7 @@ Phase advancement is security-blocked until `threats_open: 0`.
 
 - [x] All threats have a disposition (mitigate / accept / transfer)
 - [x] Accepted risks documented in Accepted Risks Log
-- [ ] `threats_open: 0` confirmed
-- [ ] `status: verified` set in frontmatter
+- [x] `threats_open: 0` confirmed
+- [x] `status: verified` set in frontmatter
 
-**Approval:** pending
+**Approval:** verified 2026-04-24

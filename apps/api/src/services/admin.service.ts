@@ -1,7 +1,7 @@
 import { UserRole, UserStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import { generationQueue, addGenerationJob, type GenerationJobData } from '../lib/queue.js';
-import { uploadService } from './upload.service.js';
+import { assertStoragePathWithinPrefixes, uploadService } from './upload.service.js';
 import { encrypt, decrypt, getEncryptionKey } from '../lib/crypto.js';
 
 export type ApiKeyProvider = 'gemini' | 'openai';
@@ -144,6 +144,29 @@ function getProviderMissingKeyMessage(provider: ApiKeyProvider): string {
 
 function getProviderKeyNotFoundMessage(provider: ApiKeyProvider): string {
   return `${API_KEY_PROVIDER_LABELS[provider]} API 키를 찾을 수 없습니다`;
+}
+
+async function validateRetryStoragePath(
+  value: unknown,
+  allowedPrefixes: string[],
+  label: string
+): Promise<string | undefined> {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'string') {
+    throw new Error(`${label} 이미지 경로가 유효하지 않습니다`);
+  }
+
+  const normalized = assertStoragePathWithinPrefixes(
+    value,
+    allowedPrefixes,
+    `${label} 이미지 경로 권한이 없습니다`
+  );
+
+  if (!(await uploadService.fileExists(normalized))) {
+    throw new Error(`${label} 이미지를 찾을 수 없습니다`);
+  }
+
+  return normalized;
 }
 
 async function getDashboardJobCounts(): Promise<DashboardJobCounts> {
@@ -452,6 +475,13 @@ export class AdminService {
 
     const promptData = (generation.promptData as Record<string, unknown>) ?? {};
     const options = (generation.options as Record<string, unknown>) ?? {};
+    const projectUploadPrefix = `uploads/${generation.project.userId}/${generation.projectId}`;
+    const characterUploadPrefix = `characters/${generation.project.userId}`;
+    const [sourceImagePath, characterImagePath, textureImagePath] = await Promise.all([
+      validateRetryStoragePath(promptData.sourceImagePath, [projectUploadPrefix], '원본'),
+      validateRetryStoragePath(promptData.characterImagePath, [characterUploadPrefix], '캐릭터'),
+      validateRetryStoragePath(promptData.textureImagePath, [projectUploadPrefix], '텍스처'),
+    ]);
 
     await addGenerationJob({
       generationId: generation.id,
@@ -461,9 +491,9 @@ export class AdminService {
       provider: generation.provider,
       providerModel: generation.providerModel,
       styleReferenceId: generation.styleReferenceId ?? undefined,
-      sourceImagePath: promptData.sourceImagePath as string | undefined,
-      characterImagePath: promptData.characterImagePath as string | undefined,
-      textureImagePath: promptData.textureImagePath as string | undefined,
+      sourceImagePath,
+      characterImagePath,
+      textureImagePath,
       prompt: promptData.userPrompt as string | undefined,
       options: {
         preserveStructure: (options.preserveStructure as boolean | undefined) ?? false,

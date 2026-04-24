@@ -5,6 +5,7 @@ import type { GenerationProvider, ThoughtSignatureData } from '@mockup-ai/shared
 import fs from 'fs/promises';
 import path from 'path';
 import { config } from '../config/index.js';
+import { assertStoragePathWithinPrefixes, uploadService } from './upload.service.js';
 
 const DEFAULT_GENERATION_PROVIDER: GenerationProvider = 'gemini';
 const DEFAULT_PROVIDER_MODELS: Record<GenerationProvider, string> = {
@@ -53,6 +54,51 @@ interface CreateGenerationInput {
 }
 
 type HardwareSpecOption = NonNullable<CreateGenerationInput['options']>['hardwareSpecs'];
+
+async function validateOwnedStoragePath(
+  value: string | undefined,
+  allowedPrefixes: string[],
+  label: string
+): Promise<string | undefined> {
+  if (!value) return undefined;
+
+  const normalized = assertStoragePathWithinPrefixes(
+    value,
+    allowedPrefixes,
+    `${label} 이미지 경로 권한이 없습니다`
+  );
+
+  if (!(await uploadService.fileExists(normalized))) {
+    throw new Error(`${label} 이미지를 찾을 수 없습니다`);
+  }
+
+  return normalized;
+}
+
+async function validateGenerationImagePaths(
+  userId: string,
+  projectId: string,
+  paths: {
+    sourceImagePath?: string;
+    characterImagePath?: string;
+    textureImagePath?: string;
+  }
+): Promise<{
+  sourceImagePath?: string;
+  characterImagePath?: string;
+  textureImagePath?: string;
+}> {
+  const projectUploadPrefix = `uploads/${userId}/${projectId}`;
+  const characterUploadPrefix = `characters/${userId}`;
+
+  const [sourceImagePath, characterImagePath, textureImagePath] = await Promise.all([
+    validateOwnedStoragePath(paths.sourceImagePath, [projectUploadPrefix], '원본'),
+    validateOwnedStoragePath(paths.characterImagePath, [characterUploadPrefix], '캐릭터'),
+    validateOwnedStoragePath(paths.textureImagePath, [projectUploadPrefix], '텍스처'),
+  ]);
+
+  return { sourceImagePath, characterImagePath, textureImagePath };
+}
 
 function resolveGenerationProvider(input: CreateGenerationInput): {
   provider: GenerationProvider;
@@ -104,6 +150,12 @@ export class GenerationService {
     const userInstructions = input.options?.userInstructions?.trim();
     const hardwareSpecInput = input.options?.hardwareSpecInput?.trim();
     const { provider, providerModel } = resolveGenerationProvider(input);
+    const validatedPaths = await validateGenerationImagePaths(userId, input.projectId, {
+      sourceImagePath: input.sourceImagePath,
+      characterImagePath,
+      textureImagePath: input.textureImagePath,
+    });
+    characterImagePath = validatedPaths.characterImagePath;
 
     // 생성 기록 저장
     const generation = await prisma.generation.create({
@@ -118,9 +170,9 @@ export class GenerationService {
         styleReferenceId: input.styleReferenceId || null,
         userInstructions: userInstructions || null,
         promptData: {
-          sourceImagePath: input.sourceImagePath,
+          sourceImagePath: validatedPaths.sourceImagePath,
           characterImagePath,
-          textureImagePath: input.textureImagePath,
+          textureImagePath: validatedPaths.textureImagePath,
           userPrompt: input.prompt,
           regenerationMeta: input.regenerationMeta,
         },
@@ -148,9 +200,9 @@ export class GenerationService {
       provider,
       providerModel,
       styleReferenceId: input.styleReferenceId,
-      sourceImagePath: input.sourceImagePath,
+      sourceImagePath: validatedPaths.sourceImagePath,
       characterImagePath,
-      textureImagePath: input.textureImagePath,
+      textureImagePath: validatedPaths.textureImagePath,
       prompt: input.prompt,
       options: {
         preserveStructure: input.options?.preserveStructure ?? false,

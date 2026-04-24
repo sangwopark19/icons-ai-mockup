@@ -22,6 +22,44 @@ interface UploadResult {
   metadata: ImageMetadata;
 }
 
+export function normalizeStoragePath(relativePath: string): string {
+  const trimmed = relativePath.trim();
+  const slashPath = trimmed.replaceAll('\\', '/');
+
+  if (!slashPath || path.isAbsolute(slashPath) || path.win32.isAbsolute(trimmed)) {
+    throw new Error('파일 경로가 유효하지 않습니다');
+  }
+
+  if (slashPath.split('/').includes('..')) {
+    throw new Error('파일 경로가 유효하지 않습니다');
+  }
+
+  const normalized = path.posix.normalize(slashPath);
+  if (normalized === '.' || normalized.startsWith('../') || normalized.includes('/../')) {
+    throw new Error('파일 경로가 유효하지 않습니다');
+  }
+
+  return normalized;
+}
+
+export function assertStoragePathWithinPrefixes(
+  relativePath: string,
+  allowedPrefixes: string[],
+  message = '파일 경로 권한이 없습니다'
+): string {
+  const normalized = normalizeStoragePath(relativePath);
+  const normalizedPrefixes = allowedPrefixes.map((prefix) => normalizeStoragePath(prefix));
+  const allowed = normalizedPrefixes.some(
+    (prefix) => normalized === prefix || normalized.startsWith(`${prefix}/`)
+  );
+
+  if (!allowed) {
+    throw new Error(message);
+  }
+
+  return normalized;
+}
+
 /**
  * 업로드 서비스
  */
@@ -217,7 +255,7 @@ export class UploadService {
    * 파일 삭제
    */
   async deleteFile(relativePath: string): Promise<void> {
-    const fullPath = path.join(this.baseDir, relativePath);
+    const fullPath = this.resolveStoragePath(relativePath);
     try {
       await fs.unlink(fullPath);
     } catch {
@@ -229,7 +267,7 @@ export class UploadService {
    * 파일 읽기
    */
   async readFile(relativePath: string): Promise<Buffer> {
-    const fullPath = path.join(this.baseDir, relativePath);
+    const fullPath = this.resolveStoragePath(relativePath);
     return fs.readFile(fullPath);
   }
 
@@ -237,13 +275,25 @@ export class UploadService {
    * 파일 존재 확인
    */
   async fileExists(relativePath: string): Promise<boolean> {
-    const fullPath = path.join(this.baseDir, relativePath);
+    const fullPath = this.resolveStoragePath(relativePath);
     try {
       await fs.access(fullPath);
       return true;
     } catch {
       return false;
     }
+  }
+
+  private resolveStoragePath(relativePath: string): string {
+    const normalized = normalizeStoragePath(relativePath);
+    const basePath = path.resolve(this.baseDir);
+    const fullPath = path.resolve(basePath, normalized);
+
+    if (fullPath !== basePath && !fullPath.startsWith(`${basePath}${path.sep}`)) {
+      throw new Error('파일 경로가 유효하지 않습니다');
+    }
+
+    return fullPath;
   }
 }
 

@@ -246,5 +246,7 @@ model ApiKey {
 
   @@index([isActive])
   @@index([provider, isActive])
+  // Partial unique index `api_keys_one_active_per_provider` is enforced in SQL migration
+  // because Prisma schema does not model filtered unique indexes.
   @@map("api_keys")
 }
