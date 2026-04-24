@@ -94,7 +94,16 @@ export default function ProjectDetailPage() {
                   className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
                 >
                   <span>⚡</span>
-                  <span>IP 변경</span>
+                  <span>IP 변경 v1</span>
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href={`/projects/${projectId}/ip-change/openai`}
+                  className="flex items-center gap-3 rounded-lg border border-brand-500/30 px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+                >
+                  <span>⚡</span>
+                  <span>IP 변경 v2</span>
                 </Link>
               </li>
               <li>
@@ -160,11 +169,36 @@ export default function ProjectDetailPage() {
               <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-yellow-500/10 text-2xl">
                 ⚡
               </div>
-              <h3 className="mb-2 text-lg font-medium text-[var(--text-primary)] group-hover:text-brand-500">
-                IP 변경
-              </h3>
+              <div className="mb-2 flex items-center gap-2">
+                <h3 className="text-lg font-medium text-[var(--text-primary)] group-hover:text-brand-500">
+                  IP 변경 v1
+                </h3>
+                <span className="rounded border border-[var(--border-default)] px-1.5 py-0.5 text-xs font-semibold text-[var(--text-tertiary)]">
+                  v1
+                </span>
+              </div>
               <p className="text-sm text-[var(--text-tertiary)]">
-                기존 제품의 캐릭터를 새로운 IP로 변경합니다
+                기존 방식으로 제품의 캐릭터를 변경합니다.
+              </p>
+            </Link>
+
+            <Link
+              href={`/projects/${projectId}/ip-change/openai`}
+              className="group rounded-xl border border-brand-500/60 bg-[var(--bg-secondary)] p-6 transition-all hover:border-brand-400 hover:shadow-lg"
+            >
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-brand-500/10 text-2xl">
+                ⚡
+              </div>
+              <div className="mb-2 flex items-center gap-2">
+                <h3 className="text-lg font-medium text-[var(--text-primary)] group-hover:text-brand-500">
+                  IP 변경 v2
+                </h3>
+                <span className="rounded bg-brand-500/10 px-1.5 py-0.5 text-xs font-semibold text-brand-400">
+                  v2
+                </span>
+              </div>
+              <p className="text-sm text-[var(--text-tertiary)]">
+                제품 구조와 시점을 더 강하게 유지하며 새 캐릭터를 적용합니다.
               </p>
             </Link>
 
