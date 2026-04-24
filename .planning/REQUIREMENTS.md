@@ -18,7 +18,7 @@ Requirements for milestone v1.1 OpenAI GPT Image 2 Dual Provider.
 
 - [x] **OIP-01**: User can generate two OpenAI GPT Image 2 IP Change candidates from a source product image and a character reference image.
 - [x] **OIP-02**: User can request OpenAI IP Change with structure, viewpoint, background, and hardware-preservation options.
-- [ ] **OIP-03**: User can save, review, and download OpenAI IP Change results through the existing project history flow.
+- [x] **OIP-03**: User can save, review, and download OpenAI IP Change results through the existing project history flow.
 
 ### OpenAI Sketch To Real
 
