@@ -217,3 +217,32 @@ describe('GenerationService - selectImage', () => {
     });
   });
 });
+
+describe('GenerationService - copyStyle', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('rejects OpenAI v2 style copy before enqueueing a failing worker job', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { addGenerationJob } = await import('../../lib/queue.js');
+    const { generationService } = await import('../generation.service.js');
+
+    vi.mocked(prisma.generation.findFirst).mockResolvedValue({
+      id: 'gen1',
+      project: { userId: 'u1' },
+      images: [],
+      provider: 'openai',
+      mode: 'ip_change',
+    } as any);
+
+    await expect(
+      generationService.copyStyle('u1', 'gen1', {
+        characterImagePath: 'characters/u1/character.png',
+      })
+    ).rejects.toThrow('OpenAI IP 변경 v2는 스타일 복사를 지원하지 않습니다');
+
+    expect(vi.mocked(prisma.generation.create)).not.toHaveBeenCalled();
+    expect(vi.mocked(addGenerationJob)).not.toHaveBeenCalled();
+  });
+});

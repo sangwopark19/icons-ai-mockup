@@ -154,8 +154,24 @@ export default function GenerationResultPage() {
     const validToken = await getValidAccessToken();
     if (!validToken) return;
 
-    const endpoint = `/api/images/${imageId}/download`;
-    window.open(`${API_URL}${endpoint}?token=${validToken}`, '_blank');
+    const response = await apiFetch(`/api/images/${imageId}/download`, {
+      token: validToken,
+    });
+
+    if (!response.ok) {
+      setSaveMessage('다운로드에 실패했습니다. 잠시 후 다시 시도해주세요.');
+      return;
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${imageId}.png`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
   };
 
   /**

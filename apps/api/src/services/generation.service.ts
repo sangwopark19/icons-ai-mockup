@@ -480,6 +480,10 @@ export class GenerationService {
       throw new Error('새 캐릭터 또는 제품 이미지를 제공해야 합니다');
     }
 
+    if (original.provider === 'openai') {
+      throw new Error('OpenAI IP 변경 v2는 스타일 복사를 지원하지 않습니다');
+    }
+
     const promptData = (original.promptData as Record<string, unknown>) || {};
     const options = (original.options as Record<string, unknown>) || {};
 

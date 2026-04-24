@@ -20,6 +20,10 @@ vi.mock('openai', () => ({
   toFile: mocks.toFile,
 }));
 
+const pngBase64 = Buffer.from([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00,
+]).toString('base64');
+
 describe('OpenAIImageService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -47,8 +51,8 @@ describe('OpenAIImageService', () => {
 
     const result = await openaiImageService.generateIPChange(
       'sk-test',
-      Buffer.from('source').toString('base64'),
-      Buffer.from('character').toString('base64'),
+      pngBase64,
+      pngBase64,
       {
         preserveStructure: true,
         transparentBackground: false,
@@ -72,8 +76,8 @@ describe('OpenAIImageService', () => {
 
     await openaiImageService.generateIPChange(
       'sk-test',
-      Buffer.from('source').toString('base64'),
-      Buffer.from('character').toString('base64'),
+      pngBase64,
+      pngBase64,
       {
         preserveStructure: true,
         transparentBackground: true,
@@ -124,8 +128,8 @@ describe('OpenAIImageService', () => {
 
     await openaiImageService.generateIPChange(
       'sk-test',
-      Buffer.from('source').toString('base64'),
-      Buffer.from('character').toString('base64'),
+      pngBase64,
+      pngBase64,
       {
         preserveStructure: true,
         transparentBackground: false,

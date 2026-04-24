@@ -53,6 +53,11 @@ const CopyStyleSchema = z.object({
   sourceImagePath: z.string().optional(),
 });
 
+const HistoryQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+});
+
 /**
  * 생성 라우트
  */
@@ -271,14 +276,14 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get('/project/:projectId/history', async (request, reply) => {
     const user = (request as any).user;
     const { projectId } = request.params as { projectId: string };
-    const { page = '1', limit = '20' } = request.query as { page?: string; limit?: string };
+    const { page, limit } = HistoryQuerySchema.parse(request.query);
 
     try {
       const { generations, total } = await generationService.getProjectHistory(
         user.id,
         projectId,
-        parseInt(page),
-        parseInt(limit)
+        page,
+        limit
       );
 
       return reply.send({
@@ -295,10 +300,10 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
             : null,
         })),
         pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
+          page,
+          limit,
           total,
-          totalPages: Math.ceil(total / parseInt(limit)),
+          totalPages: Math.ceil(total / limit),
         },
       });
     } catch (error) {

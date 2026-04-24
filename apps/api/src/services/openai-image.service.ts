@@ -59,17 +59,21 @@ export class OpenAIImageService {
     const responseIds: string[] = [];
     const revisedPrompts: string[] = [];
     const calls: Array<Record<string, unknown>> = [];
+    const sourceBuffer = this.decodeBase64Image(sourceImageBase64);
+    const characterBuffer = this.decodeBase64Image(characterImageBase64);
+    const sourceMimeType = this.detectMimeType(sourceBuffer);
+    const characterMimeType = this.detectMimeType(characterBuffer);
 
     for (let index = 0; index < 2; index++) {
       const sourceImage = await toFile(
-        this.decodeBase64Image(sourceImageBase64),
-        `source-product-${index + 1}.png`,
-        { type: 'image/png' }
+        sourceBuffer,
+        `source-product-${index + 1}.${this.extensionForMimeType(sourceMimeType)}`,
+        { type: sourceMimeType }
       );
       const characterImage = await toFile(
-        this.decodeBase64Image(characterImageBase64),
-        `character-reference-${index + 1}.png`,
-        { type: 'image/png' }
+        characterBuffer,
+        `character-reference-${index + 1}.${this.extensionForMimeType(characterMimeType)}`,
+        { type: characterMimeType }
       );
 
       const response = (await client.images.edit({
@@ -187,6 +191,33 @@ Output:
   private decodeBase64Image(value: string): Buffer {
     const normalized = value.includes(',') ? value.split(',').pop() || value : value;
     return Buffer.from(normalized, 'base64');
+  }
+
+  private detectMimeType(buffer: Buffer): 'image/png' | 'image/jpeg' | 'image/webp' {
+    if (
+      buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+    ) {
+      return 'image/png';
+    }
+
+    if (buffer.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff]))) {
+      return 'image/jpeg';
+    }
+
+    if (
+      buffer.subarray(0, 4).toString('ascii') === 'RIFF' &&
+      buffer.subarray(8, 12).toString('ascii') === 'WEBP'
+    ) {
+      return 'image/webp';
+    }
+
+    throw new Error('지원하지 않는 이미지 형식입니다');
+  }
+
+  private extensionForMimeType(mimeType: 'image/png' | 'image/jpeg' | 'image/webp'): string {
+    if (mimeType === 'image/jpeg') return 'jpg';
+    if (mimeType === 'image/webp') return 'webp';
+    return 'png';
   }
 
   private buildHardwarePrompt(options: OpenAIIPChangeOptions): string {
