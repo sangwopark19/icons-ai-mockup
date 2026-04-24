@@ -123,6 +123,14 @@ enum GenerationStatus {
   @@map("generation_status")
 }
 
+/// AI Provider 열거형
+enum Provider {
+  gemini
+  openai
+
+  @@map("provider")
+}
+
 /// 생성 기록 테이블
 model Generation {
   id            String           @id @default(uuid())
@@ -131,6 +139,9 @@ model Generation {
   sourceImageId String?          @map("source_image_id")
   mode          GenerationMode
   status        GenerationStatus @default(pending)
+  provider      Provider         @default(gemini)
+  providerModel String           @default("gemini-3-pro-image-preview") @map("provider_model")
+  providerTrace Json?            @map("provider_trace")
   promptData    Json             @map("prompt_data")
   options       Json             @default("{}")
   retryCount    Int              @default(0) @map("retry_count")
@@ -138,9 +149,13 @@ model Generation {
   createdAt     DateTime         @default(now()) @map("created_at")
   completedAt   DateTime?        @map("completed_at")
 
-  thoughtSignatures Json?   @map("thought_signatures")
-  styleReferenceId  String? @map("style_reference_id")
-  userInstructions  String? @map("user_instructions")
+  thoughtSignatures   Json?   @map("thought_signatures")
+  styleReferenceId    String? @map("style_reference_id")
+  userInstructions    String? @map("user_instructions")
+  openaiRequestId     String? @map("openai_request_id")
+  openaiResponseId    String? @map("openai_response_id")
+  openaiImageCallId   String? @map("openai_image_call_id")
+  openaiRevisedPrompt String? @map("openai_revised_prompt")
 
   project        Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
   ipCharacter    IPCharacter?     @relation(fields: [ipCharacterId], references: [id], onDelete: SetNull)
@@ -221,6 +236,7 @@ model ImageHistory {
 model ApiKey {
   id           String    @id @default(uuid())
   alias        String
+  provider     Provider  @default(gemini)
   encryptedKey String    @map("encrypted_key")
   maskedKey    String    @map("masked_key")
   isActive     Boolean   @default(false) @map("is_active")
@@ -229,5 +245,6 @@ model ApiKey {
   createdAt    DateTime  @default(now()) @map("created_at")
 
   @@index([isActive])
+  @@index([provider, isActive])
   @@map("api_keys")
 }
