@@ -191,7 +191,7 @@ export default function IPChangePage() {
             >
               ← 뒤로
             </Link>
-            <h1 className="text-lg font-semibold text-[var(--text-primary)]">⚡ IP 변경</h1>
+            <h1 className="text-lg font-semibold text-[var(--text-primary)]">⚡ IP 변경 v1</h1>
           </div>
         </div>
       </header>
@@ -199,7 +199,7 @@ export default function IPChangePage() {
       {/* 메인 */}
       <main className="mx-auto max-w-5xl px-4 py-8">
         <p className="mb-8 text-[var(--text-secondary)]">
-          기존 제품의 캐릭터를 새로운 IP로 변경합니다
+          기존 방식으로 제품의 캐릭터를 변경합니다.
         </p>
 
         {error && <div className="mb-6 rounded-lg bg-red-500/10 p-4 text-red-500">{error}</div>}
