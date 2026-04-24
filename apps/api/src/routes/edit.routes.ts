@@ -47,17 +47,33 @@ const editRoutes: FastifyPluginAsync = async (fastify) => {
       });
     }
 
+    if (generation.provider !== 'gemini') {
+      return reply.code(400).send({
+        success: false,
+        error: {
+          code: 'UNSUPPORTED_PROVIDER_EDIT',
+          message: `${generation.provider} provider는 현재 부분 수정을 지원하지 않습니다.`,
+        },
+      });
+    }
+
     try {
       // 원본 이미지 로드
       const originalBuffer = await uploadService.readFile(selectedImage.filePath);
       const originalBase64 = originalBuffer.toString('base64');
 
       // DB에서 활성 API 키 조회
-      const { id: activeKeyId, key: activeApiKey } = await adminService.getActiveApiKey();
+      const { id: activeKeyId, key: activeApiKey } = await adminService.getActiveApiKey(
+        generation.provider
+      );
 
       // Gemini API로 부분 수정
-      await adminService.incrementCallCount(activeKeyId);
-      const editResult = await geminiService.generateEdit(activeApiKey, originalBase64, body.prompt);
+      await adminService.incrementCallCount(generation.provider, activeKeyId);
+      const editResult = await geminiService.generateEdit(
+        activeApiKey,
+        originalBase64,
+        body.prompt
+      );
 
       // 새 생성 기록 저장
       const newGeneration = await prisma.generation.create({
@@ -67,6 +83,8 @@ const editRoutes: FastifyPluginAsync = async (fastify) => {
           sourceImageId: selectedImage.id,
           mode: generation.mode,
           status: 'completed',
+          provider: generation.provider,
+          providerModel: generation.providerModel,
           promptData: {
             ...(generation.promptData as object),
             editPrompt: body.prompt,
