@@ -94,6 +94,12 @@ export interface ListGenerationsResult {
     status: string;
     errorMessage: string | null;
     retryCount: number;
+    provider: ApiKeyProvider;
+    providerModel: string;
+    openaiRequestId: string | null;
+    openaiResponseId: string | null;
+    openaiImageCallId: string | null;
+    openaiRevisedPrompt: string | null;
     promptData: unknown;
     options: unknown;
     createdAt: Date;
@@ -401,6 +407,12 @@ export class AdminService {
         status: g.status,
         errorMessage: g.errorMessage,
         retryCount: g.retryCount,
+        provider: g.provider,
+        providerModel: g.providerModel,
+        openaiRequestId: g.openaiRequestId,
+        openaiResponseId: g.openaiResponseId,
+        openaiImageCallId: g.openaiImageCallId,
+        openaiRevisedPrompt: g.openaiRevisedPrompt,
         promptData: g.promptData,
         options: g.options,
         createdAt: g.createdAt,
@@ -606,7 +618,11 @@ export class AdminService {
     );
   }
 
-  async createApiKey(provider: ApiKeyProvider, alias: string, rawKey: string): Promise<ApiKeyListItem>;
+  async createApiKey(
+    provider: ApiKeyProvider,
+    alias: string,
+    rawKey: string
+  ): Promise<ApiKeyListItem>;
   async createApiKey(alias: string, rawKey: string): Promise<ApiKeyListItem>;
   async createApiKey(
     providerOrAlias: ApiKeyProvider | string,
