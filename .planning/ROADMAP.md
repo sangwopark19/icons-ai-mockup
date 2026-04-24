@@ -7,7 +7,7 @@
   - Requirements: [v1.0-REQUIREMENTS.md](./milestones/v1.0-REQUIREMENTS.md)
   - Audit: [v1.0-MILESTONE-AUDIT.md](./milestones/v1.0-MILESTONE-AUDIT.md)
   - Phase artifacts: [v1.0-phases/](./milestones/v1.0-phases/)
-- 📋 **v1.1 OpenAI GPT Image 2 Dual Provider** — Phases 7-10 planned 2026-04-23
+- 🚧 **v1.1 OpenAI GPT Image 2 Dual Provider** — Phases 7-10 in progress, started 2026-04-24
   - Goal: keep Gemini intact while adding matching OpenAI GPT Image 2 workflows beside it
   - Requirements: [.planning/REQUIREMENTS.md](./REQUIREMENTS.md)
   - Research: [.planning/research/](./research/)
@@ -27,9 +27,9 @@
 </details>
 
 <details open>
-<summary>📋 v1.1 OpenAI GPT Image 2 Dual Provider (Phases 7-10) — PLANNED</summary>
+<summary>🚧 v1.1 OpenAI GPT Image 2 Dual Provider (Phases 7-10) — IN PROGRESS</summary>
 
-- [ ] **Phase 7: Provider Foundation and Key Separation**
+- [x] **Phase 7: Provider Foundation and Key Separation** — completed 2026-04-24
   - Goal: make generation, admin key management, and queue routing provider-aware without breaking Gemini
   - Requirements: `OPS-01`, `OPS-02`, `OPS-03`, `OPS-04`
   - Success criteria:
@@ -116,10 +116,10 @@
 | Milestone | Phases | Plans | Status | Shipped |
 |-----------|--------|-------|--------|---------|
 | v1.0 AI Mockup Admin Panel | 1-6 | 18/18 | Shipped | 2026-04-23 |
-| v1.1 OpenAI GPT Image 2 Dual Provider | 7-10 | 0/0 | Planned | — |
+| v1.1 OpenAI GPT Image 2 Dual Provider | 7-10 | 4/4 | In Progress | — |
 
 ## Next
 
-**Phase 7: Provider Foundation and Key Separation** — make generation and admin control plane provider-aware before exposing OpenAI workflows.
+**Phase 8: OpenAI IP Change Parity** — add the OpenAI GPT Image 2 `IP 변경` workflow while preserving the existing Gemini flow.
 
-Run `$gsd-discuss-phase 7` to gather implementation context, or `$gsd-plan-phase 7` to move directly into planning.
+Run `$gsd-discuss-phase 8` to gather implementation context, or `$gsd-plan-phase 8` to move directly into planning.

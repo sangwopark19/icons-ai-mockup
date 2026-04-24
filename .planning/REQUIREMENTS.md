@@ -34,10 +34,10 @@ Requirements for milestone v1.1 OpenAI GPT Image 2 Dual Provider.
 
 ### Operations And Observability
 
-- [ ] **OPS-01**: Admin can store and activate OpenAI API keys separately from Gemini API keys.
-- [ ] **OPS-02**: Admin can view provider-aware generation metadata for OpenAI runs, including provider, model, and request identifiers needed for support.
-- [ ] **OPS-03**: System routes each queued generation job to the correct provider runtime based on the saved generation request.
-- [ ] **OPS-04**: System stores the OpenAI response linkage needed for OpenAI regenerate, style-copy, and multi-turn edit flows.
+- [x] **OPS-01**: Admin can store and activate OpenAI API keys separately from Gemini API keys. Validated in Phase 7.
+- [x] **OPS-02**: Admin can view provider-aware generation metadata for OpenAI runs, including provider, model, and request identifiers needed for support. Validated in Phase 7.
+- [x] **OPS-03**: System routes each queued generation job to the correct provider runtime based on the saved generation request. Validated in Phase 7 foundation: worker validates saved provider/model and rejects unsupported OpenAI runtime without Gemini fallback.
+- [x] **OPS-04**: System stores the OpenAI response linkage needed for OpenAI regenerate, style-copy, and multi-turn edit flows. Validated in Phase 7 foundation: schema and admin payload support OpenAI linkage fields; runtime population follows in OpenAI workflow phases.
 
 ## v2 Requirements
 
@@ -83,10 +83,10 @@ Requirements for milestone v1.1 OpenAI GPT Image 2 Dual Provider.
 | OED-01 | Phase 10 | Pending |
 | OED-02 | Phase 10 | Pending |
 | OED-03 | Phase 10 | Pending |
-| OPS-01 | Phase 7 | Pending |
-| OPS-02 | Phase 7 | Pending |
-| OPS-03 | Phase 7 | Pending |
-| OPS-04 | Phase 7 | Pending |
+| OPS-01 | Phase 7 | Satisfied |
+| OPS-02 | Phase 7 | Satisfied |
+| OPS-03 | Phase 7 | Foundation Satisfied |
+| OPS-04 | Phase 7 | Foundation Satisfied |
 
 **Coverage:**
 - v1 requirements: 17 total

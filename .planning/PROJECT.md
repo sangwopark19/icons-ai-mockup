@@ -36,12 +36,15 @@
 - ✓ encrypted Gemini API key CRUD, activation, usage call count — v1.0
 - ✓ Dashboard active API key alias/callCount display — v1.0
 - ✓ Edit-mode Gemini call count tracking — v1.0
+- ✓ Provider-aware generation schema, queue payloads, and worker guardrails — Phase 7
+- ✓ Provider-scoped Gemini/OpenAI admin API key management — Phase 7
+- ✓ Admin provider/model/support metadata monitoring — Phase 7
 
 ### Active
 
 - [ ] OpenAI GPT Image 2 provider를 기존 Gemini 옆에 병행 추가
 - [ ] OpenAI 버전의 핵심 이미지 워크플로를 기존 UI 흐름과 동일한 수준으로 제공
-- [ ] provider/model/debug metadata를 저장하고 운영자가 분리 추적할 수 있게 만들기
+- [ ] OpenAI runtime에서 request/response linkage를 실제 생성 결과에 기록하기
 
 ### Future Candidates
 
@@ -82,9 +85,9 @@
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Gemini와 OpenAI를 병행 provider로 운영 | 기존 사용자 흐름을 유지하면서 OpenAI 품질을 검증해야 함 | — Pending |
+| Gemini와 OpenAI를 병행 provider로 운영 | 기존 사용자 흐름을 유지하면서 OpenAI 품질을 검증해야 함 | Foundation complete in Phase 7 |
 | 기존 메뉴 옆에 OpenAI 버전을 노출 | 기능 parity를 사용자에게 명확히 보여주면서 비교 가능하게 함 | — Pending |
-| provider/model을 Generation의 1급 데이터로 저장 | history, regenerate, support, queue routing에서 provider 구분이 필요함 | — Pending |
+| provider/model을 Generation의 1급 데이터로 저장 | history, regenerate, support, queue routing에서 provider 구분이 필요함 | Complete in Phase 7 |
 | OpenAI runtime을 별도 service로 추가 | `gemini.service.ts`를 provider 혼합 blob으로 만들지 않기 위함 | — Pending |
 | OpenAI transparent output은 후처리로 해결 | `gpt-image-2` API 제약을 제품 옵션과 양립시키기 위함 | — Pending |
 | OpenAI style copy는 Responses linkage 사용 | Gemini `thoughtSignature`를 그대로 재사용할 수 없음 | — Pending |
@@ -107,4 +110,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-23 after starting milestone v1.1*
+*Last updated: 2026-04-24 after completing Phase 7*
