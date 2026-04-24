@@ -61,6 +61,10 @@ function resolveGenerationProvider(input: CreateGenerationInput): {
   const provider = input.provider ?? DEFAULT_GENERATION_PROVIDER;
   const providerModel = input.providerModel?.trim() || DEFAULT_PROVIDER_MODELS[provider];
 
+  if (providerModel !== DEFAULT_PROVIDER_MODELS[provider]) {
+    throw new Error('providerModel이 provider와 일치하지 않습니다');
+  }
+
   return { provider, providerModel };
 }
 
@@ -83,7 +87,7 @@ export class GenerationService {
 
     // 캐릭터 이미지 경로 결정 (IP 변경 모드일 경우)
     let characterImagePath: string | undefined = input.characterImagePath;
-    
+
     // characterId가 제공된 경우 DB에서 가져옴
     if (input.mode === 'ip_change' && input.characterId && !characterImagePath) {
       const character = await prisma.iPCharacter.findFirst({
@@ -192,25 +196,35 @@ export class GenerationService {
   /**
    * 이미지 선택
    */
-  async selectImage(userId: string, generationId: string, imageId: string): Promise<GeneratedImage | null> {
+  async selectImage(
+    userId: string,
+    generationId: string,
+    imageId: string
+  ): Promise<GeneratedImage | null> {
     const generation = await this.getById(userId, generationId);
     if (!generation) {
       throw new Error('생성 기록을 찾을 수 없습니다');
     }
 
-    // 모든 이미지 선택 해제
-    await prisma.generatedImage.updateMany({
-      where: { generationId },
-      data: { isSelected: false },
-    });
+    return prisma.$transaction(async (tx) => {
+      const image = await tx.generatedImage.findFirst({
+        where: { id: imageId, generationId },
+      });
 
-    // 선택된 이미지 표시
-    const image = await prisma.generatedImage.update({
-      where: { id: imageId },
-      data: { isSelected: true },
-    });
+      if (!image) {
+        return null;
+      }
 
-    return image;
+      await tx.generatedImage.updateMany({
+        where: { generationId },
+        data: { isSelected: false },
+      });
+
+      return tx.generatedImage.update({
+        where: { id: image.id },
+        data: { isSelected: true },
+      });
+    });
   }
 
   /**
@@ -283,7 +297,9 @@ export class GenerationService {
         fixedViewpoint: (options.fixedViewpoint as boolean | undefined) ?? false,
         removeShadows: (options.removeShadows as boolean | undefined) ?? false,
         userInstructions:
-          (options.userInstructions as string | undefined) ?? original.userInstructions ?? undefined,
+          (options.userInstructions as string | undefined) ??
+          original.userInstructions ??
+          undefined,
         hardwareSpecInput: (options.hardwareSpecInput as string | undefined) ?? undefined,
         hardwareSpecs: (options.hardwareSpecs as HardwareSpecOption | undefined) ?? undefined,
         outputCount: (options.outputCount as number | undefined) ?? 2,
@@ -407,7 +423,9 @@ export class GenerationService {
         fixedViewpoint: (options.fixedViewpoint as boolean | undefined) ?? false,
         removeShadows: (options.removeShadows as boolean | undefined) ?? false,
         userInstructions:
-          (options.userInstructions as string | undefined) ?? original.userInstructions ?? undefined,
+          (options.userInstructions as string | undefined) ??
+          original.userInstructions ??
+          undefined,
         hardwareSpecInput: (options.hardwareSpecInput as string | undefined) ?? undefined,
         hardwareSpecs: (options.hardwareSpecs as HardwareSpecOption | undefined) ?? undefined,
         outputCount: (options.outputCount as number | undefined) ?? 2,
@@ -469,7 +487,7 @@ export class GenerationService {
         if (image.thumbnailPath) {
           await fs.unlink(path.join(config.uploadDir, image.thumbnailPath));
         }
-        
+
         // 디렉토리 경로 추출 (첫 번째 이미지에서만)
         if (!generationDir) {
           generationDir = path.dirname(fullPath);

@@ -62,8 +62,16 @@ const generationWorker = new Worker<GenerationJobData>(
         throw new Error('저장된 provider와 큐 provider가 일치하지 않아 작업을 실행할 수 없습니다.');
       }
 
+      if (job.data.providerModel !== generation.providerModel) {
+        throw new Error('저장된 providerModel과 큐 providerModel이 일치하지 않습니다.');
+      }
+
       const provider = generation.provider;
       const mode = generation.mode;
+
+      if (provider === 'openai') {
+        throw new Error('OpenAI 이미지 런타임은 아직 지원되지 않습니다.');
+      }
 
       // DB에서 활성 API 키 조회 (작업별 1회, 캐싱 없음 — CONTEXT.md 정책)
       const { id: activeKeyId, key: activeApiKey } = await adminService.getActiveApiKey(provider);
@@ -93,10 +101,6 @@ const generationWorker = new Worker<GenerationJobData>(
 
       let generatedImages: Buffer[];
       let thoughtSignatures: ThoughtSignatureData[] = [];
-
-      if (provider === 'openai') {
-        throw new Error('OpenAI 이미지 런타임은 아직 지원되지 않습니다.');
-      }
 
       if (mode === 'ip_change') {
         if (!sourceImageBase64 || !characterImageBase64) {

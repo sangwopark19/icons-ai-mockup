@@ -1,6 +1,6 @@
 import { UserRole, UserStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
-import { generationQueue, addGenerationJob } from '../lib/queue.js';
+import { generationQueue, addGenerationJob, type GenerationJobData } from '../lib/queue.js';
 import { uploadService } from './upload.service.js';
 import { encrypt, decrypt, getEncryptionKey } from '../lib/crypto.js';
 
@@ -460,14 +460,22 @@ export class AdminService {
       mode: generation.mode as 'ip_change' | 'sketch_to_real',
       provider: generation.provider,
       providerModel: generation.providerModel,
+      styleReferenceId: generation.styleReferenceId ?? undefined,
       sourceImagePath: promptData.sourceImagePath as string | undefined,
       characterImagePath: promptData.characterImagePath as string | undefined,
       textureImagePath: promptData.textureImagePath as string | undefined,
-      prompt: promptData.prompt as string | undefined,
+      prompt: promptData.userPrompt as string | undefined,
       options: {
-        preserveStructure: (options.preserveStructure as boolean) ?? false,
-        transparentBackground: (options.transparentBackground as boolean) ?? false,
-        outputCount: (options.outputCount as number) ?? 1,
+        preserveStructure: (options.preserveStructure as boolean | undefined) ?? false,
+        transparentBackground: (options.transparentBackground as boolean | undefined) ?? false,
+        preserveHardware: (options.preserveHardware as boolean | undefined) ?? false,
+        fixedBackground: (options.fixedBackground as boolean | undefined) ?? false,
+        fixedViewpoint: (options.fixedViewpoint as boolean | undefined) ?? false,
+        removeShadows: (options.removeShadows as boolean | undefined) ?? false,
+        userInstructions: (options.userInstructions as string | undefined) ?? undefined,
+        hardwareSpecInput: (options.hardwareSpecInput as string | undefined) ?? undefined,
+        hardwareSpecs: options.hardwareSpecs as GenerationJobData['options']['hardwareSpecs'],
+        outputCount: (options.outputCount as number | undefined) ?? 1,
       },
     });
 
