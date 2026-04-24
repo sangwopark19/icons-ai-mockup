@@ -7,8 +7,7 @@ import { useAuthStore } from '@/stores/auth.store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ImageUploader } from '@/components/ui/image-uploader';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+import { apiFetch } from '@/lib/api';
 
 /**
  * 스케치 실사화 페이지
@@ -39,14 +38,16 @@ export default function SketchToRealPage() {
    * 이미지 업로드
    */
   const uploadImage = async (file: File): Promise<string> => {
+    if (!accessToken) {
+      throw new Error('인증이 필요합니다');
+    }
+
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await fetch(`${API_URL}/api/upload/image?projectId=${projectId}`, {
+    const response = await apiFetch(`/api/upload/image?projectId=${projectId}`, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
+      token: accessToken,
       body: formData,
     });
 
@@ -77,11 +78,11 @@ export default function SketchToRealPage() {
       const [sourceImagePath, textureImagePath] = await Promise.all(uploads);
 
       // 생성 요청
-      const response = await fetch(`${API_URL}/api/generations`, {
+      const response = await apiFetch('/api/generations', {
         method: 'POST',
+        token: accessToken,
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
           projectId,
@@ -141,7 +142,7 @@ export default function SketchToRealPage() {
   if (authLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--bg-primary)]">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+        <div className="border-brand-500 h-8 w-8 animate-spin rounded-full border-2 border-t-transparent" />
       </div>
     );
   }
@@ -152,27 +153,22 @@ export default function SketchToRealPage() {
       <header className="border-b border-[var(--border-default)] bg-[var(--bg-secondary)]">
         <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4">
           <div className="flex items-center gap-4">
-            <Link href={`/projects/${projectId}`} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+            <Link
+              href={`/projects/${projectId}`}
+              className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            >
               ← 뒤로
             </Link>
-            <h1 className="text-lg font-semibold text-[var(--text-primary)]">
-              ✏️ 스케치 실사화
-            </h1>
+            <h1 className="text-lg font-semibold text-[var(--text-primary)]">✏️ 스케치 실사화</h1>
           </div>
         </div>
       </header>
 
       {/* 메인 */}
       <main className="mx-auto max-w-5xl px-4 py-8">
-        <p className="mb-8 text-[var(--text-secondary)]">
-          2D 스케치를 실제 제품처럼 변환합니다
-        </p>
+        <p className="mb-8 text-[var(--text-secondary)]">2D 스케치를 실제 제품처럼 변환합니다</p>
 
-        {error && (
-          <div className="mb-6 rounded-lg bg-red-500/10 p-4 text-red-500">
-            {error}
-          </div>
-        )}
+        {error && <div className="mb-6 rounded-lg bg-red-500/10 p-4 text-red-500">{error}</div>}
 
         <div className="grid gap-8 lg:grid-cols-2">
           {/* 스케치 이미지 */}
@@ -217,9 +213,7 @@ export default function SketchToRealPage() {
                 onChange={(e) => setTransparentBg(e.target.checked)}
                 className="h-4 w-4 rounded border-[var(--border-default)] bg-[var(--bg-tertiary)]"
               />
-              <span className="text-sm text-[var(--text-secondary)]">
-                투명 배경 (누끼)
-              </span>
+              <span className="text-sm text-[var(--text-secondary)]">투명 배경 (누끼)</span>
             </label>
           </div>
         </div>

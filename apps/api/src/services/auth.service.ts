@@ -182,9 +182,7 @@ export class AuthService {
    * 세션 저장
    */
   private async saveSession(userId: string, token: string): Promise<void> {
-    // Refresh Token 만료 시간 계산 (기본 7일)
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
+    const expiresAt = this.getTokenExpiresAt(token);
 
     await prisma.session.create({
       data: {
@@ -193,6 +191,22 @@ export class AuthService {
         expiresAt,
       },
     });
+  }
+
+  /**
+   * JWT exp 클레임을 DB 세션 만료 시간의 단일 기준으로 사용
+   */
+  private getTokenExpiresAt(token: string): Date {
+    const decoded = jwt.decode(token);
+
+    if (decoded && typeof decoded === 'object' && typeof decoded.exp === 'number') {
+      return new Date(decoded.exp * 1000);
+    }
+
+    // 정상 경로에서는 refresh token에 exp가 항상 들어간다.
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+    return expiresAt;
   }
 
   /**

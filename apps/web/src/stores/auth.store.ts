@@ -49,7 +49,8 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       // 액션
       setUser: (user) => set({ user }),
 
-      setTokens: (accessToken, refreshToken) => set({ accessToken, refreshToken }),
+      setTokens: (accessToken, refreshToken) =>
+        set({ accessToken, refreshToken, isAuthenticated: true, isLoading: false }),
 
       login: (user, accessToken, refreshToken) =>
         set({

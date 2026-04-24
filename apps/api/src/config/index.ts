@@ -25,7 +25,7 @@ const envSchema = z.object({
 
   // JWT
   JWT_SECRET: z.string().min(32),
-  JWT_ACCESS_EXPIRY: z.string().default('15m'),
+  JWT_ACCESS_EXPIRY: z.string().default('1d'),
   JWT_REFRESH_EXPIRY: z.string().default('7d'),
 
   // API key encryption
@@ -89,7 +89,7 @@ function parseEnv() {
         databaseUrl: 'postgresql://user:password@localhost:5432/mockup?schema=public',
         redisUrl: 'redis://localhost:6379',
         jwtSecret: 'development-secret-key-change-in-production',
-        jwtAccessExpiry: '15m',
+        jwtAccessExpiry: '1d',
         jwtRefreshExpiry: '7d',
         encryptionKey: developmentEncryptionKey,
         geminiApiKey: undefined,

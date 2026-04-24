@@ -22,7 +22,7 @@ vi.mock('../../lib/prisma.js', () => ({
 vi.mock('../../config/index.js', () => ({
   config: {
     jwtSecret: 'test-secret-key-for-unit-tests-32-chars-long',
-    jwtAccessExpiry: '15m',
+    jwtAccessExpiry: '1d',
     jwtRefreshExpiry: '7d',
   },
 }));
@@ -67,6 +67,7 @@ describe('AuthService - JWT role payload', () => {
     expect(decoded.userId).toBe('user-123');
     expect(decoded.email).toBe('admin@example.com');
     expect(decoded.role).toBe('admin');
+    expect(decoded.exp - decoded.iat).toBe(86_400);
   });
 
   it('should include role in the JWT access token payload for regular user', async () => {
@@ -94,5 +95,34 @@ describe('AuthService - JWT role payload', () => {
     const decoded = jwt.decode(accessToken) as any;
     expect(decoded).toBeDefined();
     expect(decoded.role).toBe('user');
+  });
+
+  it('should persist refresh session expiry from the refresh token exp claim', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { authService } = await import('../auth.service.js');
+
+    const user = {
+      id: 'user-789',
+      email: 'session@example.com',
+      name: '세션 사용자',
+      passwordHash: 'hashed-password',
+      role: 'user',
+      status: 'active',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastLoginAt: null,
+    };
+
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(user as any);
+    vi.mocked(prisma.session.create).mockResolvedValue({} as any);
+    vi.mocked(prisma.user.update).mockResolvedValue(user as any);
+
+    const { refreshToken } = await authService.login('session@example.com', 'password123');
+    const decoded = jwt.decode(refreshToken) as any;
+    const createCall = vi.mocked(prisma.session.create).mock.calls[0]?.[0] as any;
+
+    expect(decoded?.exp).toBeTypeOf('number');
+    expect(createCall.data.token).toBe(refreshToken);
+    expect(createCall.data.expiresAt.getTime()).toBe(decoded.exp * 1000);
   });
 });

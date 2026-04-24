@@ -12,6 +12,8 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         API_PORT: 4000,
+        JWT_ACCESS_EXPIRY: '1d',
+        JWT_REFRESH_EXPIRY: '7d',
       },
     },
     {
@@ -24,6 +26,8 @@ module.exports = {
       max_memory_restart: '2G',
       env: {
         NODE_ENV: 'production',
+        JWT_ACCESS_EXPIRY: '1d',
+        JWT_REFRESH_EXPIRY: '7d',
       },
     },
     {
