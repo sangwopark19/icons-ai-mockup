@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { Clipboard, FolderOpen } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
 /**
@@ -37,6 +38,7 @@ export function ImageUploader({
   const [isDragging, setIsDragging] = React.useState(false);
   const [localPreview, setLocalPreview] = React.useState<string | null>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
+  const pasteAreaRef = React.useRef<HTMLDivElement>(null);
 
   const displayPreview = preview || localPreview;
 
@@ -100,9 +102,37 @@ export function ImageUploader({
   };
 
   /**
-   * 클릭 핸들러
+   * 붙여넣기 이미지 처리
    */
-  const handleClick = () => {
+  const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+    const file = Array.from(e.clipboardData.items)
+      .find((item) => item.kind === 'file' && item.type.startsWith('image/'))
+      ?.getAsFile();
+
+    if (!file) return;
+
+    e.preventDefault();
+
+    const extension = file.type.split('/')[1] || 'png';
+    const pastedFile = new File([file], `pasted-image-${Date.now()}.${extension}`, {
+      type: file.type,
+      lastModified: Date.now(),
+    });
+
+    handleFile(pastedFile);
+  };
+
+  /**
+   * 붙여넣기 영역 클릭 핸들러
+   */
+  const handlePasteAreaClick = () => {
+    pasteAreaRef.current?.focus();
+  };
+
+  /**
+   * 파일 선택 핸들러
+   */
+  const handleBrowseClick = () => {
     inputRef.current?.click();
   };
 
@@ -137,20 +167,18 @@ export function ImageUploader({
       )}
 
       <div
-        onClick={handleClick}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         className={cn(
-          'relative flex min-h-[200px] cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-6 transition-all',
+          'relative min-h-[200px] overflow-hidden rounded-xl border-2 border-dashed transition-all',
           'border-[var(--border-default)] bg-[var(--bg-tertiary)]',
-          'hover:border-brand-500 hover:bg-brand-500/5',
           isDragging && 'border-brand-500 bg-brand-500/10',
           isLoading && 'pointer-events-none opacity-50'
         )}
       >
         {displayPreview ? (
-          <>
+          <div className="flex min-h-[200px] flex-col items-center justify-center gap-3 p-6">
             <img
               src={displayPreview}
               alt="Preview"
@@ -162,21 +190,51 @@ export function ImageUploader({
             >
               ✕
             </button>
-          </>
+          </div>
         ) : (
-          <>
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--bg-primary)] text-2xl">
-              📁
-            </div>
-            <div className="text-center">
-              <p className="font-medium text-[var(--text-primary)]">
-                이미지를 드래그하거나 클릭하세요
-              </p>
-              {description && (
-                <p className="mt-1 text-sm text-[var(--text-tertiary)]">{description}</p>
+          <div className="grid min-h-[200px] grid-cols-1 sm:grid-cols-2">
+            <div
+              ref={pasteAreaRef}
+              tabIndex={0}
+              onClick={handlePasteAreaClick}
+              onPaste={handlePaste}
+              aria-label="붙여넣기 이미지 영역"
+              className={cn(
+                'flex cursor-copy flex-col items-center justify-center gap-3 p-6 text-center transition-colors',
+                'hover:bg-brand-500/5 focus:outline-none focus-visible:bg-brand-500/10 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500'
               )}
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
+                <Clipboard className="h-5 w-5" aria-hidden="true" />
+              </div>
+              <div>
+                <p className="font-medium text-[var(--text-primary)]">붙여넣기</p>
+                <p className="mt-1 text-sm text-[var(--text-tertiary)]">
+                  복사한 이미지 사용
+                </p>
+              </div>
             </div>
-          </>
+
+            <button
+              type="button"
+              onClick={handleBrowseClick}
+              className={cn(
+                'flex flex-col items-center justify-center gap-3 border-t border-[var(--border-default)] p-6 text-center transition-colors',
+                'hover:bg-brand-500/5 focus:outline-none focus-visible:bg-brand-500/10 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500',
+                'sm:border-l sm:border-t-0'
+              )}
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
+                <FolderOpen className="h-5 w-5" aria-hidden="true" />
+              </div>
+              <div>
+                <p className="font-medium text-[var(--text-primary)]">파일 선택</p>
+                <p className="mt-1 text-sm text-[var(--text-tertiary)]">
+                  {description || '기기에서 이미지 업로드'}
+                </p>
+              </div>
+            </button>
+          </div>
         )}
 
         {isLoading && (
