@@ -9,7 +9,7 @@ Requirements for milestone v1.1 OpenAI GPT Image 2 Dual Provider.
 
 ### Provider Selection
 
-- [ ] **PROV-01**: User can open an OpenAI GPT Image 2 version of the IP Change workflow from a project without losing access to the existing Gemini version.
+- [x] **PROV-01**: User can open an OpenAI GPT Image 2 version of the IP Change workflow from a project without losing access to the existing Gemini version.
 - [ ] **PROV-02**: User can open an OpenAI GPT Image 2 version of the Sketch to Real workflow from a project without losing access to the existing Gemini version.
 - [ ] **PROV-03**: User can see which provider and model produced each generation in the result view and project history.
 - [ ] **PROV-04**: User can regenerate a saved generation with the same provider and core options used for the original request.
