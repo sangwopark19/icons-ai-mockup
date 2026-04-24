@@ -1,0 +1,4 @@
+interface:
+  display_name: "Mockup OpenAI Image Runtime"
+  short_description: "OpenAI SDK와 이미지 런타임 연동 지침"
+  default_prompt: "Use $mockup-openai-image-runtime to implement GPT Image 2 in the Fastify worker runtime without removing Gemini."

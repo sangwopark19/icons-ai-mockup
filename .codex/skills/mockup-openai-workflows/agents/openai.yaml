@@ -1,0 +1,4 @@
+interface:
+  display_name: "Mockup OpenAI Workflows"
+  short_description: "기능별 OpenAI 이미지 워크플로 설계"
+  default_prompt: "Use $mockup-openai-workflows to map MockupAI features to the right GPT Image 2 workflow, prompt pattern, and endpoint."

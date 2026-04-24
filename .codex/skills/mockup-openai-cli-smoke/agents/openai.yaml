@@ -1,0 +1,4 @@
+interface:
+  display_name: "Mockup OpenAI CLI Smoke"
+  short_description: "curl과 Node 스크립트로 이미지 API 점검"
+  default_prompt: "Use $mockup-openai-cli-smoke to run or adapt GPT Image 2 smoke tests with curl and Node scripts for this project."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Mockup OpenAI Dual Provider"
+  short_description: "Gemini와 OpenAI 병행 운영 아키텍처"
+  default_prompt: "Use $mockup-openai-dual-provider to design a rollout that keeps Gemini menus and adds matching GPT Image 2 menus beside them."
