@@ -318,6 +318,29 @@ export class GenerationService {
     });
   }
 
+  async updateOpenAIMetadata(
+    generationId: string,
+    metadata: {
+      requestIds: string[];
+      responseId?: string;
+      imageCallIds: string[];
+      revisedPrompt?: string;
+      providerTrace: Record<string, unknown>;
+    }
+  ): Promise<void> {
+    await prisma.generation.update({
+      where: { id: generationId },
+      data: {
+        openaiRequestId: metadata.requestIds.length > 0 ? metadata.requestIds.join(',') : null,
+        openaiResponseId: metadata.responseId || null,
+        openaiImageCallId:
+          metadata.imageCallIds.length > 0 ? metadata.imageCallIds.join(',') : null,
+        openaiRevisedPrompt: metadata.revisedPrompt || null,
+        providerTrace: metadata.providerTrace as Prisma.JsonObject,
+      },
+    });
+  }
+
   /**
    * 동일 조건으로 재생성
    */
