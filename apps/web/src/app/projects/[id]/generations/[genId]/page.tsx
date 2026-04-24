@@ -6,8 +6,7 @@ import Link from 'next/link';
 import { useAuthStore } from '@/stores/auth.store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+import { API_URL, apiFetch, getValidAccessToken } from '@/lib/api';
 
 interface GenerationImage {
   id: string;
@@ -60,23 +59,7 @@ export default function GenerationResultPage() {
 
     isLoadingRef.current = true;
     try {
-      const response = await fetch(`${API_URL}/api/generations/${genId}`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-
-      // 401 에러 시 자동 로그아웃 및 로그인 페이지 리다이렉트
-      if (response.status === 401) {
-        console.error('인증 실패: 자동 로그아웃 처리');
-        setIsPolling(false);
-        // 인증 정보 클리어
-        const { logout } = useAuthStore.getState();
-        logout();
-        // 로그인 페이지로 리다이렉트
-        router.push('/login');
-        return;
-      }
+      const response = await apiFetch(`/api/generations/${genId}`, { token: accessToken });
 
       // 기타 HTTP 에러 처리
       if (!response.ok) {
@@ -117,7 +100,7 @@ export default function GenerationResultPage() {
       // 로딩 플래그 해제
       isLoadingRef.current = false;
     }
-  }, [accessToken, genId, router]);
+  }, [accessToken, genId]);
 
   // 폴링
   useEffect(() => {
@@ -160,11 +143,11 @@ export default function GenerationResultPage() {
 
     setSelectedImageId(imageId);
 
-    await fetch(`${API_URL}/api/generations/${genId}/select`, {
+    await apiFetch(`/api/generations/${genId}/select`, {
       method: 'POST',
+      token: accessToken,
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify({ imageId }),
     });
@@ -174,10 +157,11 @@ export default function GenerationResultPage() {
    * 다운로드
    */
   const handleDownload = async (imageId: string) => {
-    if (!accessToken) return;
+    const validToken = await getValidAccessToken();
+    if (!validToken) return;
 
     const endpoint = `/api/images/${imageId}/download`;
-    window.open(`${API_URL}${endpoint}?token=${accessToken}`, '_blank');
+    window.open(`${API_URL}${endpoint}?token=${validToken}`, '_blank');
   };
 
   /**
@@ -189,11 +173,11 @@ export default function GenerationResultPage() {
     setIsEditing(true);
     try {
       // 올바른 경로: /api/generations/:id/edit
-      const response = await fetch(`${API_URL}/api/generations/${genId}/edit`, {
+      const response = await apiFetch(`/api/generations/${genId}/edit`, {
         method: 'POST',
+        token: accessToken,
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
           prompt: editPrompt,
@@ -226,11 +210,9 @@ export default function GenerationResultPage() {
     setIsSaving(true);
     setSaveMessage(null);
     try {
-      const response = await fetch(`${API_URL}/api/images/${selectedImageId}/save`, {
+      const response = await apiFetch(`/api/images/${selectedImageId}/save`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
+        token: accessToken,
       });
 
       const data = await response.json();
@@ -256,11 +238,9 @@ export default function GenerationResultPage() {
 
     setIsRegenerating(true);
     try {
-      const response = await fetch(`${API_URL}/api/generations/${genId}/regenerate`, {
+      const response = await apiFetch(`/api/generations/${genId}/regenerate`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
+        token: accessToken,
       });
 
       const data = await response.json();

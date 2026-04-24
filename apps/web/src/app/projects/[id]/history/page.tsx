@@ -6,9 +6,7 @@ import Link from 'next/link';
 import { useAuthStore } from '@/stores/auth.store';
 import { Button } from '@/components/ui/button';
 import { formatRelativeTime } from '@/lib/utils';
-import { imageApi } from '@/lib/api';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+import { API_URL, apiFetch } from '@/lib/api';
 
 interface HistoryItem {
   id: string;
@@ -48,22 +46,25 @@ export default function HistoryPage() {
     e.stopPropagation();
 
     if (!accessToken) return;
-    if (!confirm('이 생성 기록과 모든 이미지를 삭제하시겠습니까?\n삭제된 데이터는 복구할 수 없습니다.')) return;
+    if (
+      !confirm(
+        '이 생성 기록과 모든 이미지를 삭제하시겠습니까?\n삭제된 데이터는 복구할 수 없습니다.'
+      )
+    )
+      return;
 
     try {
       setDeletingId(generationId);
-      
-      const response = await fetch(`${API_URL}/api/generations/${generationId}`, {
+
+      const response = await apiFetch(`/api/generations/${generationId}`, {
         method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
+        token: accessToken,
       });
 
       if (!response.ok) {
         throw new Error('삭제 실패');
       }
-      
+
       // 로컬 상태에서 삭제된 항목 제거
       setHistory((prev) => prev.filter((item) => item.id !== generationId));
       alert('히스토리가 삭제되었습니다.');
@@ -83,13 +84,9 @@ export default function HistoryPage() {
 
     try {
       setIsLoading(true);
-      const response = await fetch(
-        `${API_URL}/api/generations/project/${projectId}/history?page=${page}&limit=20`,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        }
+      const response = await apiFetch(
+        `/api/generations/project/${projectId}/history?page=${page}&limit=20`,
+        { token: accessToken }
       );
 
       const data = await response.json();
@@ -120,7 +117,7 @@ export default function HistoryPage() {
   if (authLoading || isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--bg-primary)]">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+        <div className="border-brand-500 h-8 w-8 animate-spin rounded-full border-2 border-t-transparent" />
       </div>
     );
   }
@@ -131,12 +128,13 @@ export default function HistoryPage() {
       <header className="border-b border-[var(--border-default)] bg-[var(--bg-secondary)]">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
           <div className="flex items-center gap-4">
-            <Link href={`/projects/${projectId}`} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+            <Link
+              href={`/projects/${projectId}`}
+              className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            >
               ← 뒤로
             </Link>
-            <h1 className="text-lg font-semibold text-[var(--text-primary)]">
-              📚 히스토리
-            </h1>
+            <h1 className="text-lg font-semibold text-[var(--text-primary)]">📚 히스토리</h1>
           </div>
         </div>
       </header>
@@ -151,7 +149,7 @@ export default function HistoryPage() {
                 <Link
                   key={item.id}
                   href={`/projects/${projectId}/generations/${item.id}`}
-                  className="group overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--bg-secondary)] transition-all hover:border-brand-500 hover:shadow-lg"
+                  className="hover:border-brand-500 group overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--bg-secondary)] transition-all hover:shadow-lg"
                 >
                   {/* 이미지 */}
                   <div className="aspect-square bg-[var(--bg-tertiary)]">
@@ -172,9 +170,7 @@ export default function HistoryPage() {
                   <div className="p-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 text-sm">
-                        <span>
-                          {item.mode === 'ip_change' ? '⚡' : '✏️'}
-                        </span>
+                        <span>{item.mode === 'ip_change' ? '⚡' : '✏️'}</span>
                         <span className="text-[var(--text-secondary)]">
                           {item.mode === 'ip_change' ? 'IP 변경' : '스케치 실사화'}
                         </span>
@@ -237,12 +233,8 @@ export default function HistoryPage() {
             <h3 className="mb-2 text-lg font-medium text-[var(--text-primary)]">
               아직 히스토리가 없습니다
             </h3>
-            <p className="mb-4 text-[var(--text-secondary)]">
-              목업을 생성하면 여기에 저장됩니다
-            </p>
-            <Button onClick={() => router.push(`/projects/${projectId}`)}>
-              목업 생성하기
-            </Button>
+            <p className="mb-4 text-[var(--text-secondary)]">목업을 생성하면 여기에 저장됩니다</p>
+            <Button onClick={() => router.push(`/projects/${projectId}`)}>목업 생성하기</Button>
           </div>
         )}
       </main>

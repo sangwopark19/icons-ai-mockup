@@ -2,46 +2,176 @@
  * API 클라이언트
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+import { useAuthStore } from '@/stores/auth.store';
+
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 interface RequestOptions extends RequestInit {
   token?: string;
+  skipAuthRefresh?: boolean;
+}
+
+interface RefreshResult {
+  accessToken: string | null;
+  status: 'refreshed' | 'missing-token' | 'unauthorized' | 'failed';
+}
+
+let refreshPromise: Promise<RefreshResult> | null = null;
+
+function buildApiUrl(endpoint: string): string {
+  if (/^https?:\/\//.test(endpoint)) return endpoint;
+  return `${API_URL}${endpoint}`;
+}
+
+function emitRefreshFailed() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('auth:refresh-failed'));
+  }
+}
+
+function shouldEndSession(status: RefreshResult['status']): boolean {
+  return status === 'missing-token' || status === 'unauthorized';
+}
+
+export function getAccessTokenExpiresAt(token: string): number | null {
+  try {
+    const payload = token.split('.')[1];
+    if (!payload) return null;
+
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
+    const decoded = JSON.parse(globalThis.atob(padded)) as { exp?: unknown };
+
+    return typeof decoded.exp === 'number' ? decoded.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
+async function refreshStoredSession(): Promise<RefreshResult> {
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = (async () => {
+    const { refreshToken, setTokens } = useAuthStore.getState();
+
+    if (!refreshToken) {
+      return { accessToken: null, status: 'missing-token' };
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/api/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      });
+
+      if (response.status === 401) {
+        return { accessToken: null, status: 'unauthorized' };
+      }
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        return { accessToken: null, status: 'failed' };
+      }
+
+      setTokens(data.data.accessToken, data.data.refreshToken);
+      return { accessToken: data.data.accessToken, status: 'refreshed' };
+    } catch {
+      return { accessToken: null, status: 'failed' };
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+}
+
+export async function refreshAuthSession(): Promise<string | null> {
+  const result = await refreshStoredSession();
+  if (shouldEndSession(result.status)) {
+    emitRefreshFailed();
+  }
+  return result.accessToken;
+}
+
+export async function getValidAccessToken(): Promise<string | null> {
+  const { accessToken, refreshToken } = useAuthStore.getState();
+
+  if (!accessToken) {
+    return refreshToken ? refreshAuthSession() : null;
+  }
+
+  const expiresAt = getAccessTokenExpiresAt(accessToken);
+  if (!refreshToken || !expiresAt || expiresAt - Date.now() > 60_000) {
+    return accessToken;
+  }
+
+  return refreshAuthSession();
+}
+
+export async function apiFetch(endpoint: string, options: RequestOptions = {}): Promise<Response> {
+  const { token, skipAuthRefresh = false, ...fetchOptions } = options;
+  const headers = new Headers(fetchOptions.headers);
+  const authToken = token ?? useAuthStore.getState().accessToken;
+
+  if (authToken && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${authToken}`);
+  }
+
+  let response = await fetch(buildApiUrl(endpoint), {
+    ...fetchOptions,
+    headers,
+  });
+
+  if (response.status === 401 && !skipAuthRefresh) {
+    const refreshResult = await refreshStoredSession();
+
+    if (refreshResult.accessToken) {
+      const retryHeaders = new Headers(headers);
+      retryHeaders.set('Authorization', `Bearer ${refreshResult.accessToken}`);
+
+      response = await fetch(buildApiUrl(endpoint), {
+        ...fetchOptions,
+        headers: retryHeaders,
+      });
+    }
+
+    if (response.status === 401 || shouldEndSession(refreshResult.status)) {
+      emitRefreshFailed();
+    }
+  }
+
+  return response;
 }
 
 /**
  * API 요청 함수
  */
 async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
-  const { token, ...fetchOptions } = options;
-  const method = fetchOptions.method ?? 'GET';
+  const { token, skipAuthRefresh, ...fetchOptions } = options;
 
-  const headers: HeadersInit = {
-    ...options.headers,
-  };
+  const headers = new Headers(fetchOptions.headers);
 
   // body가 있을 때만 Content-Type 설정 (DELETE 등 body 없는 요청에서 Fastify 에러 방지)
   if (options.body) {
-    (headers as Record<string, string>)['Content-Type'] = 'application/json';
+    headers.set('Content-Type', 'application/json');
   }
 
   if (token) {
-    (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
+    headers.set('Authorization', `Bearer ${token}`);
   }
 
-  const response = await fetch(`${API_URL}${endpoint}`, {
+  const response = await apiFetch(endpoint, {
     ...fetchOptions,
+    token,
+    skipAuthRefresh,
     headers,
   });
 
   const data = await response.json();
 
   if (!response.ok) {
-    // 401 에러 시 토큰 만료 이벤트 발생
     if (response.status === 401) {
-      // 브라우저 환경에서만 이벤트 발생
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('auth:token-expired'));
-      }
       throw new Error('인증이 만료되었습니다. 다시 로그인해주세요.');
     }
     throw new Error(data.error?.message || '요청에 실패했습니다');
@@ -99,6 +229,7 @@ export const authApi = {
       data: { accessToken: string; refreshToken: string };
     }>('/api/auth/refresh', {
       method: 'POST',
+      skipAuthRefresh: true,
       body: JSON.stringify({ refreshToken }),
     });
   },
