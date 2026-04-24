@@ -2,35 +2,35 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: OpenAI GPT Image 2 Dual Provider
-status: "Phase 07 shipped — PR #2"
-stopped_at: Phase 8 context gathered
-last_updated: "2026-04-24T06:24:30.556Z"
+status: executing
+stopped_at: Completed 08-01-PLAN.md
+last_updated: "2026-04-24T08:39:56.257Z"
 last_activity: 2026-04-24
 progress:
   total_phases: 4
   completed_phases: 1
-  total_plans: 4
-  completed_plans: 4
-  percent: 100
+  total_plans: 8
+  completed_plans: 5
+  percent: 63
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-23)
+See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** 사용자가 원하는 제품 목업을 구조와 디테일을 잃지 않고 빠르게 생성하고 비교할 수 있어야 한다.
-**Current focus:** Phase 8 — openai-ip-change-parity
+**Current focus:** Phase 08 — openai-ip-change-parity
 
 ## Current Position
 
-Phase: 8
-Plan: Not started
-Status: Phase 07 shipped — PR #2
+Phase: 08 (openai-ip-change-parity) — EXECUTING
+Plan: 2 of 4
+Status: Ready to execute
 Last activity: 2026-04-24
 
-Progress: [███░░░░░░░] 25%
+Progress: [██████░░░░] 63%
 
 ## Performance Metrics
 
@@ -135,6 +135,8 @@ Progress: [███░░░░░░░] 25%
 - Worker jobs validate that the queued provider matches the persisted Generation.provider before any runtime dispatch.
 - OpenAI generation jobs intentionally fail with an explicit unsupported-runtime error until Phase 08 adds the image runtime.
 - Admin monitoring exposes safe provider/model/OpenAI support identifiers while keeping providerTrace backend-only.
+- OpenAI phases must use `.planning/OPENAI-SKILL-GUARDRAILS.md`; Phase 8 requires dual-provider, workflow, image-runtime, IP Change, and CLI smoke skill guidance.
+- GPT Image 2 prompt work must also read workflow-specific prompt references: prompt-playbook/workflow-matrix plus the relevant `gpt-image-2-notes.md` for IP Change, Sketch Realization, or Precision Edit.
 
 ### Pending Todos
 
@@ -167,7 +169,7 @@ Items acknowledged and deferred at milestone close on 2026-04-23:
 ## Session Continuity
 
 Last session: --stopped-at
-Stopped at: Phase 8 context gathered
+Stopped at: Completed 08-01-PLAN.md
 Resume file: --resume-file
 
-**Planned Phase:** 07 (provider-foundation-and-key-separation) — 4 plans — 2026-04-24T01:01:02.467Z
+**Planned Phase:** 8 (OpenAI IP Change Parity) — 4 plans — 2026-04-24T07:32:48.475Z
