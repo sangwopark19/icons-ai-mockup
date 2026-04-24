@@ -6,24 +6,15 @@ import Link from 'next/link';
 import { useAuthStore } from '@/stores/auth.store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { API_URL, apiFetch, getValidAccessToken } from '@/lib/api';
+import {
+  API_URL,
+  apiFetch,
+  getValidAccessToken,
+  type GenerationDetail,
+  type GenerationImage,
+} from '@/lib/api';
 
-interface GenerationImage {
-  id: string;
-  filePath: string;
-  thumbnailPath: string | null;
-  isSelected: boolean;
-  width: number;
-  height: number;
-}
-
-interface GenerationData {
-  id: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
-  mode: string;
-  errorMessage: string | null;
-  images: GenerationImage[];
-}
+const V2_CANDIDATE_LABELS = ['후보 1', '후보 2'];
 
 /**
  * 생성 결과 페이지
@@ -35,7 +26,7 @@ export default function GenerationResultPage() {
   const genId = params.genId as string;
   const { accessToken, isAuthenticated, isLoading: authLoading } = useAuthStore();
 
-  const [generation, setGeneration] = useState<GenerationData | null>(null);
+  const [generation, setGeneration] = useState<GenerationDetail | null>(null);
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(true);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -44,6 +35,8 @@ export default function GenerationResultPage() {
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const isV2 = Boolean(generation && generation.provider === 'openai' && generation.mode === 'ip_change');
+  const disabledFollowupId = 'v2-disabled-followups';
 
   // Interval 관리를 위한 ref
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -157,6 +150,7 @@ export default function GenerationResultPage() {
    * 다운로드
    */
   const handleDownload = async (imageId: string) => {
+    if (!imageId) return;
     const validToken = await getValidAccessToken();
     if (!validToken) return;
 
@@ -168,6 +162,7 @@ export default function GenerationResultPage() {
    * 부분 수정 요청
    */
   const handleEdit = async () => {
+    if (isV2) return;
     if (!accessToken || !selectedImageId || !editPrompt.trim()) return;
 
     setIsEditing(true);
@@ -217,14 +212,14 @@ export default function GenerationResultPage() {
 
       const data = await response.json();
       if (data.success) {
-        setSaveMessage('✅ 히스토리에 저장되었습니다!');
+        setSaveMessage('히스토리에 저장되었습니다');
         setTimeout(() => setSaveMessage(null), 3000);
       } else {
-        setSaveMessage('❌ 저장에 실패했습니다');
+        setSaveMessage('저장에 실패했습니다. 잠시 후 다시 시도해주세요.');
       }
     } catch (error) {
       console.error('저장 실패:', error);
-      setSaveMessage('❌ 저장에 실패했습니다');
+      setSaveMessage('저장에 실패했습니다. 잠시 후 다시 시도해주세요.');
     } finally {
       setIsSaving(false);
     }
@@ -234,6 +229,7 @@ export default function GenerationResultPage() {
    * 동일 조건 재생성
    */
   const handleRegenerateWithSameInputs = async () => {
+    if (isV2) return;
     if (!accessToken) return;
 
     setIsRegenerating(true);
@@ -263,7 +259,9 @@ export default function GenerationResultPage() {
    */
   const handleModifyConditions = () => {
     // 모드에 따라 해당 페이지로 이동
-    if (generation?.mode === 'ip_change') {
+    if (isV2) {
+      router.push(`/projects/${projectId}/ip-change/openai`);
+    } else if (generation?.mode === 'ip_change') {
       router.push(`/projects/${projectId}/ip-change`);
     } else if (generation?.mode === 'sketch_to_real') {
       router.push(`/projects/${projectId}/sketch-to-real`);
@@ -276,6 +274,7 @@ export default function GenerationResultPage() {
    * 스타일 복사
    */
   const handleStyleCopy = (copyTarget: 'ip-change' | 'new-product') => {
+    if (isV2) return;
     const styleRef = generation?.id ?? genId;
     const query = new URLSearchParams({ styleRef, copyTarget });
     router.push(`/projects/${projectId}/ip-change?${query.toString()}`);
@@ -291,19 +290,26 @@ export default function GenerationResultPage() {
 
   // 로딩 중
   if (!generation || generation.status === 'pending' || generation.status === 'processing') {
+    const pendingIsV2 = generation?.provider === 'openai' && generation.mode === 'ip_change';
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--bg-primary)]">
         <div className="border-brand-500 mb-4 h-12 w-12 animate-spin rounded-full border-4 border-t-transparent" />
         <h2 className="text-xl font-semibold text-[var(--text-primary)]">
-          목업을 생성하고 있습니다...
+          {pendingIsV2 ? 'v2 목업을 생성하고 있습니다...' : '목업을 생성하고 있습니다...'}
         </h2>
         <p className="mt-2 text-[var(--text-secondary)]">
-          {generation?.status === 'processing' ? 'AI가 이미지를 생성 중입니다' : '작업 대기 중...'}
+          {pendingIsV2
+            ? '두 후보를 준비 중입니다. 완료되면 바로 선택할 수 있습니다.'
+            : generation?.status === 'processing'
+              ? 'AI가 이미지를 생성 중입니다'
+              : '작업 대기 중...'}
         </p>
-        <p className="mt-3 max-w-md text-center text-sm text-[var(--text-secondary)]">
-          고품질 결과를 위해 고성능 AI로 처리 중이라 시간이 오래 걸릴 수 있습니다. 완료까지 잠시만
-          다른작업을 하면서 기다려주세요.
-        </p>
+        {!pendingIsV2 && (
+          <p className="mt-3 max-w-md text-center text-sm text-[var(--text-secondary)]">
+            고품질 결과를 위해 고성능 AI로 처리 중이라 시간이 오래 걸릴 수 있습니다. 완료까지
+            잠시만 다른작업을 하면서 기다려주세요.
+          </p>
+        )}
       </div>
     );
   }
@@ -315,9 +321,16 @@ export default function GenerationResultPage() {
         <div className="mb-4 text-5xl">❌</div>
         <h2 className="text-xl font-semibold text-[var(--text-primary)]">생성에 실패했습니다</h2>
         <p className="mt-2 text-[var(--text-secondary)]">
-          {generation.errorMessage || '알 수 없는 오류가 발생했습니다'}
+          {isV2
+            ? 'v2 IP 변경 생성에 실패했습니다. 이미지를 확인한 뒤 다시 시도해주세요.'
+            : generation.errorMessage || '알 수 없는 오류가 발생했습니다'}
         </p>
-        <Button className="mt-6" onClick={() => router.back()}>
+        <Button
+          className="mt-6"
+          onClick={() =>
+            isV2 ? router.push(`/projects/${projectId}/ip-change/openai`) : router.back()
+          }
+        >
           다시 시도
         </Button>
       </div>
@@ -338,10 +351,22 @@ export default function GenerationResultPage() {
             >
               ← 프로젝트로
             </Link>
-            <h1 className="text-lg font-semibold text-[var(--text-primary)]">생성 결과</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-semibold text-[var(--text-primary)]">생성 결과</h1>
+              {generation.mode === 'ip_change' && (
+                <span className="rounded bg-[var(--bg-tertiary)] px-1.5 py-0.5 text-xs font-semibold text-[var(--text-tertiary)]">
+                  {isV2 ? 'v2' : 'v1'}
+                </span>
+              )}
+            </div>
           </div>
           <div className="flex gap-2">
-            <Button onClick={() => handleDownload(selectedImageId!)}>다운로드</Button>
+            <Button
+              onClick={() => selectedImageId && handleDownload(selectedImageId)}
+              disabled={!selectedImageId}
+            >
+              다운로드
+            </Button>
           </div>
         </div>
       </header>
@@ -354,7 +379,7 @@ export default function GenerationResultPage() {
             {selectedImage && (
               <img
                 src={`${API_URL}/uploads/${selectedImage.filePath}`}
-                alt="Generated mockup"
+                alt={isV2 ? '선택된 v2 IP 변경 결과' : '생성된 목업 결과'}
                 className="max-h-[600px] rounded-lg object-contain"
               />
             )}
@@ -363,13 +388,15 @@ export default function GenerationResultPage() {
           {/* 이미지 목록 */}
           <div className="space-y-4">
             <h3 className="font-medium text-[var(--text-primary)]">
-              생성된 이미지 ({generation.images.length}개)
+              {isV2 ? '생성된 이미지 (2개)' : `생성된 이미지 (${generation.images.length}개)`}
             </h3>
             <div className="grid grid-cols-2 gap-3">
-              {generation.images.map((image) => (
+              {generation.images.map((image, index) => (
                 <button
                   key={image.id}
                   onClick={() => handleSelectImage(image.id)}
+                  aria-label={isV2 ? `후보 ${index + 1} 선택` : `이미지 ${index + 1} 선택`}
+                  aria-pressed={selectedImageId === image.id}
                   className={`relative overflow-hidden rounded-lg border-2 transition-all ${
                     selectedImageId === image.id
                       ? 'border-brand-500 shadow-lg'
@@ -378,9 +405,14 @@ export default function GenerationResultPage() {
                 >
                   <img
                     src={`${API_URL}/uploads/${image.thumbnailPath || image.filePath}`}
-                    alt="Generated option"
+                    alt={isV2 ? `v2 IP 변경 후보 ${index + 1}` : `생성 후보 ${index + 1}`}
                     className="aspect-square w-full object-cover"
                   />
+                  {isV2 && (
+                    <span className="absolute left-2 top-2 rounded bg-black/70 px-2 py-1 text-xs text-white">
+                      {V2_CANDIDATE_LABELS[index] ?? `후보 ${index + 1}`}
+                    </span>
+                  )}
                   {selectedImageId === image.id && (
                     <div className="bg-brand-500/20 absolute inset-0 flex items-center justify-center">
                       <span className="bg-brand-500 rounded-full px-2 py-1 text-xs text-white">
@@ -394,7 +426,18 @@ export default function GenerationResultPage() {
 
             {/* 추가 액션 */}
             <div className="space-y-2 pt-4">
-              <Button variant="secondary" className="w-full" onClick={() => setShowEditModal(true)}>
+              {isV2 && (
+                <p id={disabledFollowupId} className="text-center text-xs text-[var(--text-tertiary)]">
+                  v2 후속 편집은 다음 업데이트에서 지원됩니다
+                </p>
+              )}
+              <Button
+                variant="secondary"
+                className="w-full"
+                onClick={() => setShowEditModal(true)}
+                disabled={isV2}
+                aria-describedby={isV2 ? disabledFollowupId : undefined}
+              >
                 ✏️ 부분 수정
               </Button>
               <Button
@@ -409,6 +452,8 @@ export default function GenerationResultPage() {
                 variant="secondary"
                 className="w-full"
                 onClick={() => handleStyleCopy('ip-change')}
+                disabled={isV2}
+                aria-describedby={isV2 ? disabledFollowupId : undefined}
               >
                 🎨 스타일 복사 (IP 변경)
               </Button>
@@ -416,6 +461,8 @@ export default function GenerationResultPage() {
                 variant="secondary"
                 className="w-full"
                 onClick={() => handleStyleCopy('new-product')}
+                disabled={isV2}
+                aria-describedby={isV2 ? disabledFollowupId : undefined}
               >
                 🧩 스타일 복사 (새 제품 적용)
               </Button>
@@ -427,6 +474,8 @@ export default function GenerationResultPage() {
                 className="w-full"
                 onClick={handleRegenerateWithSameInputs}
                 isLoading={isRegenerating}
+                disabled={isV2}
+                aria-describedby={isV2 ? disabledFollowupId : undefined}
               >
                 🔁 동일 조건 재생성
               </Button>

@@ -249,6 +249,46 @@ export interface Project {
   savedImageCount?: number;
 }
 
+export type GenerationProvider = 'gemini' | 'openai';
+export type GenerationMode = 'ip_change' | 'sketch_to_real';
+
+export interface GenerationImage {
+  id: string;
+  filePath: string;
+  thumbnailPath: string | null;
+  isSelected: boolean;
+  width: number;
+  height: number;
+}
+
+export interface GenerationDetail {
+  id: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  mode: GenerationMode;
+  provider: 'gemini' | 'openai';
+  providerModel: string;
+  options?: Record<string, unknown>;
+  errorMessage: string | null;
+  images: GenerationImage[];
+}
+
+export interface HistoryGenerationItem {
+  id: string;
+  mode: GenerationMode;
+  provider: 'gemini' | 'openai';
+  providerModel: string;
+  createdAt: string;
+  selectedImage: {
+    id: string;
+    filePath: string;
+    thumbnailPath: string | null;
+  } | null;
+  character: {
+    id: string;
+    name: string;
+  } | null;
+}
+
 /**
  * 프로젝트 관련 API
  */
