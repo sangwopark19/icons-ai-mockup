@@ -4,13 +4,34 @@ import { generationQueue, addGenerationJob } from '../lib/queue.js';
 import { uploadService } from './upload.service.js';
 import { encrypt, decrypt, getEncryptionKey } from '../lib/crypto.js';
 
+export type ApiKeyProvider = 'gemini' | 'openai';
+
+type ActiveApiKeyStats = { alias: string; callCount: number };
+
+const API_KEY_PROVIDER_LABELS: Record<ApiKeyProvider, string> = {
+  gemini: 'Gemini',
+  openai: 'OpenAI',
+};
+
+const API_KEY_PUBLIC_SELECT = {
+  id: true,
+  provider: true,
+  alias: true,
+  maskedKey: true,
+  isActive: true,
+  callCount: true,
+  lastUsedAt: true,
+  createdAt: true,
+} as const;
+
 export interface DashboardStats {
   userCount: number;
   generationCount: number;
   failedJobCount: number;
   queueDepth: number;
   storageBytes: number;
-  activeApiKeys: { alias: string; callCount: number } | null;
+  activeApiKeysByProvider: Record<ApiKeyProvider, ActiveApiKeyStats | null>;
+  activeApiKeys?: ActiveApiKeyStats | null;
   userCountYesterday: number;
   generationCountYesterday: number;
   failedJobCountYesterday: number;
@@ -18,6 +39,7 @@ export interface DashboardStats {
 
 export interface ApiKeyListItem {
   id: string;
+  provider: ApiKeyProvider;
   alias: string;
   maskedKey: string;
   isActive: boolean;
@@ -110,6 +132,14 @@ export interface ListImagesResult {
 
 type DashboardJobCounts = Partial<Record<'waiting' | 'active' | 'delayed', number>>;
 
+function getProviderMissingKeyMessage(provider: ApiKeyProvider): string {
+  return `${API_KEY_PROVIDER_LABELS[provider]} API 키가 설정되지 않았습니다`;
+}
+
+function getProviderKeyNotFoundMessage(provider: ApiKeyProvider): string {
+  return `${API_KEY_PROVIDER_LABELS[provider]} API 키를 찾을 수 없습니다`;
+}
+
 async function getDashboardJobCounts(): Promise<DashboardJobCounts> {
   try {
     return await generationQueue.getJobCounts('waiting', 'active', 'delayed');
@@ -172,7 +202,8 @@ export class AdminService {
       userCountYesterday,
       generationCountYesterday,
       failedJobCountYesterday,
-      activeApiKeyRecord,
+      activeGeminiApiKeyRecord,
+      activeOpenAiApiKeyRecord,
     ] = await Promise.all([
       prisma.user.count({ where: { status: { not: 'deleted' } } }),
       prisma.generation.count(),
@@ -194,7 +225,11 @@ export class AdminService {
         },
       }),
       prisma.apiKey.findFirst({
-        where: { isActive: true },
+        where: { provider: 'gemini', isActive: true },
+        select: { alias: true, callCount: true },
+      }),
+      prisma.apiKey.findFirst({
+        where: { provider: 'openai', isActive: true },
         select: { alias: true, callCount: true },
       }),
     ]);
@@ -208,7 +243,10 @@ export class AdminService {
       failedJobCount,
       queueDepth,
       storageBytes: imageAggregate._sum.fileSize ?? 0,
-      activeApiKeys: activeApiKeyRecord ?? null,
+      activeApiKeysByProvider: {
+        gemini: activeGeminiApiKeyRecord ?? null,
+        openai: activeOpenAiApiKeyRecord ?? null,
+      },
       userCountYesterday,
       generationCountYesterday,
       failedJobCountYesterday,
@@ -545,79 +583,103 @@ export class AdminService {
 
   // ─── Phase 4: API Key Management ─────────────────────────────────────────
 
-  async listApiKeys(): Promise<ApiKeyListItem[]> {
+  async listApiKeys(provider: ApiKeyProvider): Promise<ApiKeyListItem[]>;
+  async listApiKeys(): Promise<ApiKeyListItem[]>;
+  async listApiKeys(provider: ApiKeyProvider = 'gemini'): Promise<ApiKeyListItem[]> {
     const rows = await prisma.apiKey.findMany({
+      where: { provider },
       orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        alias: true,
-        maskedKey: true,
-        isActive: true,
-        callCount: true,
-        lastUsedAt: true,
-        createdAt: true,
-      },
+      select: API_KEY_PUBLIC_SELECT,
     });
     // Ensure encryptedKey never leaks — strip any extra fields defensively
-    return rows.map(({ id, alias, maskedKey, isActive, callCount, lastUsedAt, createdAt }) => ({
-      id,
-      alias,
-      maskedKey,
-      isActive,
-      callCount,
-      lastUsedAt,
-      createdAt,
-    }));
+    return rows.map(
+      ({ id, provider, alias, maskedKey, isActive, callCount, lastUsedAt, createdAt }) => ({
+        id,
+        provider,
+        alias,
+        maskedKey,
+        isActive,
+        callCount,
+        lastUsedAt,
+        createdAt,
+      })
+    );
   }
 
-  async createApiKey(alias: string, rawKey: string): Promise<ApiKeyListItem> {
-    const maskedKey = rawKey.slice(-4);
-    const encryptedKey = encrypt(rawKey, getEncryptionKey());
+  async createApiKey(provider: ApiKeyProvider, alias: string, rawKey: string): Promise<ApiKeyListItem>;
+  async createApiKey(alias: string, rawKey: string): Promise<ApiKeyListItem>;
+  async createApiKey(
+    providerOrAlias: ApiKeyProvider | string,
+    aliasOrRawKey: string,
+    rawKey?: string
+  ): Promise<ApiKeyListItem> {
+    const provider: ApiKeyProvider = rawKey ? (providerOrAlias as ApiKeyProvider) : 'gemini';
+    const alias = rawKey ? aliasOrRawKey : providerOrAlias;
+    const keyToStore = rawKey ?? aliasOrRawKey;
+    const maskedKey = keyToStore.slice(-4);
+    const encryptedKey = encrypt(keyToStore, getEncryptionKey());
 
     const created = await prisma.apiKey.create({
-      data: { alias, encryptedKey, maskedKey, isActive: false },
-      select: {
-        id: true,
-        alias: true,
-        maskedKey: true,
-        isActive: true,
-        callCount: true,
-        lastUsedAt: true,
-        createdAt: true,
-      },
+      data: { provider, alias, encryptedKey, maskedKey, isActive: false },
+      select: API_KEY_PUBLIC_SELECT,
     });
 
     return created;
   }
 
-  async deleteApiKey(id: string): Promise<void> {
-    const key = await prisma.apiKey.findUnique({ where: { id } });
+  async deleteApiKey(provider: ApiKeyProvider, id: string): Promise<void>;
+  async deleteApiKey(id: string): Promise<void>;
+  async deleteApiKey(providerOrId: ApiKeyProvider | string, id?: string): Promise<void> {
+    const provider: ApiKeyProvider = id ? (providerOrId as ApiKeyProvider) : 'gemini';
+    const keyId = id ?? providerOrId;
+    const key = await prisma.apiKey.findFirst({ where: { id: keyId, provider } });
 
     if (!key) {
-      throw new Error('API 키를 찾을 수 없습니다');
+      throw new Error(getProviderKeyNotFoundMessage(provider));
     }
     if (key.isActive) {
       throw new Error('활성 키는 삭제할 수 없습니다');
     }
 
-    await prisma.apiKey.delete({ where: { id } });
+    await prisma.apiKey.deleteMany({ where: { id: keyId, provider } });
   }
 
-  async activateApiKey(id: string): Promise<ApiKeyListItem> {
-    // Prepare operations so we can capture the update result
-    const deactivateAll = prisma.apiKey.updateMany({ where: {}, data: { isActive: false } });
-    const activateTarget = prisma.apiKey.update({
-      where: { id },
-      data: { isActive: true },
+  async activateApiKey(provider: ApiKeyProvider, id: string): Promise<ApiKeyListItem>;
+  async activateApiKey(id: string): Promise<ApiKeyListItem>;
+  async activateApiKey(
+    providerOrId: ApiKeyProvider | string,
+    id?: string
+  ): Promise<ApiKeyListItem> {
+    const provider: ApiKeyProvider = id ? (providerOrId as ApiKeyProvider) : 'gemini';
+    const keyId = id ?? providerOrId;
+    const key = await prisma.apiKey.findFirst({ where: { id: keyId, provider } });
+
+    if (!key) {
+      throw new Error(getProviderKeyNotFoundMessage(provider));
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      await tx.apiKey.updateMany({
+        where: { provider, isActive: true },
+        data: { isActive: false },
+      });
+      await tx.apiKey.updateMany({
+        where: { id: keyId, provider },
+        data: { isActive: true },
+      });
+      return tx.apiKey.findFirst({
+        where: { id: keyId, provider },
+        select: API_KEY_PUBLIC_SELECT,
+      });
     });
 
-    await prisma.$transaction([deactivateAll, activateTarget]);
-
-    // activateTarget has already been executed and its promise resolved — read result
-    const updated = await activateTarget;
+    if (!updated) {
+      throw new Error(getProviderKeyNotFoundMessage(provider));
+    }
 
     return {
       id: updated.id,
+      provider: updated.provider,
       alias: updated.alias,
       maskedKey: updated.maskedKey,
       isActive: updated.isActive,
@@ -627,25 +689,38 @@ export class AdminService {
     };
   }
 
-  async getActiveApiKey(): Promise<{ id: string; key: string }> {
-    const activeKey = await prisma.apiKey.findFirst({ where: { isActive: true } });
+  async getActiveApiKey(provider: ApiKeyProvider = 'gemini'): Promise<{
+    id: string;
+    provider: ApiKeyProvider;
+    key: string;
+  }> {
+    const activeKey = await prisma.apiKey.findFirst({ where: { provider, isActive: true } });
 
     if (!activeKey) {
-      throw new Error('Gemini API 키가 설정되지 않았습니다');
+      throw new Error(getProviderMissingKeyMessage(provider));
     }
 
     const decryptedKey = decrypt(activeKey.encryptedKey, getEncryptionKey());
-    return { id: activeKey.id, key: decryptedKey };
+    return { id: activeKey.id, provider: activeKey.provider, key: decryptedKey };
   }
 
-  async incrementCallCount(id: string): Promise<void> {
-    await prisma.apiKey.update({
-      where: { id },
+  async incrementCallCount(provider: ApiKeyProvider, id: string): Promise<void>;
+  async incrementCallCount(id: string): Promise<void>;
+  async incrementCallCount(provider: ApiKeyProvider | string, id?: string): Promise<void> {
+    const resolvedProvider: ApiKeyProvider = id ? (provider as ApiKeyProvider) : 'gemini';
+    const resolvedId = id ?? provider;
+
+    const result = await prisma.apiKey.updateMany({
+      where: { id: resolvedId, provider: resolvedProvider },
       data: {
         callCount: { increment: 1 },
         lastUsedAt: new Date(),
       },
     });
+
+    if (result.count === 0) {
+      throw new Error(getProviderKeyNotFoundMessage(resolvedProvider));
+    }
   }
 }
 
