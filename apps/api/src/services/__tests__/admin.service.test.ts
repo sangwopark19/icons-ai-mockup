@@ -30,6 +30,7 @@ vi.mock('../../lib/prisma.js', () => ({
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
+      deleteMany: vi.fn(),
       updateMany: vi.fn(),
     },
     $transaction: vi.fn(),
@@ -93,10 +94,45 @@ describe('AdminService - getDashboardStats', () => {
     expect(stats.failedJobCount).toBe(10);
     expect(stats.storageBytes).toBe(1024000);
     expect(stats.queueDepth).toBe(3); // waiting + active + delayed
-    expect(stats.activeApiKeys).toBeNull();
+    expect(stats.activeApiKeysByProvider).toEqual({ gemini: null, openai: null });
     expect(stats.userCountYesterday).toBe(5);
     expect(stats.generationCountYesterday).toBe(80);
     expect(stats.failedJobCountYesterday).toBe(8);
+  });
+
+  it('should return active key stats independently by provider', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { generationQueue } = await import('../../lib/queue.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.user.count).mockResolvedValue(0);
+    vi.mocked(prisma.generation.count).mockResolvedValue(0);
+    vi.mocked(prisma.generatedImage.aggregate).mockResolvedValue({
+      _sum: { fileSize: null },
+    } as any);
+    vi.mocked(generationQueue.getJobCounts).mockResolvedValue({
+      waiting: 0,
+      active: 0,
+      delayed: 0,
+    } as any);
+    vi.mocked(prisma.apiKey.findFirst)
+      .mockResolvedValueOnce({ alias: 'Gemini Primary', callCount: 12 } as any)
+      .mockResolvedValueOnce({ alias: 'OpenAI Primary', callCount: 7 } as any);
+
+    const stats = await adminService.getDashboardStats();
+
+    expect(stats.activeApiKeysByProvider).toEqual({
+      gemini: { alias: 'Gemini Primary', callCount: 12 },
+      openai: { alias: 'OpenAI Primary', callCount: 7 },
+    });
+    expect(vi.mocked(prisma.apiKey.findFirst)).toHaveBeenCalledWith({
+      where: { provider: 'gemini', isActive: true },
+      select: { alias: true, callCount: true },
+    });
+    expect(vi.mocked(prisma.apiKey.findFirst)).toHaveBeenCalledWith({
+      where: { provider: 'openai', isActive: true },
+      select: { alias: true, callCount: true },
+    });
   });
 
   it('should exclude deleted users from userCount', async () => {
@@ -793,6 +829,7 @@ describe('AdminService - listApiKeys', () => {
     vi.mocked(prisma.apiKey.findMany).mockResolvedValue([
       {
         id: 'k1',
+        provider: 'gemini',
         alias: 'Primary',
         maskedKey: '****ABCD',
         isActive: true,
@@ -803,10 +840,14 @@ describe('AdminService - listApiKeys', () => {
       },
     ] as any);
 
-    const result = await adminService.listApiKeys();
+    const result = await adminService.listApiKeys('gemini');
 
     expect(result[0]).not.toHaveProperty('encryptedKey');
     expect(result[0].maskedKey).toBe('****ABCD');
+    expect(result[0].provider).toBe('gemini');
+    expect(vi.mocked(prisma.apiKey.findMany)).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { provider: 'gemini' } })
+    );
   });
 
   it('should return all expected fields (alias, maskedKey, isActive, callCount)', async () => {
@@ -816,6 +857,7 @@ describe('AdminService - listApiKeys', () => {
     vi.mocked(prisma.apiKey.findMany).mockResolvedValue([
       {
         id: 'k1',
+        provider: 'openai',
         alias: 'Primary',
         maskedKey: '****ABCD',
         isActive: true,
@@ -826,10 +868,11 @@ describe('AdminService - listApiKeys', () => {
       },
     ] as any);
 
-    const result = await adminService.listApiKeys();
+    const result = await adminService.listApiKeys('openai');
 
     expect(result[0]).toMatchObject({
       id: 'k1',
+      provider: 'openai',
       alias: 'Primary',
       maskedKey: '****ABCD',
       isActive: true,
@@ -850,6 +893,7 @@ describe('AdminService - createApiKey', () => {
     const rawKey = 'AIzaSyD-testkey-ABCD';
     vi.mocked(prisma.apiKey.create).mockResolvedValue({
       id: 'k1',
+      provider: 'openai',
       alias: 'Test',
       maskedKey: 'ABCD',
       isActive: false,
@@ -858,9 +902,10 @@ describe('AdminService - createApiKey', () => {
       createdAt: new Date(),
     } as any);
 
-    await adminService.createApiKey('Test', rawKey);
+    await adminService.createApiKey('openai', 'Test', rawKey);
 
     const callArg = vi.mocked(prisma.apiKey.create).mock.calls[0][0] as any;
+    expect(callArg.data.provider).toBe('openai');
     // maskedKey should be last 4 chars only
     expect(callArg.data.maskedKey).toBe('ABCD');
     // encryptedKey must not be the raw key
@@ -874,6 +919,7 @@ describe('AdminService - createApiKey', () => {
 
     vi.mocked(prisma.apiKey.create).mockResolvedValue({
       id: 'k1',
+      provider: 'gemini',
       alias: 'Test',
       maskedKey: '1234',
       isActive: false,
@@ -882,7 +928,7 @@ describe('AdminService - createApiKey', () => {
       createdAt: new Date(),
     } as any);
 
-    await adminService.createApiKey('Test', 'AIzaSyD-key-1234');
+    await adminService.createApiKey('gemini', 'Test', 'AIzaSyD-key-1234');
 
     expect(vi.mocked(encrypt)).toHaveBeenCalled();
   });
@@ -897,36 +943,42 @@ describe('AdminService - deleteApiKey', () => {
     const { prisma } = await import('../../lib/prisma.js');
     const { adminService } = await import('../admin.service.js');
 
-    vi.mocked(prisma.apiKey.findUnique).mockResolvedValue({
+    vi.mocked(prisma.apiKey.findFirst).mockResolvedValue({
       id: 'k1',
+      provider: 'openai',
       isActive: true,
     } as any);
 
-    await expect(adminService.deleteApiKey('k1')).rejects.toThrow();
+    await expect(adminService.deleteApiKey('openai', 'k1')).rejects.toThrow();
   });
 
   it('should delete if key is not active (KEY-03)', async () => {
     const { prisma } = await import('../../lib/prisma.js');
     const { adminService } = await import('../admin.service.js');
 
-    vi.mocked(prisma.apiKey.findUnique).mockResolvedValue({
+    vi.mocked(prisma.apiKey.findFirst).mockResolvedValue({
       id: 'k1',
+      provider: 'openai',
       isActive: false,
     } as any);
-    vi.mocked(prisma.apiKey.delete).mockResolvedValue({} as any);
+    vi.mocked(prisma.apiKey.deleteMany).mockResolvedValue({ count: 1 });
 
-    await adminService.deleteApiKey('k1');
+    await adminService.deleteApiKey('openai', 'k1');
 
-    expect(vi.mocked(prisma.apiKey.delete)).toHaveBeenCalledWith({ where: { id: 'k1' } });
+    expect(vi.mocked(prisma.apiKey.deleteMany)).toHaveBeenCalledWith({
+      where: { id: 'k1', provider: 'openai' },
+    });
   });
 
   it('should throw if key is not found', async () => {
     const { prisma } = await import('../../lib/prisma.js');
     const { adminService } = await import('../admin.service.js');
 
-    vi.mocked(prisma.apiKey.findUnique).mockResolvedValue(null);
+    vi.mocked(prisma.apiKey.findFirst).mockResolvedValue(null);
 
-    await expect(adminService.deleteApiKey('nonexistent')).rejects.toThrow();
+    await expect(adminService.deleteApiKey('openai', 'nonexistent')).rejects.toThrow(
+      'OpenAI API 키를 찾을 수 없습니다'
+    );
   });
 });
 
@@ -939,25 +991,109 @@ describe('AdminService - activateApiKey', () => {
     const { prisma } = await import('../../lib/prisma.js');
     const { adminService } = await import('../admin.service.js');
 
-    vi.mocked(prisma.$transaction).mockImplementation(async (ops: any) => {
-      // Execute all operations
-      for (const op of ops) await op;
-      return [];
-    });
-    vi.mocked(prisma.apiKey.updateMany).mockResolvedValue({ count: 2 });
-    vi.mocked(prisma.apiKey.update).mockResolvedValue({
-      id: 'k2',
-      isActive: true,
-      alias: 'New',
-      maskedKey: 'EFGH',
-      callCount: 0,
-      lastUsedAt: null,
-      createdAt: new Date(),
-    } as any);
+    vi.mocked(prisma.apiKey.findFirst)
+      .mockResolvedValueOnce({
+        id: 'k2',
+        provider: 'openai',
+        isActive: false,
+      } as any)
+      .mockResolvedValueOnce({
+        id: 'k2',
+        provider: 'openai',
+        isActive: true,
+        alias: 'New',
+        maskedKey: 'EFGH',
+        callCount: 0,
+        lastUsedAt: null,
+        createdAt: new Date(),
+      } as any);
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) =>
+      callback(prisma as any)
+    );
+    vi.mocked(prisma.apiKey.updateMany).mockResolvedValue({ count: 1 });
 
-    await adminService.activateApiKey('k2');
+    await adminService.activateApiKey('openai', 'k2');
 
     expect(vi.mocked(prisma.$transaction)).toHaveBeenCalled();
+    expect(vi.mocked(prisma.apiKey.updateMany)).toHaveBeenNthCalledWith(1, {
+      where: { provider: 'openai', isActive: true },
+      data: { isActive: false },
+    });
+    expect(vi.mocked(prisma.apiKey.updateMany)).toHaveBeenNthCalledWith(2, {
+      where: { id: 'k2', provider: 'openai' },
+      data: { isActive: true },
+    });
+  });
+
+  it('should not deactivate the other provider when activating a key', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.apiKey.findFirst)
+      .mockResolvedValueOnce({
+        id: 'g2',
+        provider: 'gemini',
+        isActive: false,
+      } as any)
+      .mockResolvedValueOnce({
+        id: 'g2',
+        provider: 'gemini',
+        isActive: true,
+        alias: 'Gemini New',
+        maskedKey: 'EFGH',
+        callCount: 0,
+        lastUsedAt: null,
+        createdAt: new Date(),
+      } as any);
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) =>
+      callback(prisma as any)
+    );
+    vi.mocked(prisma.apiKey.updateMany).mockResolvedValue({ count: 1 });
+
+    await adminService.activateApiKey('gemini', 'g2');
+
+    expect(vi.mocked(prisma.apiKey.updateMany)).toHaveBeenNthCalledWith(1, {
+      where: { provider: 'gemini', isActive: true },
+      data: { isActive: false },
+    });
+    expect(vi.mocked(prisma.apiKey.updateMany)).not.toHaveBeenCalledWith(
+      expect.objectContaining({ where: { isActive: true } })
+    );
+  });
+
+  it('should return activated provider-scoped key data', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.apiKey.findFirst)
+      .mockResolvedValueOnce({
+        id: 'k2',
+        provider: 'openai',
+        isActive: false,
+      } as any)
+      .mockResolvedValueOnce({
+        id: 'k2',
+        provider: 'openai',
+        isActive: true,
+        alias: 'New',
+        maskedKey: 'EFGH',
+        callCount: 0,
+        lastUsedAt: null,
+        createdAt: new Date(),
+      } as any);
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) =>
+      callback(prisma as any)
+    );
+    vi.mocked(prisma.apiKey.updateMany).mockResolvedValue({ count: 1 });
+
+    const result = await adminService.activateApiKey('openai', 'k2');
+
+    expect(result).toMatchObject({
+      id: 'k2',
+      provider: 'openai',
+      alias: 'New',
+      isActive: true,
+    });
   });
 });
 
@@ -973,16 +1109,18 @@ describe('AdminService - getActiveApiKey', () => {
 
     vi.mocked(prisma.apiKey.findFirst).mockResolvedValue({
       id: 'k1',
+      provider: 'openai',
       encryptedKey: 'mock-iv:mock-tag:mock-data',
       isActive: true,
     } as any);
 
     // decrypt mock returns 'decrypted-key' by default
-    const result = await adminService.getActiveApiKey();
+    const result = await adminService.getActiveApiKey('openai');
     expect(vi.mocked(decrypt)).toHaveBeenCalled();
-    expect(typeof result === 'string' || (typeof result === 'object' && result !== null)).toBe(
-      true
-    );
+    expect(result).toEqual({ id: 'k1', provider: 'openai', key: 'decrypted-key' });
+    expect(vi.mocked(prisma.apiKey.findFirst)).toHaveBeenCalledWith({
+      where: { provider: 'openai', isActive: true },
+    });
   });
 
   it('should throw if no active key exists (KEY-05)', async () => {
@@ -991,8 +1129,8 @@ describe('AdminService - getActiveApiKey', () => {
 
     vi.mocked(prisma.apiKey.findFirst).mockResolvedValue(null);
 
-    await expect(adminService.getActiveApiKey()).rejects.toThrow(
-      'Gemini API 키가 설정되지 않았습니다'
+    await expect(adminService.getActiveApiKey('openai')).rejects.toThrow(
+      'OpenAI API 키가 설정되지 않았습니다'
     );
   });
 });
@@ -1006,13 +1144,13 @@ describe('AdminService - incrementCallCount', () => {
     const { prisma } = await import('../../lib/prisma.js');
     const { adminService } = await import('../admin.service.js');
 
-    vi.mocked(prisma.apiKey.update).mockResolvedValue({} as any);
+    vi.mocked(prisma.apiKey.updateMany).mockResolvedValue({ count: 1 });
 
-    await adminService.incrementCallCount('k1');
+    await adminService.incrementCallCount('openai', 'k1');
 
-    expect(vi.mocked(prisma.apiKey.update)).toHaveBeenCalledWith(
+    expect(vi.mocked(prisma.apiKey.updateMany)).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'k1' },
+        where: { id: 'k1', provider: 'openai' },
         data: expect.objectContaining({
           callCount: { increment: 1 },
           lastUsedAt: expect.any(Date),
