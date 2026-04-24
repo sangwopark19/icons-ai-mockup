@@ -40,6 +40,7 @@ interface CreateGenerationInput {
     removeShadows?: boolean;
     userInstructions?: string;
     hardwareSpecInput?: string;
+    quality?: 'low' | 'medium' | 'high';
     hardwareSpecs?: {
       items: Array<{
         type: 'zipper' | 'ring' | 'buckle' | 'patch' | 'button' | 'other';
@@ -185,6 +186,7 @@ export class GenerationService {
           removeShadows: input.options?.removeShadows ?? false,
           userInstructions: userInstructions || undefined,
           hardwareSpecInput: hardwareSpecInput || undefined,
+          quality: input.options?.quality,
           hardwareSpecs: input.options?.hardwareSpecs,
           outputCount: input.options?.outputCount ?? 2,
         },
@@ -213,6 +215,7 @@ export class GenerationService {
         removeShadows: input.options?.removeShadows ?? false,
         userInstructions: userInstructions || undefined,
         hardwareSpecInput: hardwareSpecInput || undefined,
+        quality: input.options?.quality,
         hardwareSpecs: input.options?.hardwareSpecs,
         outputCount: input.options?.outputCount ?? 2,
       },
@@ -353,6 +356,7 @@ export class GenerationService {
           original.userInstructions ??
           undefined,
         hardwareSpecInput: (options.hardwareSpecInput as string | undefined) ?? undefined,
+        quality: (options.quality as 'low' | 'medium' | 'high' | undefined) ?? undefined,
         hardwareSpecs: (options.hardwareSpecs as HardwareSpecOption | undefined) ?? undefined,
         outputCount: (options.outputCount as number | undefined) ?? 2,
       },
@@ -429,6 +433,7 @@ export class GenerationService {
         removeShadows: options.removeShadows ?? false,
         userInstructions: options.userInstructions ?? null,
         hardwareSpecInput: options.hardwareSpecInput ?? null,
+        quality: options.quality ?? null,
         hardwareSpecs: options.hardwareSpecs ?? null,
         outputCount: options.outputCount ?? 2,
       },
@@ -479,6 +484,7 @@ export class GenerationService {
           original.userInstructions ??
           undefined,
         hardwareSpecInput: (options.hardwareSpecInput as string | undefined) ?? undefined,
+        quality: (options.quality as 'low' | 'medium' | 'high' | undefined) ?? undefined,
         hardwareSpecs: (options.hardwareSpecs as HardwareSpecOption | undefined) ?? undefined,
         outputCount: (options.outputCount as number | undefined) ?? 2,
       },

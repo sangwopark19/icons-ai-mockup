@@ -25,6 +25,7 @@ const CreateGenerationSchema = z.object({
       removeShadows: z.boolean().optional(),
       userInstructions: z.string().max(2000).optional(),
       hardwareSpecInput: z.string().max(2000).optional(),
+      quality: z.enum(['low', 'medium', 'high']).optional(),
       hardwareSpecs: z
         .object({
           items: z.array(

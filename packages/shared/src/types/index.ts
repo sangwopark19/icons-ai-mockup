@@ -79,6 +79,7 @@ export const GenerationOptionsSchema = z.object({
   removeShadows: z.boolean().default(false),
   userInstructions: z.string().max(2000).optional(),
   hardwareSpecInput: z.string().max(2000).optional(),
+  quality: z.enum(['low', 'medium', 'high']).optional(),
   hardwareSpecs: z
     .object({
       items: z.array(

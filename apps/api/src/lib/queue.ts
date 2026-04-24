@@ -25,6 +25,7 @@ export interface GenerationJobData {
     removeShadows?: boolean;
     userInstructions?: string;
     hardwareSpecInput?: string;
+    quality?: 'low' | 'medium' | 'high';
     hardwareSpecs?: {
       items: Array<{
         type: 'zipper' | 'ring' | 'buckle' | 'patch' | 'button' | 'other';
