@@ -2,10 +2,19 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/stores/auth.store';
-import { adminApi, type AdminApiKey } from '@/lib/api';
+import { adminApi, type AdminApiKey, type AdminProvider } from '@/lib/api';
 import { ApiKeyTable } from './ApiKeyTable';
 import { AddKeyModal } from './AddKeyModal';
 import { ConfirmDialog } from '@/components/admin/confirm-dialog';
+
+const PROVIDER_OPTIONS: Array<{ value: AdminProvider; label: string }> = [
+  { value: 'gemini', label: 'Gemini' },
+  { value: 'openai', label: 'OpenAI' },
+];
+
+function getProviderLabel(provider: AdminProvider): string {
+  return PROVIDER_OPTIONS.find((option) => option.value === provider)?.label ?? provider;
+}
 
 interface ConfirmAction {
   type: 'delete' | 'activate';
@@ -15,6 +24,7 @@ interface ConfirmAction {
 
 export default function ApiKeysPage() {
   const { accessToken } = useAuthStore();
+  const [selectedProvider, setSelectedProvider] = useState<AdminProvider>('gemini');
   const [keys, setKeys] = useState<AdminApiKey[]>([]);
   const [loading, setLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -31,15 +41,15 @@ export default function ApiKeysPage() {
     if (!accessToken) return;
     setLoading(true);
     try {
-      const res = await adminApi.listApiKeys(accessToken);
+      const res = await adminApi.listApiKeys(accessToken, selectedProvider);
       setKeys(res.data);
     } catch (err) {
       console.error('Failed to fetch API keys:', err);
-      showToast('API 키 목록을 불러오지 못했습니다', 'error');
+      showToast(`${getProviderLabel(selectedProvider)} API 키 목록을 불러오지 못했습니다`, 'error');
     } finally {
       setLoading(false);
     }
-  }, [accessToken]);
+  }, [accessToken, selectedProvider]);
 
   useEffect(() => {
     fetchKeys();
@@ -48,12 +58,15 @@ export default function ApiKeysPage() {
   const handleAddKey = async (alias: string, apiKey: string) => {
     if (!accessToken) return;
     try {
-      await adminApi.createApiKey(accessToken, { alias, apiKey });
+      await adminApi.createApiKey(accessToken, { provider: selectedProvider, alias, apiKey });
       setShowAddModal(false);
       await fetchKeys();
-      showToast(`API 키 '${alias}'가 추가되었습니다`);
+      showToast(`${getProviderLabel(selectedProvider)} API 키 '${alias}'가 추가되었습니다`);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'API 키 추가에 실패했습니다';
+      const message =
+        err instanceof Error
+          ? err.message
+          : `${getProviderLabel(selectedProvider)} API 키 추가에 실패했습니다`;
       showToast(message, 'error');
       throw err;
     }
@@ -76,11 +89,15 @@ export default function ApiKeysPage() {
     setConfirmLoading(true);
     try {
       if (confirmAction.type === 'delete') {
-        await adminApi.deleteApiKey(accessToken, confirmAction.id);
-        showToast(`API 키 '${confirmAction.alias}'가 삭제되었습니다`);
+        await adminApi.deleteApiKey(accessToken, selectedProvider, confirmAction.id);
+        showToast(
+          `${getProviderLabel(selectedProvider)} API 키 '${confirmAction.alias}'가 삭제되었습니다`
+        );
       } else {
-        await adminApi.activateApiKey(accessToken, confirmAction.id);
-        showToast(`API 키 '${confirmAction.alias}'가 활성화되었습니다`);
+        await adminApi.activateApiKey(accessToken, selectedProvider, confirmAction.id);
+        showToast(
+          `${getProviderLabel(selectedProvider)} API 키 '${confirmAction.alias}'가 활성화되었습니다`
+        );
       }
       setConfirmAction(null);
       await fetchKeys();
@@ -98,19 +115,21 @@ export default function ApiKeysPage() {
   };
 
   const confirmTitle =
-    confirmAction?.type === 'delete' ? 'API 키 삭제' : 'API 키 활성화';
+    confirmAction?.type === 'delete'
+      ? `${getProviderLabel(selectedProvider)} API 키 삭제`
+      : `${getProviderLabel(selectedProvider)} API 키 활성화`;
 
   const confirmMessage =
     confirmAction?.type === 'delete'
-      ? `키 [${confirmAction?.alias}]을 삭제합니다`
-      : `활성 키를 [${confirmAction?.alias}]으로 전환합니다. 새 생성 작업부터 이 키를 사용합니다.`;
+      ? `${getProviderLabel(selectedProvider)} 키 [${confirmAction?.alias}]을 삭제합니다`
+      : `${getProviderLabel(selectedProvider)} 활성 키를 [${confirmAction?.alias}]으로 전환합니다. 새 ${getProviderLabel(selectedProvider)} 생성 작업부터 이 키를 사용합니다.`;
 
   return (
     <div className="space-y-6">
       {/* Toast notification */}
       {toast && (
         <div
-          className={`fixed top-4 right-4 z-50 px-4 py-2 rounded-lg shadow-lg text-sm text-white ${
+          className={`fixed right-4 top-4 z-50 rounded-lg px-4 py-2 text-sm text-white shadow-lg ${
             toast.type === 'error' ? 'bg-red-600' : 'bg-green-600'
           }`}
         >
@@ -123,15 +142,33 @@ export default function ApiKeysPage() {
         <h1 className="text-2xl font-bold text-[var(--text-primary)]">API 키 관리</h1>
         <button
           onClick={() => setShowAddModal(true)}
-          className="inline-flex items-center h-10 px-4 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 transition-colors"
+          className="inline-flex h-10 items-center rounded-lg bg-blue-600 px-4 text-sm font-medium text-white transition-colors hover:bg-blue-700 active:bg-blue-800"
         >
-          키 추가
+          {getProviderLabel(selectedProvider)} 키 추가
         </button>
+      </div>
+
+      <div className="inline-flex rounded-lg border border-[var(--border-default)] bg-[var(--bg-secondary)] p-1">
+        {PROVIDER_OPTIONS.map((provider) => (
+          <button
+            key={provider.value}
+            type="button"
+            onClick={() => setSelectedProvider(provider.value)}
+            className={`h-9 min-w-24 rounded-md px-4 text-sm font-medium transition-colors ${
+              selectedProvider === provider.value
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]'
+            }`}
+          >
+            {provider.label}
+          </button>
+        ))}
       </div>
 
       {/* API key table */}
       <ApiKeyTable
         keys={keys}
+        provider={selectedProvider}
         onDelete={handleDeleteClick}
         onActivate={handleActivateClick}
         loading={loading}
@@ -140,6 +177,7 @@ export default function ApiKeysPage() {
       {/* Add key modal */}
       <AddKeyModal
         isOpen={showAddModal}
+        provider={selectedProvider}
         onClose={() => setShowAddModal(false)}
         onSubmit={handleAddKey}
       />
