@@ -12,6 +12,8 @@
     "db:generate": "turbo run db:generate",
     "db:push": "turbo run db:push",
     "db:migrate": "turbo run db:migrate",
+    "gsd:patch-codex": "node scripts/apply-codex-gsd-subagent-patch.mjs",
+    "gsd:patch-codex:check": "node scripts/apply-codex-gsd-subagent-patch.mjs --check",
     "clean": "turbo run clean && rm -rf node_modules"
   },
   "devDependencies": {
