@@ -1,27 +1,29 @@
 ---
 phase: 08-openai-ip-change-parity
-reviewed: 2026-04-24T09:01:00Z
+reviewed: 2026-04-27T02:21:19Z
 depth: standard
-files_reviewed: 15
+files_reviewed: 17
 files_reviewed_list:
-  - 'apps/api/package.json'
-  - 'packages/shared/src/types/index.ts'
-  - 'apps/api/src/routes/generation.routes.ts'
-  - 'apps/api/src/services/generation.service.ts'
-  - 'apps/api/src/lib/queue.ts'
-  - 'apps/api/src/services/openai-image.service.ts'
-  - 'apps/api/src/services/__tests__/openai-image.service.test.ts'
-  - 'apps/api/src/services/__tests__/generation.service.test.ts'
-  - 'apps/api/src/worker.ts'
-  - 'apps/web/src/app/projects/[id]/page.tsx'
-  - 'apps/web/src/app/projects/[id]/ip-change/page.tsx'
-  - 'apps/web/src/app/projects/[id]/ip-change/openai/page.tsx'
-  - 'apps/web/src/app/projects/[id]/generations/[genId]/page.tsx'
-  - 'apps/web/src/app/projects/[id]/history/page.tsx'
-  - 'apps/web/src/lib/api.ts'
+  - apps/api/package.json
+  - apps/api/src/lib/queue.ts
+  - apps/api/src/routes/generation.routes.ts
+  - apps/api/src/services/__tests__/generation.service.test.ts
+  - apps/api/src/services/__tests__/openai-image.service.test.ts
+  - apps/api/src/services/generation.service.ts
+  - apps/api/src/services/openai-image.service.ts
+  - apps/api/src/worker.ts
+  - apps/web/src/app/projects/[id]/generations/[genId]/page.tsx
+  - apps/web/src/app/projects/[id]/history/page.tsx
+  - apps/web/src/app/projects/[id]/ip-change/openai/page.tsx
+  - apps/web/src/app/projects/[id]/ip-change/page.tsx
+  - apps/web/src/app/projects/[id]/page.tsx
+  - apps/web/src/lib/api.ts
+  - package.json
+  - packages/shared/src/types/index.ts
+  - scripts/apply-codex-gsd-subagent-patch.mjs
 findings:
-  critical: 1
-  warning: 3
+  critical: 2
+  warning: 2
   info: 0
   total: 4
 status: issues_found
@@ -29,123 +31,169 @@ status: issues_found
 
 # Phase 08: Code Review Report
 
-**Reviewed:** 2026-04-24T09:01:00Z
+**Reviewed:** 2026-04-27T02:21:19Z
 **Depth:** standard
-**Files Reviewed:** 15
+**Files Reviewed:** 17
 **Status:** issues_found
 
 ## Summary
 
-OpenAI IP change v2 flow, shared generation contracts, API generation routes/services, worker dispatch, result/history UI, and API client behavior were reviewed at standard depth. `pnpm-lock.yaml` was inspected for dependency context but excluded from `files_reviewed_list` as a lock file per review rules.
+Reviewed the requested phase 08 source scope plus current-PR source files outside the phase summary that affect runtime behavior (`package.json` and `scripts/apply-codex-gsd-subagent-patch.mjs`). Lockfile and planning artifacts were excluded from source review.
 
-Verification run:
-- `pnpm --filter @mockup-ai/api type-check` passed
-- `pnpm --filter @mockup-ai/web type-check` passed
-- `pnpm --filter @mockup-ai/api test -- src/services/__tests__/generation.service.test.ts src/services/__tests__/openai-image.service.test.ts` passed
+The main regressions are that the generation API persists jobs that the worker already knows cannot run, and OpenAI v2 exposes a transparent-background option that is silently ignored. Usage accounting for OpenAI is also undercounted, and the new Codex patch check command can pass despite warnings.
 
 ## Critical Issues
 
-### CR-01: Access Token Is Exposed In Download URL
+### CR-01: [BLOCKER] Generation creation accepts requests that are guaranteed to fail in the worker
 
-**File:** `apps/web/src/app/projects/[id]/generations/[genId]/page.tsx:158`
+**Files:**
+- `apps/api/src/routes/generation.routes.ts:8`
+- `apps/api/src/services/generation.service.ts:153`
+- `apps/api/src/worker.ts:105`
+- `apps/api/src/worker.ts:214`
 
-**Issue:** `handleDownload` appends the bearer access token to the download URL query string and opens it in a new tab. Query-string tokens are commonly persisted in browser history, server/proxy logs, and referrer surfaces. This turns a normal image download into credential exposure.
+**Issue:** `CreateGenerationSchema` makes `sourceImagePath`, `characterId`, and `characterImagePath` optional for every mode and does not reject `provider: "openai"` with `mode: "sketch_to_real"`. `GenerationService.create` resolves the provider and persists a pending generation before enforcing these mode/provider invariants. The worker later throws for missing IP-change images, missing sketch source images, or unsupported OpenAI non-IP modes. That means invalid authenticated API requests receive `201`, create durable generation records, enqueue jobs, then fail asynchronously instead of returning a synchronous validation error.
 
 **Fix:**
-```tsx
-const handleDownload = async (imageId: string) => {
-  if (!imageId) return;
-  const validToken = await getValidAccessToken();
-  if (!validToken) return;
+```ts
+const CreateGenerationSchema = z
+  .object({
+    projectId: z.string().uuid(),
+    mode: z.enum(['ip_change', 'sketch_to_real']),
+    provider: z.enum(['gemini', 'openai']).optional(),
+    providerModel: z.string().min(1).optional(),
+    sourceImagePath: z.string().optional(),
+    characterId: z.string().uuid().optional(),
+    characterImagePath: z.string().optional(),
+    textureImagePath: z.string().optional(),
+    prompt: z.string().max(2000).optional(),
+    options: GenerationOptionsSchema.optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.provider === 'openai' && value.mode !== 'ip_change') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['provider'],
+        message: 'OpenAI provider currently supports only ip_change',
+      });
+    }
 
-  const response = await apiFetch(`/api/images/${imageId}/download`, {
-    token: validToken,
+    if (value.mode === 'ip_change' && !value.sourceImagePath) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['sourceImagePath'],
+        message: 'sourceImagePath is required for ip_change',
+      });
+    }
+
+    if (value.mode === 'ip_change' && !value.characterId && !value.characterImagePath) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['characterImagePath'],
+        message: 'characterId or characterImagePath is required for ip_change',
+      });
+    }
+
+    if (value.mode === 'sketch_to_real' && !value.sourceImagePath) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['sourceImagePath'],
+        message: 'sourceImagePath is required for sketch_to_real',
+      });
+    }
   });
-  if (!response.ok) {
-    throw new Error('다운로드에 실패했습니다');
-  }
-
-  const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = `${imageId}.png`;
-  anchor.click();
-  URL.revokeObjectURL(url);
-};
 ```
+
+Add the same defensive checks in `GenerationService.create` before `prisma.generation.create`, so direct service callers cannot bypass route validation.
+
+### CR-02: [BLOCKER] OpenAI v2 transparent-background requests are accepted but always saved as opaque output
+
+**Files:**
+- `apps/web/src/app/projects/[id]/ip-change/openai/page.tsx:112`
+- `apps/web/src/app/projects/[id]/ip-change/openai/page.tsx:267`
+- `apps/api/src/worker.ts:116`
+- `apps/api/src/services/openai-image.service.ts:178`
+- `apps/api/src/services/generation.service.ts:537`
+
+**Issue:** The OpenAI v2 page exposes "투명 배경 (누끼)" and sends `transparentBackground` in the generation options. The worker passes that option into `openaiImageService.generateIPChange`, but the OpenAI prompt explicitly says to generate an opaque image first and there is no downstream background-removal step. The saved `GeneratedImage` is also hard-coded with `hasTransparency: false`. Users can request transparent output and get a completed generation that is always opaque, with metadata claiming no transparency.
+
+**Fix:**
+```ts
+const result = await openaiImageService.generateIPChange(...);
+let outputImages = result.images;
+let hasTransparency = false;
+
+if (options.transparentBackground) {
+  outputImages = await Promise.all(
+    result.images.map((image) => backgroundRemovalService.removeBackground(image))
+  );
+  hasTransparency = true;
+}
+
+generatedImages = outputImages;
+```
+
+Thread `hasTransparency` through `saveGeneratedImage`, persist it on `GeneratedImage`, and add a regression test that verifies OpenAI v2 transparent requests run the removal path. If background removal is not available yet, reject or hide the OpenAI transparent option instead of accepting it.
 
 ## Warnings
 
-### WR-01: OpenAI Input Files Are Always Labeled As PNG
+### WR-01: [WARNING] OpenAI API usage is undercounted by 50 percent for each successful v2 generation
 
-**File:** `apps/api/src/services/openai-image.service.ts:64`
+**Files:**
+- `apps/api/src/worker.ts:115`
+- `apps/api/src/services/openai-image.service.ts:67`
+- `apps/api/src/services/openai-image.service.ts:79`
+- `apps/api/src/services/admin.service.ts:767`
 
-**Issue:** `generateIPChange` sends both source and character inputs to `toFile` with `{ type: 'image/png' }`, but the upload API accepts JPEG, PNG, and WebP. A valid JPEG/WebP upload will be sent to OpenAI with the wrong MIME type, which can cause rejected edits or inconsistent provider behavior.
+**Issue:** The worker increments the active OpenAI key call count once before `generateIPChange`. That service then loops twice and performs two `client.images.edit` requests to produce two outputs. `AdminService.incrementCallCount` only increments by one, so admin usage/quota data reports one call for two actual OpenAI API calls.
 
-**Fix:**
+**Fix:** Make the accounting count match the provider calls. For example, add an `amount` parameter to `incrementCallCount` and increment after the OpenAI result returns:
+
 ```ts
-private detectMimeType(buffer: Buffer): 'image/png' | 'image/jpeg' | 'image/webp' {
-  if (buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) {
-    return 'image/png';
-  }
-  if (buffer.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff]))) {
-    return 'image/jpeg';
-  }
-  if (buffer.subarray(0, 4).toString('ascii') === 'RIFF' && buffer.subarray(8, 12).toString('ascii') === 'WEBP') {
-    return 'image/webp';
-  }
-  throw new Error('지원하지 않는 이미지 형식입니다');
+async incrementCallCount(provider: ApiKeyProvider, id: string, amount = 1): Promise<void> {
+  await prisma.apiKey.updateMany({
+    where: { id, provider },
+    data: {
+      callCount: { increment: amount },
+      lastUsedAt: new Date(),
+    },
+  });
 }
 
-const sourceBuffer = this.decodeBase64Image(sourceImageBase64);
-const sourceImage = await toFile(sourceBuffer, `source-product-${index + 1}`, {
-  type: this.detectMimeType(sourceBuffer),
-});
+const result = await openaiImageService.generateIPChange(...);
+await adminService.incrementCallCount(provider, activeKeyId, result.providerTrace.calls.length);
 ```
 
-### WR-02: Unsupported OpenAI Style Copy Can Still Be Enqueued
+If failed attempts should also be counted, move the increment into the same per-request boundary that calls `client.images.edit` and make that policy explicit in tests.
 
-**File:** `apps/api/src/services/generation.service.ts:486`
+### WR-02: [WARNING] `gsd:patch-codex:check` exits successfully when required patch targets are missing
 
-**Issue:** The result UI disables v2 style copy, and the worker rejects OpenAI jobs that contain `styleReferenceId`. However, the backend `copyStyle` path can still create a new OpenAI generation with `styleReferenceId: original.id`, enqueue it, and only fail later in the worker. Direct API callers can create guaranteed-failing jobs and failed generation records.
+**Files:**
+- `package.json:16`
+- `scripts/apply-codex-gsd-subagent-patch.mjs:109`
+- `scripts/apply-codex-gsd-subagent-patch.mjs:242`
+- `scripts/apply-codex-gsd-subagent-patch.mjs:246`
+
+**Issue:** `package.json` exposes `gsd:patch-codex:check` for validation. The script records missing files or missing insertion markers in `warnings`, but in `--check` mode it only sets `process.exitCode = 1` when `changes.length` is non-zero. If a required Codex config or workflow target is missing and no replacement is queued, the command prints warnings and exits 0, so CI or a preflight check can report that the patch is applied even though the script could not verify or apply it.
 
 **Fix:**
-```ts
-const original = await this.getById(userId, generationId);
-if (!original) {
-  throw new Error('생성 기록을 찾을 수 없습니다');
+```js
+if (warnings.length) {
+  console.error(`Warnings:\n${warnings.map((w) => `- ${w}`).join('\n')}`);
+  if (checkOnly) process.exitCode = 1;
 }
 
-if (original.provider === 'openai') {
-  throw new Error('OpenAI IP 변경 v2는 스타일 복사를 지원하지 않습니다');
+if (changes.length) {
+  console.log(`${dryRun ? 'Would update' : 'Updated'} ${changes.length} file(s):`);
+  for (const file of changes) console.log(`- ${file}`);
+  if (checkOnly) process.exitCode = 1;
 }
 ```
 
-### WR-03: History Pagination Accepts NaN, Zero, And Negative Values
-
-**File:** `apps/api/src/routes/generation.routes.ts:274`
-
-**Issue:** The history route parses `page` and `limit` with `parseInt` and passes the result directly to `getProjectHistory`. Values like `page=abc`, `page=-1`, or `limit=0` can produce `NaN`, negative `skip`, invalid `take`, or `Infinity` in `totalPages`, leading to incorrect responses or Prisma runtime errors.
-
-**Fix:**
-```ts
-const HistoryQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-});
-
-const { page, limit } = HistoryQuerySchema.parse(request.query);
-const { generations, total } = await generationService.getProjectHistory(
-  user.id,
-  projectId,
-  page,
-  limit
-);
-```
+Add a small script-level test or fixture run that verifies `--check` fails when a required marker or file is missing.
 
 ---
 
-_Reviewed: 2026-04-24T09:01:00Z_
-_Reviewer: Claude (gsd-code-reviewer)_
+_Reviewed: 2026-04-27T02:21:19Z_
+_Reviewer: the agent (gsd-code-reviewer)_
 _Depth: standard_
