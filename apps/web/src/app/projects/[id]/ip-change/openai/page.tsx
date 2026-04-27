@@ -28,7 +28,6 @@ export default function OpenAIIPChangePage() {
   const [characterPreview, setCharacterPreview] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [preserveStructure, setPreserveStructure] = useState(true);
-  const [transparentBg, setTransparentBg] = useState(false);
   const [preserveHardware, setPreserveHardware] = useState(false);
   const [fixedBackground, setFixedBackground] = useState(true);
   const [fixedViewpoint, setFixedViewpoint] = useState(true);
@@ -111,7 +110,6 @@ export default function OpenAIIPChangePage() {
           characterImagePath,
           options: {
             preserveStructure,
-            transparentBackground: transparentBg,
             preserveHardware,
             fixedBackground,
             fixedViewpoint,
@@ -263,15 +261,6 @@ export default function OpenAIIPChangePage() {
                 className="h-4 w-4 rounded border-[var(--border-default)] bg-[var(--bg-tertiary)]"
               />
               <span className="text-sm text-[var(--text-secondary)]">원본 구조 우선 유지</span>
-            </label>
-            <label className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                checked={transparentBg}
-                onChange={(event) => setTransparentBg(event.target.checked)}
-                className="h-4 w-4 rounded border-[var(--border-default)] bg-[var(--bg-tertiary)]"
-              />
-              <span className="text-sm text-[var(--text-secondary)]">투명 배경 (누끼)</span>
             </label>
             <label className="flex items-center gap-3">
               <input

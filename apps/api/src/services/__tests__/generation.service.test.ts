@@ -123,6 +123,86 @@ describe('GenerationService - provider contract', () => {
     });
   });
 
+  it('rejects OpenAI non-IP modes before creating a doomed worker job', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { addGenerationJob } = await import('../../lib/queue.js');
+    const { generationService } = await import('../generation.service.js');
+
+    vi.mocked(prisma.project.findFirst).mockResolvedValue({ id: 'proj1', userId: 'u1' } as any);
+
+    await expect(
+      generationService.create('u1', {
+        projectId: 'proj1',
+        mode: 'sketch_to_real',
+        provider: 'openai',
+        providerModel: 'gpt-image-2',
+        sourceImagePath: 'uploads/u1/proj1/source.png',
+      })
+    ).rejects.toThrow('OpenAI provider는 현재 IP 변경 v2만 지원합니다');
+
+    expect(vi.mocked(prisma.generation.create)).not.toHaveBeenCalled();
+    expect(vi.mocked(addGenerationJob)).not.toHaveBeenCalled();
+  });
+
+  it('rejects incomplete mode inputs before enqueueing guaranteed failures', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { addGenerationJob } = await import('../../lib/queue.js');
+    const { generationService } = await import('../generation.service.js');
+
+    vi.mocked(prisma.project.findFirst).mockResolvedValue({ id: 'proj1', userId: 'u1' } as any);
+
+    await expect(
+      generationService.create('u1', {
+        projectId: 'proj1',
+        mode: 'ip_change',
+        characterImagePath: 'characters/u1/character.png',
+      })
+    ).rejects.toThrow('IP 변경에는 원본 이미지가 필요합니다');
+
+    await expect(
+      generationService.create('u1', {
+        projectId: 'proj1',
+        mode: 'ip_change',
+        sourceImagePath: 'uploads/u1/proj1/source.png',
+      })
+    ).rejects.toThrow('IP 변경에는 캐릭터 이미지가 필요합니다');
+
+    await expect(
+      generationService.create('u1', {
+        projectId: 'proj1',
+        mode: 'sketch_to_real',
+      })
+    ).rejects.toThrow('스케치 실사화에는 원본 이미지가 필요합니다');
+
+    expect(vi.mocked(prisma.generation.create)).not.toHaveBeenCalled();
+    expect(vi.mocked(addGenerationJob)).not.toHaveBeenCalled();
+  });
+
+  it('rejects OpenAI transparent-background requests until v2 supports removal output', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { addGenerationJob } = await import('../../lib/queue.js');
+    const { generationService } = await import('../generation.service.js');
+
+    vi.mocked(prisma.project.findFirst).mockResolvedValue({ id: 'proj1', userId: 'u1' } as any);
+
+    await expect(
+      generationService.create('u1', {
+        projectId: 'proj1',
+        mode: 'ip_change',
+        provider: 'openai',
+        providerModel: 'gpt-image-2',
+        sourceImagePath: 'uploads/u1/proj1/source.png',
+        characterImagePath: 'characters/u1/character.png',
+        options: {
+          transparentBackground: true,
+        },
+      })
+    ).rejects.toThrow('OpenAI IP 변경 v2는 투명 배경을 아직 지원하지 않습니다');
+
+    expect(vi.mocked(prisma.generation.create)).not.toHaveBeenCalled();
+    expect(vi.mocked(addGenerationJob)).not.toHaveBeenCalled();
+  });
+
   it('updates OpenAI support metadata without raw response bodies', async () => {
     const { prisma } = await import('../../lib/prisma.js');
     const { generationService } = await import('../generation.service.js');

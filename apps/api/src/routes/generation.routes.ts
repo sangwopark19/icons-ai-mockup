@@ -5,44 +5,86 @@ import { generationService } from '../services/generation.service.js';
 /**
  * 요청 스키마
  */
-const CreateGenerationSchema = z.object({
-  projectId: z.string().uuid(),
-  mode: z.enum(['ip_change', 'sketch_to_real']),
-  provider: z.enum(['gemini', 'openai']).optional(),
-  providerModel: z.string().min(1).optional(),
-  sourceImagePath: z.string().optional(),
-  characterId: z.string().uuid().optional(),
-  characterImagePath: z.string().optional(), // 직접 업로드된 캐릭터 이미지 경로
-  textureImagePath: z.string().optional(),
-  prompt: z.string().max(2000).optional(),
-  options: z
-    .object({
-      preserveStructure: z.boolean().optional(),
-      transparentBackground: z.boolean().optional(),
-      preserveHardware: z.boolean().optional(),
-      fixedBackground: z.boolean().optional(),
-      fixedViewpoint: z.boolean().optional(),
-      removeShadows: z.boolean().optional(),
-      userInstructions: z.string().max(2000).optional(),
-      hardwareSpecInput: z.string().max(2000).optional(),
-      quality: z.enum(['low', 'medium', 'high']).optional(),
-      hardwareSpecs: z
-        .object({
-          items: z.array(
-            z.object({
-              type: z.enum(['zipper', 'ring', 'buckle', 'patch', 'button', 'other']),
-              material: z.string(),
-              color: z.string(),
-              position: z.string(),
-              size: z.string().optional(),
-            })
-          ),
-        })
-        .optional(),
-      outputCount: z.number().int().min(1).max(4).optional(),
-    })
-    .optional(),
-});
+const CreateGenerationSchema = z
+  .object({
+    projectId: z.string().uuid(),
+    mode: z.enum(['ip_change', 'sketch_to_real']),
+    provider: z.enum(['gemini', 'openai']).optional(),
+    providerModel: z.string().min(1).optional(),
+    sourceImagePath: z.string().optional(),
+    characterId: z.string().uuid().optional(),
+    characterImagePath: z.string().optional(), // 직접 업로드된 캐릭터 이미지 경로
+    textureImagePath: z.string().optional(),
+    prompt: z.string().max(2000).optional(),
+    options: z
+      .object({
+        preserveStructure: z.boolean().optional(),
+        transparentBackground: z.boolean().optional(),
+        preserveHardware: z.boolean().optional(),
+        fixedBackground: z.boolean().optional(),
+        fixedViewpoint: z.boolean().optional(),
+        removeShadows: z.boolean().optional(),
+        userInstructions: z.string().max(2000).optional(),
+        hardwareSpecInput: z.string().max(2000).optional(),
+        quality: z.enum(['low', 'medium', 'high']).optional(),
+        hardwareSpecs: z
+          .object({
+            items: z.array(
+              z.object({
+                type: z.enum(['zipper', 'ring', 'buckle', 'patch', 'button', 'other']),
+                material: z.string(),
+                color: z.string(),
+                position: z.string(),
+                size: z.string().optional(),
+              })
+            ),
+          })
+          .optional(),
+        outputCount: z.number().int().min(1).max(4).optional(),
+      })
+      .optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.provider === 'openai' && value.mode !== 'ip_change') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['provider'],
+        message: 'OpenAI provider는 현재 IP 변경 v2만 지원합니다',
+      });
+    }
+
+    if (value.mode === 'ip_change' && !value.sourceImagePath) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['sourceImagePath'],
+        message: 'IP 변경에는 원본 이미지가 필요합니다',
+      });
+    }
+
+    if (value.mode === 'ip_change' && !value.characterId && !value.characterImagePath) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['characterImagePath'],
+        message: 'IP 변경에는 캐릭터 이미지가 필요합니다',
+      });
+    }
+
+    if (value.mode === 'sketch_to_real' && !value.sourceImagePath) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['sourceImagePath'],
+        message: '스케치 실사화에는 원본 이미지가 필요합니다',
+      });
+    }
+
+    if (value.provider === 'openai' && value.options?.transparentBackground) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['options', 'transparentBackground'],
+        message: 'OpenAI IP 변경 v2는 투명 배경을 아직 지원하지 않습니다',
+      });
+    }
+  });
 
 const SelectImageSchema = z.object({
   imageId: z.string().uuid(),

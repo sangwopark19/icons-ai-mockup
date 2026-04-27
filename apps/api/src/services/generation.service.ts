@@ -115,6 +115,33 @@ function resolveGenerationProvider(input: CreateGenerationInput): {
   return { provider, providerModel };
 }
 
+function validateCreateGenerationInput(
+  input: CreateGenerationInput,
+  provider: GenerationProvider
+): void {
+  if (provider === 'openai' && input.mode !== 'ip_change') {
+    throw new Error('OpenAI provider는 현재 IP 변경 v2만 지원합니다');
+  }
+
+  if (input.mode === 'ip_change') {
+    if (!input.sourceImagePath) {
+      throw new Error('IP 변경에는 원본 이미지가 필요합니다');
+    }
+
+    if (!input.characterId && !input.characterImagePath) {
+      throw new Error('IP 변경에는 캐릭터 이미지가 필요합니다');
+    }
+  }
+
+  if (input.mode === 'sketch_to_real' && !input.sourceImagePath) {
+    throw new Error('스케치 실사화에는 원본 이미지가 필요합니다');
+  }
+
+  if (provider === 'openai' && input.options?.transparentBackground) {
+    throw new Error('OpenAI IP 변경 v2는 투명 배경을 아직 지원하지 않습니다');
+  }
+}
+
 /**
  * 생성 서비스
  */
@@ -134,6 +161,9 @@ export class GenerationService {
 
     // 캐릭터 이미지 경로 결정 (IP 변경 모드일 경우)
     let characterImagePath: string | undefined = input.characterImagePath;
+    const { provider, providerModel } = resolveGenerationProvider(input);
+
+    validateCreateGenerationInput(input, provider);
 
     // characterId가 제공된 경우 DB에서 가져옴
     if (input.mode === 'ip_change' && input.characterId && !characterImagePath) {
@@ -150,7 +180,6 @@ export class GenerationService {
 
     const userInstructions = input.options?.userInstructions?.trim();
     const hardwareSpecInput = input.options?.hardwareSpecInput?.trim();
-    const { provider, providerModel } = resolveGenerationProvider(input);
     const validatedPaths = await validateGenerationImagePaths(userId, input.projectId, {
       sourceImagePath: input.sourceImagePath,
       characterImagePath,
