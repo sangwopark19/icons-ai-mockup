@@ -27,26 +27,21 @@ const pngBase64 = Buffer.from([
 describe('OpenAIImageService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.edit
-      .mockResolvedValueOnce({
-        _request_id: 'req_1',
-        id: 'resp_1',
-        data: [{ b64_json: Buffer.from('candidate-1').toString('base64'), id: 'img_1' }],
-      })
-      .mockResolvedValueOnce({
-        _request_id: 'req_2',
-        id: 'resp_2',
-        data: [
-          {
-            b64_json: Buffer.from('candidate-2').toString('base64'),
-            id: 'img_2',
-            revised_prompt: 'revised',
-          },
-        ],
-      });
+    mocks.edit.mockResolvedValue({
+      _request_id: 'req_1',
+      id: 'resp_1',
+      data: [
+        { b64_json: Buffer.from('candidate-1').toString('base64'), id: 'img_1' },
+        {
+          b64_json: Buffer.from('candidate-2').toString('base64'),
+          id: 'img_2',
+          revised_prompt: 'revised',
+        },
+      ],
+    });
   });
 
-  it('returns exactly two image buffers from two edit calls', async () => {
+  it('returns exactly two image buffers from one edit call', async () => {
     const { openaiImageService } = await import('../openai-image.service.js');
 
     const result = await openaiImageService.generateIPChange(
@@ -61,11 +56,11 @@ describe('OpenAIImageService', () => {
       }
     );
 
-    expect(mocks.edit).toHaveBeenCalledTimes(2);
+    expect(mocks.edit).toHaveBeenCalledTimes(1);
     expect(result.images).toHaveLength(2);
     expect(result.images[0].toString()).toBe('candidate-1');
     expect(result.images[1].toString()).toBe('candidate-2');
-    expect(result.requestIds).toEqual(['req_1', 'req_2']);
+    expect(result.requestIds).toEqual(['req_1']);
     expect(result.responseId).toBe('resp_1');
     expect(result.imageCallIds).toEqual(['img_1', 'img_2']);
     expect(result.revisedPrompt).toBe('revised');
@@ -91,7 +86,7 @@ describe('OpenAIImageService', () => {
     expect(firstCall).toMatchObject({
       model: 'gpt-image-2',
       quality: 'high',
-      n: 1,
+      n: 2,
       size: '1024x1024',
       output_format: 'png',
     });

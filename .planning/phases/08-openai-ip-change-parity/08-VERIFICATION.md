@@ -32,7 +32,7 @@ human_verification:
 | # | Truth | Status | Evidence |
 |---|---|---|---|
 | 1 | Users can enter OpenAI IP Change v2 from the same project context as Gemini/v1. | VERIFIED | `apps/web/src/app/projects/[id]/page.tsx` renders `IP 변경 v1`, `IP 변경 v2`, keeps `/ip-change`, and links v2 to `/ip-change/openai`. |
-| 2 | OpenAI IP Change creates two candidates and carries structure/viewpoint/background/hardware/quality options. | VERIFIED | `openai-image.service.ts` calls `client.images.edit()` twice with `model: 'gpt-image-2'`, returns two buffers, uses strict `Must change`/`Must preserve` prompt sections, and tests assert no `background` or `input_fidelity`. |
+| 2 | OpenAI IP Change creates two candidates and carries structure/viewpoint/background/hardware/quality options. | VERIFIED | `openai-image.service.ts` calls `client.images.edit()` once with `model: 'gpt-image-2'` and `n: 2`, returns two buffers, uses strict `Must change`/`Must preserve` prompt sections, and tests assert no `background` or `input_fidelity`. |
 | 3 | v2 outputs can be selected, saved, reopened from history, and downloaded through existing lifecycle. | VERIFIED | Result page uses `/select`, `/save`, authenticated blob download, v2 candidate labels, disabled unsupported follow-ups, and history links back to `/generations/:id` with v1/v2 badges. |
 | 4 | Gemini/v1 behavior remains available and product UI hides provider/model details. | VERIFIED | v1 form still submits `mode: 'ip_change'` without OpenAI provider/model fields; worker keeps Gemini branches; product screens show v1/v2 labels while raw provider/model strings remain internal payload/type values. |
 
@@ -42,7 +42,7 @@ human_verification:
 
 | Artifact | Expected | Status | Details |
 |---|---|---|---|
-| `apps/api/src/services/openai-image.service.ts` | Parallel OpenAI IP Change runtime | VERIFIED | Dedicated service, `gpt-image-2`, two edit calls, request/support metadata, MIME detection fix from review. |
+| `apps/api/src/services/openai-image.service.ts` | Parallel OpenAI IP Change runtime | VERIFIED | Dedicated service, `gpt-image-2`, single `n: 2` edit call, request/support metadata, MIME detection fix from review. |
 | `apps/api/src/worker.ts` | Provider-gated dispatch | VERIFIED | Validates queued vs persisted provider/model, allows only OpenAI `ip_change`, blocks other OpenAI modes. |
 | `apps/api/src/services/generation.service.ts` | Provider/model, quality, metadata, save lifecycle | VERIFIED | Persists/enqueues quality, validates provider model, stores OpenAI metadata, blocks OpenAI style-copy enqueue. |
 | `apps/web/src/app/projects/[id]/ip-change/openai/page.tsx` | v2 form | VERIFIED | v2 defaults, two-image requirement, quality radio labels, hidden OpenAI payload, `outputCount: 2`. |
@@ -98,7 +98,7 @@ No blocking implementation anti-patterns found. Static scan found expected opera
 
 1. **Real OpenAI GPT Image 2 smoke**
    - Test: Run the Phase 8 `images-edit.sh` smoke with `OPENAI_API_KEY`, one product source image, and one character reference image.
-   - Expected: Two usable candidates or two successful service calls, request IDs recorded, no `background: "transparent"` or `input_fidelity` sent.
+   - Expected: Two usable candidates from one `n: 2` edit call, request IDs recorded, no `background: "transparent"` or `input_fidelity` sent.
    - Why human: Credentials and representative images are unavailable in this environment.
 
 2. **Authenticated browser walkthrough**

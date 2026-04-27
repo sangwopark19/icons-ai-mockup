@@ -203,6 +203,31 @@ describe('GenerationService - provider contract', () => {
     expect(vi.mocked(addGenerationJob)).not.toHaveBeenCalled();
   });
 
+  it('rejects OpenAI outputCount values outside the v2 two-candidate contract', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { addGenerationJob } = await import('../../lib/queue.js');
+    const { generationService } = await import('../generation.service.js');
+
+    vi.mocked(prisma.project.findFirst).mockResolvedValue({ id: 'proj1', userId: 'u1' } as any);
+
+    await expect(
+      generationService.create('u1', {
+        projectId: 'proj1',
+        mode: 'ip_change',
+        provider: 'openai',
+        providerModel: 'gpt-image-2',
+        sourceImagePath: 'uploads/u1/proj1/source.png',
+        characterImagePath: 'characters/u1/character.png',
+        options: {
+          outputCount: 4,
+        },
+      })
+    ).rejects.toThrow('OpenAI IP 변경 v2는 후보 2개 생성만 지원합니다');
+
+    expect(vi.mocked(prisma.generation.create)).not.toHaveBeenCalled();
+    expect(vi.mocked(addGenerationJob)).not.toHaveBeenCalled();
+  });
+
   it('updates OpenAI support metadata without raw response bodies', async () => {
     const { prisma } = await import('../../lib/prisma.js');
     const { generationService } = await import('../generation.service.js');
@@ -321,6 +346,42 @@ describe('GenerationService - copyStyle', () => {
         characterImagePath: 'characters/u1/character.png',
       })
     ).rejects.toThrow('OpenAI IP 변경 v2는 스타일 복사를 지원하지 않습니다');
+
+    expect(vi.mocked(prisma.generation.create)).not.toHaveBeenCalled();
+    expect(vi.mocked(addGenerationJob)).not.toHaveBeenCalled();
+  });
+});
+
+describe('GenerationService - regenerate', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('rejects OpenAI v2 regeneration before enqueueing a failing worker job', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { addGenerationJob } = await import('../../lib/queue.js');
+    const { generationService } = await import('../generation.service.js');
+
+    vi.mocked(prisma.generation.findFirst).mockResolvedValue({
+      id: 'gen1',
+      projectId: 'proj1',
+      project: { userId: 'u1' },
+      images: [],
+      provider: 'openai',
+      providerModel: 'gpt-image-2',
+      mode: 'ip_change',
+      promptData: {
+        sourceImagePath: 'uploads/u1/proj1/source.png',
+        characterImagePath: 'characters/u1/character.png',
+      },
+      options: {
+        outputCount: 2,
+      },
+    } as any);
+
+    await expect(generationService.regenerate('u1', 'gen1')).rejects.toThrow(
+      'OpenAI IP 변경 v2는 동일 조건 재생성을 지원하지 않습니다'
+    );
 
     expect(vi.mocked(prisma.generation.create)).not.toHaveBeenCalled();
     expect(vi.mocked(addGenerationJob)).not.toHaveBeenCalled();

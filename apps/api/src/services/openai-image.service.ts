@@ -56,50 +56,53 @@ export class OpenAIImageService {
     const images: Buffer[] = [];
     const requestIds: string[] = [];
     const imageCallIds: string[] = [];
-    const responseIds: string[] = [];
     const revisedPrompts: string[] = [];
-    const calls: Array<Record<string, unknown>> = [];
+    const candidates: Array<Record<string, unknown>> = [];
     const sourceBuffer = this.decodeBase64Image(sourceImageBase64);
     const characterBuffer = this.decodeBase64Image(characterImageBase64);
     const sourceMimeType = this.detectMimeType(sourceBuffer);
     const characterMimeType = this.detectMimeType(characterBuffer);
 
-    for (let index = 0; index < 2; index++) {
-      const sourceImage = await toFile(
-        sourceBuffer,
-        `source-product-${index + 1}.${this.extensionForMimeType(sourceMimeType)}`,
-        { type: sourceMimeType }
-      );
-      const characterImage = await toFile(
-        characterBuffer,
-        `character-reference-${index + 1}.${this.extensionForMimeType(characterMimeType)}`,
-        { type: characterMimeType }
-      );
+    const sourceImage = await toFile(
+      sourceBuffer,
+      `source-product.${this.extensionForMimeType(sourceMimeType)}`,
+      { type: sourceMimeType }
+    );
+    const characterImage = await toFile(
+      characterBuffer,
+      `character-reference.${this.extensionForMimeType(characterMimeType)}`,
+      { type: characterMimeType }
+    );
 
-      const response = (await client.images.edit({
-        model: this.model,
-        image: [sourceImage, characterImage],
-        prompt,
-        quality,
-        n: 1,
-        size: '1024x1024',
-        output_format: 'png',
-      })) as OpenAIImageResponse;
+    const response = (await client.images.edit({
+      model: this.model,
+      image: [sourceImage, characterImage],
+      prompt,
+      quality,
+      n: 2,
+      size: '1024x1024',
+      output_format: 'png',
+    })) as OpenAIImageResponse;
 
-      const image = response.data?.[0];
+    const responseImages = response.data ?? [];
+    if (responseImages.length < 2) {
+      throw new Error('OpenAI IP 변경 결과 이미지가 부족합니다');
+    }
+
+    if (response._request_id) requestIds.push(response._request_id);
+
+    for (const [index, image] of responseImages.slice(0, 2).entries()) {
       if (!image?.b64_json) {
         throw new Error('OpenAI IP 변경 결과 이미지가 없습니다');
       }
 
       images.push(Buffer.from(image.b64_json, 'base64'));
 
-      if (response._request_id) requestIds.push(response._request_id);
-      if (response.id) responseIds.push(response.id);
       if (image.id) imageCallIds.push(image.id);
       if (image.call_id) imageCallIds.push(image.call_id);
       if (image.revised_prompt) revisedPrompts.push(image.revised_prompt);
 
-      calls.push({
+      candidates.push({
         index: index + 1,
         requestId: response._request_id ?? null,
         responseId: response.id ?? null,
@@ -111,7 +114,7 @@ export class OpenAIImageService {
     return {
       images,
       requestIds,
-      responseId: responseIds[0],
+      responseId: response.id,
       imageCallIds,
       revisedPrompt: revisedPrompts[0],
       providerTrace: {
@@ -120,7 +123,8 @@ export class OpenAIImageService {
         endpoint: 'images.edit',
         quality,
         outputCount: images.length,
-        calls,
+        externalRequestCount: 1,
+        candidates,
       },
     };
   }

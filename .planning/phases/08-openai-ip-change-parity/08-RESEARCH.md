@@ -61,9 +61,9 @@ Planning implication: add a parallel OpenAI service, likely `apps/api/src/servic
 
 ### 4. Two candidates are a product contract
 
-The existing Gemini IP Change path loops to generate two images in `apps/api/src/services/gemini.service.ts`. OpenAI guidance says two explicit requests are the safest implementation until the live endpoint's multi-output behavior is verified for this app's chosen SDK call.
+The existing Gemini IP Change path loops to generate two images in `apps/api/src/services/gemini.service.ts`. The OpenAI Image API and installed SDK expose `n`, so the v2 path should request two edited images in one `images.edit` call where supported.
 
-Planning implication: Phase 8 plans should make the OpenAI service return exactly two `Buffer` outputs for IP Change. If a single OpenAI request returns multiple images reliably in the selected SDK version, use that; otherwise run two explicit edit requests and capture request metadata.
+Planning implication: Phase 8 plans should make the OpenAI service return exactly two `Buffer` outputs for IP Change. Use one `images.edit` request with `n: 2` and capture request plus per-candidate metadata.
 
 ### 5. The existing form is reusable, but v2 defaults differ
 

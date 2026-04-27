@@ -84,6 +84,18 @@ const CreateGenerationSchema = z
         message: 'OpenAI IP 변경 v2는 투명 배경을 아직 지원하지 않습니다',
       });
     }
+
+    if (
+      value.provider === 'openai' &&
+      value.options?.outputCount !== undefined &&
+      value.options.outputCount !== 2
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['options', 'outputCount'],
+        message: 'OpenAI IP 변경 v2는 후보 2개 생성만 지원합니다',
+      });
+    }
   });
 
 const SelectImageSchema = z.object({
@@ -113,10 +125,20 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
    */
   fastify.post('/', async (request, reply) => {
     const user = (request as any).user;
-    const body = CreateGenerationSchema.parse(request.body);
+    const parsed = CreateGenerationSchema.safeParse(request.body);
+
+    if (!parsed.success) {
+      return reply.code(400).send({
+        success: false,
+        error: {
+          code: 'GENERATION_FAILED',
+          message: parsed.error.issues[0]?.message ?? '생성 요청에 실패했습니다',
+        },
+      });
+    }
 
     try {
-      const generation = await generationService.create(user.id, body);
+      const generation = await generationService.create(user.id, parsed.data);
 
       return reply.code(201).send({
         success: true,

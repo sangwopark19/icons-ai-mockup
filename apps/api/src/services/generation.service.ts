@@ -140,6 +140,14 @@ function validateCreateGenerationInput(
   if (provider === 'openai' && input.options?.transparentBackground) {
     throw new Error('OpenAI IP 변경 v2는 투명 배경을 아직 지원하지 않습니다');
   }
+
+  if (
+    provider === 'openai' &&
+    input.options?.outputCount !== undefined &&
+    input.options.outputCount !== 2
+  ) {
+    throw new Error('OpenAI IP 변경 v2는 후보 2개 생성만 지원합니다');
+  }
 }
 
 /**
@@ -377,6 +385,10 @@ export class GenerationService {
     const original = await this.getById(userId, generationId);
     if (!original) {
       throw new Error('생성 기록을 찾을 수 없습니다');
+    }
+
+    if (original.provider === 'openai') {
+      throw new Error('OpenAI IP 변경 v2는 동일 조건 재생성을 지원하지 않습니다');
     }
 
     const promptData = (original.promptData as Record<string, unknown>) || {};

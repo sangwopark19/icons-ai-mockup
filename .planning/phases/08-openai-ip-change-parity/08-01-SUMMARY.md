@@ -29,7 +29,7 @@ key-files:
     - apps/api/src/worker.ts
 key-decisions:
   - "OpenAI IP Change uses a separate openai-image.service.ts instead of mixing provider code into gemini.service.ts."
-  - "Two v2 candidates are produced through two explicit images.edit calls until multi-output behavior is live-verified."
+  - "Two v2 candidates are produced through one images.edit call with n=2."
   - "gpt-image-2 requests omit background and input_fidelity; transparent-background intent remains an app option, not an OpenAI request parameter."
 patterns-established:
   - "OpenAI support IDs are stored in existing OpenAI fields and providerTrace without raw response bodies."
@@ -55,7 +55,7 @@ completed: 2026-04-24
 
 - Added the official `openai` SDK to `@mockup-ai/api`.
 - Added `quality: low | medium | high` through shared schema, API validation, persistence, and BullMQ payloads.
-- Created a dedicated OpenAI image service that calls `client.images.edit()` twice and returns exactly two candidate buffers.
+- Created a dedicated OpenAI image service that calls `client.images.edit()` once with `n: 2` and returns exactly two candidate buffers.
 - Updated the worker so `provider === "openai"` runs only `mode === "ip_change"` and blocks other OpenAI modes with an explicit Korean error.
 - Persisted OpenAI request/response/image-call/revised-prompt metadata using existing Phase 7 schema fields.
 
@@ -79,7 +79,7 @@ completed: 2026-04-24
 
 ## Decisions Made
 
-- Used two explicit `images.edit` calls to guarantee two candidates without assuming live multi-output behavior.
+- Used one `images.edit` call with `n: 2` to align the two-candidate product contract with a single external request.
 - Stored multiple request IDs and image call IDs as comma-separated values in the existing singular support fields, with structured detail retained in `providerTrace`.
 - Kept non-IP OpenAI modes blocked in worker until their roadmap phases add runtime support.
 
