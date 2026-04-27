@@ -5,43 +5,98 @@ import { generationService } from '../services/generation.service.js';
 /**
  * 요청 스키마
  */
-const CreateGenerationSchema = z.object({
-  projectId: z.string().uuid(),
-  mode: z.enum(['ip_change', 'sketch_to_real']),
-  provider: z.enum(['gemini', 'openai']).optional(),
-  providerModel: z.string().min(1).optional(),
-  sourceImagePath: z.string().optional(),
-  characterId: z.string().uuid().optional(),
-  characterImagePath: z.string().optional(), // 직접 업로드된 캐릭터 이미지 경로
-  textureImagePath: z.string().optional(),
-  prompt: z.string().max(2000).optional(),
-  options: z
-    .object({
-      preserveStructure: z.boolean().optional(),
-      transparentBackground: z.boolean().optional(),
-      preserveHardware: z.boolean().optional(),
-      fixedBackground: z.boolean().optional(),
-      fixedViewpoint: z.boolean().optional(),
-      removeShadows: z.boolean().optional(),
-      userInstructions: z.string().max(2000).optional(),
-      hardwareSpecInput: z.string().max(2000).optional(),
-      hardwareSpecs: z
-        .object({
-          items: z.array(
-            z.object({
-              type: z.enum(['zipper', 'ring', 'buckle', 'patch', 'button', 'other']),
-              material: z.string(),
-              color: z.string(),
-              position: z.string(),
-              size: z.string().optional(),
-            })
-          ),
-        })
-        .optional(),
-      outputCount: z.number().int().min(1).max(4).optional(),
-    })
-    .optional(),
-});
+const CreateGenerationSchema = z
+  .object({
+    projectId: z.string().uuid(),
+    mode: z.enum(['ip_change', 'sketch_to_real']),
+    provider: z.enum(['gemini', 'openai']).optional(),
+    providerModel: z.string().min(1).optional(),
+    sourceImagePath: z.string().optional(),
+    characterId: z.string().uuid().optional(),
+    characterImagePath: z.string().optional(), // 직접 업로드된 캐릭터 이미지 경로
+    textureImagePath: z.string().optional(),
+    prompt: z.string().max(2000).optional(),
+    options: z
+      .object({
+        preserveStructure: z.boolean().optional(),
+        transparentBackground: z.boolean().optional(),
+        preserveHardware: z.boolean().optional(),
+        fixedBackground: z.boolean().optional(),
+        fixedViewpoint: z.boolean().optional(),
+        removeShadows: z.boolean().optional(),
+        userInstructions: z.string().max(2000).optional(),
+        hardwareSpecInput: z.string().max(2000).optional(),
+        quality: z.enum(['low', 'medium', 'high']).optional(),
+        hardwareSpecs: z
+          .object({
+            items: z.array(
+              z.object({
+                type: z.enum(['zipper', 'ring', 'buckle', 'patch', 'button', 'other']),
+                material: z.string(),
+                color: z.string(),
+                position: z.string(),
+                size: z.string().optional(),
+              })
+            ),
+          })
+          .optional(),
+        outputCount: z.number().int().min(1).max(4).optional(),
+      })
+      .optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.provider === 'openai' && value.mode !== 'ip_change') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['provider'],
+        message: 'OpenAI provider는 현재 IP 변경 v2만 지원합니다',
+      });
+    }
+
+    if (value.mode === 'ip_change' && !value.sourceImagePath) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['sourceImagePath'],
+        message: 'IP 변경에는 원본 이미지가 필요합니다',
+      });
+    }
+
+    if (value.mode === 'ip_change' && !value.characterId && !value.characterImagePath) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['characterImagePath'],
+        message: 'IP 변경에는 캐릭터 이미지가 필요합니다',
+      });
+    }
+
+    if (value.mode === 'sketch_to_real' && !value.sourceImagePath) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['sourceImagePath'],
+        message: '스케치 실사화에는 원본 이미지가 필요합니다',
+      });
+    }
+
+    if (value.provider === 'openai' && value.options?.transparentBackground) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['options', 'transparentBackground'],
+        message: 'OpenAI IP 변경 v2는 투명 배경을 아직 지원하지 않습니다',
+      });
+    }
+
+    if (
+      value.provider === 'openai' &&
+      value.options?.outputCount !== undefined &&
+      value.options.outputCount !== 2
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['options', 'outputCount'],
+        message: 'OpenAI IP 변경 v2는 후보 2개 생성만 지원합니다',
+      });
+    }
+  });
 
 const SelectImageSchema = z.object({
   imageId: z.string().uuid(),
@@ -50,6 +105,11 @@ const SelectImageSchema = z.object({
 const CopyStyleSchema = z.object({
   characterImagePath: z.string().optional(),
   sourceImagePath: z.string().optional(),
+});
+
+const HistoryQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
 });
 
 /**
@@ -65,10 +125,20 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
    */
   fastify.post('/', async (request, reply) => {
     const user = (request as any).user;
-    const body = CreateGenerationSchema.parse(request.body);
+    const parsed = CreateGenerationSchema.safeParse(request.body);
+
+    if (!parsed.success) {
+      return reply.code(400).send({
+        success: false,
+        error: {
+          code: 'GENERATION_FAILED',
+          message: parsed.error.issues[0]?.message ?? '생성 요청에 실패했습니다',
+        },
+      });
+    }
 
     try {
-      const generation = await generationService.create(user.id, body);
+      const generation = await generationService.create(user.id, parsed.data);
 
       return reply.code(201).send({
         success: true,
@@ -270,14 +340,14 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get('/project/:projectId/history', async (request, reply) => {
     const user = (request as any).user;
     const { projectId } = request.params as { projectId: string };
-    const { page = '1', limit = '20' } = request.query as { page?: string; limit?: string };
+    const { page, limit } = HistoryQuerySchema.parse(request.query);
 
     try {
       const { generations, total } = await generationService.getProjectHistory(
         user.id,
         projectId,
-        parseInt(page),
-        parseInt(limit)
+        page,
+        limit
       );
 
       return reply.send({
@@ -294,10 +364,10 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
             : null,
         })),
         pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
+          page,
+          limit,
           total,
-          totalPages: Math.ceil(total / parseInt(limit)),
+          totalPages: Math.ceil(total / limit),
         },
       });
     } catch (error) {

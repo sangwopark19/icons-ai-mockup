@@ -6,22 +6,7 @@ import Link from 'next/link';
 import { useAuthStore } from '@/stores/auth.store';
 import { Button } from '@/components/ui/button';
 import { formatRelativeTime } from '@/lib/utils';
-import { API_URL, apiFetch } from '@/lib/api';
-
-interface HistoryItem {
-  id: string;
-  mode: string;
-  createdAt: string;
-  selectedImage: {
-    id: string;
-    filePath: string;
-    thumbnailPath: string | null;
-  } | null;
-  character: {
-    id: string;
-    name: string;
-  } | null;
-}
+import { API_URL, apiFetch, type HistoryGenerationItem } from '@/lib/api';
 
 /**
  * 히스토리 페이지
@@ -32,7 +17,7 @@ export default function HistoryPage() {
   const projectId = params.id as string;
   const { accessToken, isAuthenticated, isLoading: authLoading } = useAuthStore();
 
-  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [history, setHistory] = useState<HistoryGenerationItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -48,7 +33,7 @@ export default function HistoryPage() {
     if (!accessToken) return;
     if (
       !confirm(
-        '이 생성 기록과 모든 이미지를 삭제하시겠습니까?\n삭제된 데이터는 복구할 수 없습니다.'
+        '히스토리 삭제\n이 생성 기록과 모든 이미지를 삭제하시겠습니까? 삭제된 데이터는 복구할 수 없습니다.'
       )
     )
       return;
@@ -151,12 +136,11 @@ export default function HistoryPage() {
                   href={`/projects/${projectId}/generations/${item.id}`}
                   className="hover:border-brand-500 group overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--bg-secondary)] transition-all hover:shadow-lg"
                 >
-                  {/* 이미지 */}
                   <div className="aspect-square bg-[var(--bg-tertiary)]">
                     {item.selectedImage ? (
                       <img
                         src={`${API_URL}/uploads/${item.selectedImage.thumbnailPath || item.selectedImage.filePath}`}
-                        alt="Generated mockup"
+                        alt="저장된 목업"
                         className="h-full w-full object-cover"
                       />
                     ) : (
@@ -166,7 +150,6 @@ export default function HistoryPage() {
                     )}
                   </div>
 
-                  {/* 정보 */}
                   <div className="p-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 text-sm">
@@ -174,8 +157,12 @@ export default function HistoryPage() {
                         <span className="text-[var(--text-secondary)]">
                           {item.mode === 'ip_change' ? 'IP 변경' : '스케치 실사화'}
                         </span>
+                        {item.mode === 'ip_change' && (
+                          <span className="rounded bg-[var(--bg-tertiary)] px-1.5 py-0.5 text-xs font-semibold text-[var(--text-tertiary)]">
+                            {item.provider === 'openai' ? 'v2' : 'v1'}
+                          </span>
+                        )}
                       </div>
-                      {/* 삭제 버튼 - 생성 전체 삭제 */}
                       <button
                         onClick={(e) => handleDeleteGeneration(e, item.id)}
                         disabled={deletingId === item.id}
@@ -231,9 +218,11 @@ export default function HistoryPage() {
           <div className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-secondary)] p-12 text-center">
             <div className="mb-4 text-5xl">📂</div>
             <h3 className="mb-2 text-lg font-medium text-[var(--text-primary)]">
-              아직 히스토리가 없습니다
+              아직 저장된 목업이 없습니다
             </h3>
-            <p className="mb-4 text-[var(--text-secondary)]">목업을 생성하면 여기에 저장됩니다</p>
+            <p className="mb-4 text-[var(--text-secondary)]">
+              IP 변경 결과를 저장하면 여기에서 다시 열 수 있습니다.
+            </p>
             <Button onClick={() => router.push(`/projects/${projectId}`)}>목업 생성하기</Button>
           </div>
         )}

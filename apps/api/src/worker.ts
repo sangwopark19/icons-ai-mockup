@@ -1,6 +1,7 @@
 import { Worker, Job } from 'bullmq';
 import { redis } from './lib/redis.js';
 import { geminiService } from './services/gemini.service.js';
+import { openaiImageService } from './services/openai-image.service.js';
 import { uploadService } from './services/upload.service.js';
 import { generationService } from './services/generation.service.js';
 import { adminService } from './services/admin.service.js';
@@ -69,10 +70,6 @@ const generationWorker = new Worker<GenerationJobData>(
       const provider = generation.provider;
       const mode = generation.mode;
 
-      if (provider === 'openai') {
-        throw new Error('OpenAI 이미지 런타임은 아직 지원되지 않습니다.');
-      }
-
       // DB에서 활성 API 키 조회 (작업별 1회, 캐싱 없음 — CONTEXT.md 정책)
       const { id: activeKeyId, key: activeApiKey } = await adminService.getActiveApiKey(provider);
 
@@ -101,13 +98,42 @@ const generationWorker = new Worker<GenerationJobData>(
 
       let generatedImages: Buffer[];
       let thoughtSignatures: ThoughtSignatureData[] = [];
+      let openAIMetadata:
+        | Awaited<ReturnType<typeof openaiImageService.generateIPChange>>
+        | undefined;
 
       if (mode === 'ip_change') {
         if (!sourceImageBase64 || !characterImageBase64) {
           throw new Error('IP 변경에는 원본 이미지와 캐릭터 이미지가 필요합니다');
         }
 
-        if (job.data.styleReferenceId) {
+        if (provider === 'openai') {
+          if (job.data.styleReferenceId) {
+            throw new Error('OpenAI IP 변경 v2는 스타일 참조를 지원하지 않습니다');
+          }
+
+          await adminService.incrementCallCount(provider, activeKeyId);
+          const result = await openaiImageService.generateIPChange(
+            activeApiKey,
+            sourceImageBase64,
+            characterImageBase64,
+            {
+              preserveStructure: options.preserveStructure,
+              transparentBackground: options.transparentBackground,
+              preserveHardware: options.preserveHardware,
+              fixedBackground: options.fixedBackground,
+              fixedViewpoint: options.fixedViewpoint,
+              removeShadows: options.removeShadows,
+              userInstructions: options.userInstructions,
+              hardwareSpecInput: options.hardwareSpecInput,
+              hardwareSpecs: options.hardwareSpecs,
+              quality: options.quality,
+              prompt: job.data.prompt,
+            }
+          );
+          generatedImages = result.images;
+          openAIMetadata = result;
+        } else if (job.data.styleReferenceId) {
           const reference = await generationService.getById(userId, job.data.styleReferenceId);
           if (!reference) {
             throw new Error('스타일 참조 생성 기록을 찾을 수 없습니다');
@@ -185,6 +211,8 @@ const generationWorker = new Worker<GenerationJobData>(
           generatedImages = result.images;
           thoughtSignatures = result.signatures;
         }
+      } else if (provider === 'openai') {
+        throw new Error('OpenAI provider는 현재 IP 변경 v2만 지원합니다.');
       } else if (mode === 'sketch_to_real') {
         if (!sourceImageBase64) {
           throw new Error('스케치 이미지가 필요합니다');
@@ -234,6 +262,16 @@ const generationWorker = new Worker<GenerationJobData>(
 
       if (thoughtSignatures.length > 0) {
         await generationService.updateThoughtSignatures(generationId, thoughtSignatures);
+      }
+
+      if (openAIMetadata) {
+        await generationService.updateOpenAIMetadata(generationId, {
+          requestIds: openAIMetadata.requestIds,
+          responseId: openAIMetadata.responseId,
+          imageCallIds: openAIMetadata.imageCallIds,
+          revisedPrompt: openAIMetadata.revisedPrompt,
+          providerTrace: openAIMetadata.providerTrace,
+        });
       }
 
       // 완료 상태로 업데이트

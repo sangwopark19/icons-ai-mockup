@@ -67,6 +67,7 @@
 - 서비스의 본체는 AI 목업 생성 기능이며, v1.0에서는 관리자 패널 운영 기반이 강화되었다
 - 현재 핵심 runtime은 Next.js 16 + Fastify 5 + Prisma + PostgreSQL + Redis + BullMQ
 - Gemini 이미지 생성은 `apps/api/src/services/gemini.service.ts`와 `apps/api/src/worker.ts` 중심으로 동작한다
+- v1.1 OpenAI phase planning/execution must follow `.planning/OPENAI-SKILL-GUARDRAILS.md` so the GPT Image 2 skills are applied consistently.
 - OpenAI GPT Image 2 공식 조사 결과:
   - direct image generation/editing은 `v1/images/generations` / `v1/images/edits`
   - multi-turn image iteration은 Responses API + `image_generation` tool
@@ -88,6 +89,7 @@
 | Gemini와 OpenAI를 병행 provider로 운영 | 기존 사용자 흐름을 유지하면서 OpenAI 품질을 검증해야 함 | Foundation complete in Phase 7 |
 | 기존 메뉴 옆에 OpenAI 버전을 노출 | 기능 parity를 사용자에게 명확히 보여주면서 비교 가능하게 함 | — Pending |
 | provider/model을 Generation의 1급 데이터로 저장 | history, regenerate, support, queue routing에서 provider 구분이 필요함 | Complete in Phase 7 |
+| OpenAI phase마다 필수 skill matrix를 적용 | GPT Image 2 API 제약, prompt contract, runtime 분리, smoke 검증을 빠뜨리지 않기 위함 | Guardrail added |
 | OpenAI runtime을 별도 service로 추가 | `gemini.service.ts`를 provider 혼합 blob으로 만들지 않기 위함 | — Pending |
 | OpenAI transparent output은 후처리로 해결 | `gpt-image-2` API 제약을 제품 옵션과 양립시키기 위함 | — Pending |
 | OpenAI style copy는 Responses linkage 사용 | Gemini `thoughtSignature`를 그대로 재사용할 수 없음 | — Pending |
@@ -110,4 +112,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-24 after completing Phase 7*
+*Last updated: 2026-04-24 after adding OpenAI skill and prompting guardrails*

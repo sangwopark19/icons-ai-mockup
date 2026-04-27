@@ -40,6 +40,7 @@ interface CreateGenerationInput {
     removeShadows?: boolean;
     userInstructions?: string;
     hardwareSpecInput?: string;
+    quality?: 'low' | 'medium' | 'high';
     hardwareSpecs?: {
       items: Array<{
         type: 'zipper' | 'ring' | 'buckle' | 'patch' | 'button' | 'other';
@@ -114,6 +115,41 @@ function resolveGenerationProvider(input: CreateGenerationInput): {
   return { provider, providerModel };
 }
 
+function validateCreateGenerationInput(
+  input: CreateGenerationInput,
+  provider: GenerationProvider
+): void {
+  if (provider === 'openai' && input.mode !== 'ip_change') {
+    throw new Error('OpenAI provider는 현재 IP 변경 v2만 지원합니다');
+  }
+
+  if (input.mode === 'ip_change') {
+    if (!input.sourceImagePath) {
+      throw new Error('IP 변경에는 원본 이미지가 필요합니다');
+    }
+
+    if (!input.characterId && !input.characterImagePath) {
+      throw new Error('IP 변경에는 캐릭터 이미지가 필요합니다');
+    }
+  }
+
+  if (input.mode === 'sketch_to_real' && !input.sourceImagePath) {
+    throw new Error('스케치 실사화에는 원본 이미지가 필요합니다');
+  }
+
+  if (provider === 'openai' && input.options?.transparentBackground) {
+    throw new Error('OpenAI IP 변경 v2는 투명 배경을 아직 지원하지 않습니다');
+  }
+
+  if (
+    provider === 'openai' &&
+    input.options?.outputCount !== undefined &&
+    input.options.outputCount !== 2
+  ) {
+    throw new Error('OpenAI IP 변경 v2는 후보 2개 생성만 지원합니다');
+  }
+}
+
 /**
  * 생성 서비스
  */
@@ -133,6 +169,9 @@ export class GenerationService {
 
     // 캐릭터 이미지 경로 결정 (IP 변경 모드일 경우)
     let characterImagePath: string | undefined = input.characterImagePath;
+    const { provider, providerModel } = resolveGenerationProvider(input);
+
+    validateCreateGenerationInput(input, provider);
 
     // characterId가 제공된 경우 DB에서 가져옴
     if (input.mode === 'ip_change' && input.characterId && !characterImagePath) {
@@ -149,7 +188,6 @@ export class GenerationService {
 
     const userInstructions = input.options?.userInstructions?.trim();
     const hardwareSpecInput = input.options?.hardwareSpecInput?.trim();
-    const { provider, providerModel } = resolveGenerationProvider(input);
     const validatedPaths = await validateGenerationImagePaths(userId, input.projectId, {
       sourceImagePath: input.sourceImagePath,
       characterImagePath,
@@ -185,6 +223,7 @@ export class GenerationService {
           removeShadows: input.options?.removeShadows ?? false,
           userInstructions: userInstructions || undefined,
           hardwareSpecInput: hardwareSpecInput || undefined,
+          quality: input.options?.quality,
           hardwareSpecs: input.options?.hardwareSpecs,
           outputCount: input.options?.outputCount ?? 2,
         },
@@ -213,6 +252,7 @@ export class GenerationService {
         removeShadows: input.options?.removeShadows ?? false,
         userInstructions: userInstructions || undefined,
         hardwareSpecInput: hardwareSpecInput || undefined,
+        quality: input.options?.quality,
         hardwareSpecs: input.options?.hardwareSpecs,
         outputCount: input.options?.outputCount ?? 2,
       },
@@ -315,6 +355,29 @@ export class GenerationService {
     });
   }
 
+  async updateOpenAIMetadata(
+    generationId: string,
+    metadata: {
+      requestIds: string[];
+      responseId?: string;
+      imageCallIds: string[];
+      revisedPrompt?: string;
+      providerTrace: Record<string, unknown>;
+    }
+  ): Promise<void> {
+    await prisma.generation.update({
+      where: { id: generationId },
+      data: {
+        openaiRequestId: metadata.requestIds.length > 0 ? metadata.requestIds.join(',') : null,
+        openaiResponseId: metadata.responseId || null,
+        openaiImageCallId:
+          metadata.imageCallIds.length > 0 ? metadata.imageCallIds.join(',') : null,
+        openaiRevisedPrompt: metadata.revisedPrompt || null,
+        providerTrace: metadata.providerTrace as Prisma.JsonObject,
+      },
+    });
+  }
+
   /**
    * 동일 조건으로 재생성
    */
@@ -322,6 +385,10 @@ export class GenerationService {
     const original = await this.getById(userId, generationId);
     if (!original) {
       throw new Error('생성 기록을 찾을 수 없습니다');
+    }
+
+    if (original.provider === 'openai') {
+      throw new Error('OpenAI IP 변경 v2는 동일 조건 재생성을 지원하지 않습니다');
     }
 
     const promptData = (original.promptData as Record<string, unknown>) || {};
@@ -353,6 +420,7 @@ export class GenerationService {
           original.userInstructions ??
           undefined,
         hardwareSpecInput: (options.hardwareSpecInput as string | undefined) ?? undefined,
+        quality: (options.quality as 'low' | 'medium' | 'high' | undefined) ?? undefined,
         hardwareSpecs: (options.hardwareSpecs as HardwareSpecOption | undefined) ?? undefined,
         outputCount: (options.outputCount as number | undefined) ?? 2,
       },
@@ -429,6 +497,7 @@ export class GenerationService {
         removeShadows: options.removeShadows ?? false,
         userInstructions: options.userInstructions ?? null,
         hardwareSpecInput: options.hardwareSpecInput ?? null,
+        quality: options.quality ?? null,
         hardwareSpecs: options.hardwareSpecs ?? null,
         outputCount: options.outputCount ?? 2,
       },
@@ -450,6 +519,10 @@ export class GenerationService {
 
     if (!input.characterImagePath && !input.sourceImagePath) {
       throw new Error('새 캐릭터 또는 제품 이미지를 제공해야 합니다');
+    }
+
+    if (original.provider === 'openai') {
+      throw new Error('OpenAI IP 변경 v2는 스타일 복사를 지원하지 않습니다');
     }
 
     const promptData = (original.promptData as Record<string, unknown>) || {};
@@ -479,6 +552,7 @@ export class GenerationService {
           original.userInstructions ??
           undefined,
         hardwareSpecInput: (options.hardwareSpecInput as string | undefined) ?? undefined,
+        quality: (options.quality as 'low' | 'medium' | 'high' | undefined) ?? undefined,
         hardwareSpecs: (options.hardwareSpecs as HardwareSpecOption | undefined) ?? undefined,
         outputCount: (options.outputCount as number | undefined) ?? 2,
       },

@@ -8,10 +8,15 @@ import { Button } from '@/components/ui/button';
 import { ImageUploader } from '@/components/ui/image-uploader';
 import { apiFetch } from '@/lib/api';
 
-/**
- * IP 변경 페이지
- */
-export default function IPChangePage() {
+type QualityValue = 'low' | 'medium' | 'high';
+
+const QUALITY_OPTIONS: Array<{ label: string; value: QualityValue }> = [
+  { label: '빠른모드', value: 'low' },
+  { label: '균형모드', value: 'medium' },
+  { label: '퀄리티모드', value: 'high' },
+];
+
+export default function OpenAIIPChangePage() {
   const router = useRouter();
   const params = useParams();
   const projectId = params.id as string;
@@ -22,28 +27,24 @@ export default function IPChangePage() {
   const [characterImage, setCharacterImage] = useState<File | null>(null);
   const [characterPreview, setCharacterPreview] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [preserveStructure, setPreserveStructure] = useState(false);
-  const [transparentBg, setTransparentBg] = useState(false);
+  const [preserveStructure, setPreserveStructure] = useState(true);
   const [preserveHardware, setPreserveHardware] = useState(false);
-  const [fixedBackground, setFixedBackground] = useState(false);
-  const [fixedViewpoint, setFixedViewpoint] = useState(false);
+  const [fixedBackground, setFixedBackground] = useState(true);
+  const [fixedViewpoint, setFixedViewpoint] = useState(true);
   const [removeShadows, setRemoveShadows] = useState(false);
+  const [quality, setQuality] = useState<QualityValue>('medium');
   const [userInstructions, setUserInstructions] = useState('');
   const [hardwareSpecInput, setHardwareSpecInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const maxUserInstructionsLength = 2000;
   const maxHardwareSpecLength = 2000;
 
-  // 인증 체크
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.push('/login');
     }
   }, [authLoading, isAuthenticated, router]);
 
-  /**
-   * 이미지 업로드
-   */
   const uploadImage = async (file: File, type: 'source' | 'character'): Promise<string> => {
     if (!accessToken) {
       throw new Error('인증이 필요합니다');
@@ -69,13 +70,14 @@ export default function IPChangePage() {
     return data.data.filePath;
   };
 
-  /**
-   * 목업 생성
-   */
   const handleGenerate = async () => {
-    if (!sourceImage || !characterImage || !accessToken) return;
+    if (!accessToken) return;
 
     setError(null);
+    if (!sourceImage || !characterImage) {
+      setError('원본 제품 이미지와 새 캐릭터 이미지를 모두 업로드해주세요.');
+      return;
+    }
     if (userInstructions.length > maxUserInstructionsLength) {
       setError('사용자 지시문은 2000자 이내로 입력해주세요');
       return;
@@ -84,16 +86,15 @@ export default function IPChangePage() {
       setError('부자재 상세는 2000자 이내로 입력해주세요');
       return;
     }
+
     setIsGenerating(true);
 
     try {
-      // 이미지 업로드
       const [sourceImagePath, characterImagePath] = await Promise.all([
         uploadImage(sourceImage, 'source'),
         uploadImage(characterImage, 'character'),
       ]);
 
-      // 생성 요청
       const response = await apiFetch('/api/generations', {
         method: 'POST',
         token: accessToken,
@@ -103,11 +104,12 @@ export default function IPChangePage() {
         body: JSON.stringify({
           projectId,
           mode: 'ip_change',
+          provider: 'openai',
+          providerModel: 'gpt-image-2',
           sourceImagePath,
           characterImagePath,
           options: {
             preserveStructure,
-            transparentBackground: transparentBg,
             preserveHardware,
             fixedBackground,
             fixedViewpoint,
@@ -115,6 +117,7 @@ export default function IPChangePage() {
             userInstructions: userInstructions.trim() || undefined,
             hardwareSpecInput: preserveHardware ? hardwareSpecInput.trim() || undefined : undefined,
             outputCount: 2,
+            quality,
           },
         }),
       });
@@ -125,7 +128,6 @@ export default function IPChangePage() {
         throw new Error(data.error?.message || '생성 요청 실패');
       }
 
-      // 결과 페이지로 이동
       router.push(`/projects/${projectId}/generations/${data.data.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : '오류가 발생했습니다');
@@ -134,20 +136,17 @@ export default function IPChangePage() {
     }
   };
 
-  /**
-   * 파일 선택 핸들러
-   */
   const handleSourceUpload = (file: File) => {
     setSourceImage(file);
     const reader = new FileReader();
-    reader.onload = (e) => setSourcePreview(e.target?.result as string);
+    reader.onload = (event) => setSourcePreview(event.target?.result as string);
     reader.readAsDataURL(file);
   };
 
   const handleCharacterUpload = (file: File) => {
     setCharacterImage(file);
     const reader = new FileReader();
-    reader.onload = (e) => setCharacterPreview(e.target?.result as string);
+    reader.onload = (event) => setCharacterPreview(event.target?.result as string);
     reader.readAsDataURL(file);
   };
 
@@ -174,14 +173,13 @@ export default function IPChangePage() {
   if (authLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--bg-primary)]">
-        <div className="border-brand-500 h-8 w-8 animate-spin rounded-full border-2 border-t-transparent" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)]">
-      {/* 헤더 */}
       <header className="border-b border-[var(--border-default)] bg-[var(--bg-secondary)]">
         <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4">
           <div className="flex items-center gap-4">
@@ -191,21 +189,19 @@ export default function IPChangePage() {
             >
               ← 뒤로
             </Link>
-            <h1 className="text-lg font-semibold text-[var(--text-primary)]">⚡ IP 변경 v1</h1>
+            <h1 className="text-lg font-semibold text-[var(--text-primary)]">⚡ IP 변경 v2</h1>
           </div>
         </div>
       </header>
 
-      {/* 메인 */}
       <main className="mx-auto max-w-5xl px-4 py-8">
         <p className="mb-8 text-[var(--text-secondary)]">
-          기존 방식으로 제품의 캐릭터를 변경합니다.
+          기존 제품의 구조와 시점을 유지하면서 새 캐릭터를 적용합니다.
         </p>
 
         {error && <div className="mb-6 rounded-lg bg-red-500/10 p-4 text-red-500">{error}</div>}
 
         <div className="grid gap-8 lg:grid-cols-2">
-          {/* 원본 제품 이미지 */}
           <ImageUploader
             label="원본 제품 이미지"
             description="변경할 제품 사진을 업로드하세요"
@@ -215,7 +211,6 @@ export default function IPChangePage() {
             preview={sourcePreview}
           />
 
-          {/* 캐릭터 이미지 */}
           <ImageUploader
             label="새 캐릭터 이미지"
             description="적용할 캐릭터 이미지를 업로드하세요"
@@ -226,15 +221,43 @@ export default function IPChangePage() {
           />
         </div>
 
-        {/* 옵션 */}
         <div className="mt-8 rounded-xl border border-[var(--border-default)] bg-[var(--bg-secondary)] p-6">
           <h3 className="mb-4 font-medium text-[var(--text-primary)]">생성 옵션</h3>
-          <div className="space-y-3">
+
+          <fieldset>
+            <legend className="mb-2 text-sm font-medium text-[var(--text-primary)]">
+              품질 모드
+            </legend>
+            <div
+              role="radiogroup"
+              aria-label="품질 모드"
+              className="grid gap-2 rounded-lg bg-[var(--bg-tertiary)] p-1 sm:grid-cols-3"
+            >
+              {QUALITY_OPTIONS.map((option) => (
+                <label
+                  key={option.value}
+                  className="relative flex min-h-10 cursor-pointer items-center justify-center rounded-md px-3 py-2 text-sm font-medium text-[var(--text-secondary)] transition-colors has-[:checked]:bg-brand-500 has-[:checked]:text-white"
+                >
+                  <input
+                    type="radio"
+                    name="quality"
+                    value={option.value}
+                    checked={quality === option.value}
+                    onChange={() => setQuality(option.value)}
+                    className="sr-only"
+                  />
+                  {option.label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
+          <div className="mt-6 space-y-3">
             <label className="flex items-center gap-3">
               <input
                 type="checkbox"
                 checked={preserveStructure}
-                onChange={(e) => setPreserveStructure(e.target.checked)}
+                onChange={(event) => setPreserveStructure(event.target.checked)}
                 className="h-4 w-4 rounded border-[var(--border-default)] bg-[var(--bg-tertiary)]"
               />
               <span className="text-sm text-[var(--text-secondary)]">원본 구조 우선 유지</span>
@@ -242,17 +265,8 @@ export default function IPChangePage() {
             <label className="flex items-center gap-3">
               <input
                 type="checkbox"
-                checked={transparentBg}
-                onChange={(e) => setTransparentBg(e.target.checked)}
-                className="h-4 w-4 rounded border-[var(--border-default)] bg-[var(--bg-tertiary)]"
-              />
-              <span className="text-sm text-[var(--text-secondary)]">투명 배경 (누끼)</span>
-            </label>
-            <label className="flex items-center gap-3">
-              <input
-                type="checkbox"
                 checked={preserveHardware}
-                onChange={(e) => setPreserveHardware(e.target.checked)}
+                onChange={(event) => setPreserveHardware(event.target.checked)}
                 className="h-4 w-4 rounded border-[var(--border-default)] bg-[var(--bg-tertiary)]"
               />
               <span className="text-sm text-[var(--text-secondary)]">부자재 보존</span>
@@ -264,7 +278,7 @@ export default function IPChangePage() {
                 </p>
                 <textarea
                   value={hardwareSpecInput}
-                  onChange={(e) => handleHardwareSpecChange(e.target.value)}
+                  onChange={(event) => handleHardwareSpecChange(event.target.value)}
                   maxLength={maxHardwareSpecLength}
                   rows={3}
                   placeholder="예: 지퍼: YKK #5, 건메탈 그레이, 상단 중앙"
@@ -279,7 +293,7 @@ export default function IPChangePage() {
               <input
                 type="checkbox"
                 checked={fixedBackground}
-                onChange={(e) => setFixedBackground(e.target.checked)}
+                onChange={(event) => setFixedBackground(event.target.checked)}
                 className="h-4 w-4 rounded border-[var(--border-default)] bg-[var(--bg-tertiary)]"
               />
               <span className="text-sm text-[var(--text-secondary)]">배경 고정</span>
@@ -288,7 +302,7 @@ export default function IPChangePage() {
               <input
                 type="checkbox"
                 checked={fixedViewpoint}
-                onChange={(e) => setFixedViewpoint(e.target.checked)}
+                onChange={(event) => setFixedViewpoint(event.target.checked)}
                 className="h-4 w-4 rounded border-[var(--border-default)] bg-[var(--bg-tertiary)]"
               />
               <span className="text-sm text-[var(--text-secondary)]">시점 고정</span>
@@ -297,12 +311,13 @@ export default function IPChangePage() {
               <input
                 type="checkbox"
                 checked={removeShadows}
-                onChange={(e) => setRemoveShadows(e.target.checked)}
+                onChange={(event) => setRemoveShadows(event.target.checked)}
                 className="h-4 w-4 rounded border-[var(--border-default)] bg-[var(--bg-tertiary)]"
               />
               <span className="text-sm text-[var(--text-secondary)]">그림자 제거</span>
             </label>
           </div>
+
           <div className="mt-6">
             <label
               htmlFor="user-instructions"
@@ -311,12 +326,12 @@ export default function IPChangePage() {
               사용자 지시문
             </label>
             <p className="mt-1 text-xs text-[var(--text-secondary)]">
-              생성 규칙을 추가로 입력하면 다른 옵션보다 우선 적용됩니다
+              보존 규칙 안에서 추가 요청을 반영합니다.
             </p>
             <textarea
               id="user-instructions"
               value={userInstructions}
-              onChange={(e) => handleUserInstructionsChange(e.target.value)}
+              onChange={(event) => handleUserInstructionsChange(event.target.value)}
               maxLength={maxUserInstructionsLength}
               rows={4}
               placeholder="예: 배경은 항상 흰색, 캐릭터는 정면에서 보이도록 유지"
@@ -328,7 +343,6 @@ export default function IPChangePage() {
           </div>
         </div>
 
-        {/* 생성 버튼 */}
         <div className="mt-8 flex justify-end">
           <Button
             size="lg"
@@ -336,7 +350,7 @@ export default function IPChangePage() {
             isLoading={isGenerating}
             disabled={!sourceImage || !characterImage}
           >
-            목업 생성하기
+            v2 목업 생성하기
           </Button>
         </div>
       </main>

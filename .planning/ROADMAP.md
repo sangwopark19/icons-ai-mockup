@@ -11,6 +11,7 @@
   - Goal: keep Gemini intact while adding matching OpenAI GPT Image 2 workflows beside it
   - Requirements: [.planning/REQUIREMENTS.md](./REQUIREMENTS.md)
   - Research: [.planning/research/](./research/)
+  - Skill guardrails: [.planning/OPENAI-SKILL-GUARDRAILS.md](./OPENAI-SKILL-GUARDRAILS.md)
 
 ## Phases
 
@@ -41,6 +42,8 @@
 - [ ] **Phase 8: OpenAI IP Change Parity**
   - Goal: add an OpenAI GPT Image 2 version of the `IP 변경` workflow that matches current product expectations
   - Requirements: `PROV-01`, `OIP-01`, `OIP-02`, `OIP-03`
+  - Required skills: `mockup-openai-dual-provider`, `mockup-openai-workflows`, `mockup-openai-image-runtime`, `mockup-ip-change`, `mockup-openai-cli-smoke`
+  - Required prompt refs: `.codex/skills/mockup-openai-workflows/references/workflow-matrix.md`, `.codex/skills/mockup-openai-workflows/references/prompt-playbook.md`, `.codex/skills/mockup-ip-change/references/gpt-image-2-notes.md`
   - Success criteria:
     1. Users can enter the OpenAI IP Change flow from the same project context as Gemini
     2. OpenAI IP Change returns two candidates and preserves structure/viewpoint/hardware constraints
@@ -50,6 +53,8 @@
 - [ ] **Phase 9: OpenAI Sketch to Real Parity**
   - Goal: add an OpenAI GPT Image 2 version of `스케치 실사화` with the same design-preservation contract
   - Requirements: `PROV-02`, `OSR-01`, `OSR-02`, `OSR-03`
+  - Required skills: `mockup-openai-dual-provider`, `mockup-openai-workflows`, `mockup-openai-image-runtime`, `mockup-sketch-realization`, `mockup-openai-cli-smoke`
+  - Required prompt refs: `.codex/skills/mockup-openai-workflows/references/workflow-matrix.md`, `.codex/skills/mockup-openai-workflows/references/prompt-playbook.md`, `.codex/skills/mockup-sketch-realization/references/gpt-image-2-notes.md`
   - Success criteria:
     1. Users can enter the OpenAI Sketch to Real flow from the same project context as Gemini
     2. OpenAI Sketch to Real returns two candidates from sketch plus optional texture input
@@ -59,6 +64,8 @@
 - [ ] **Phase 10: Provider-Aware Result Continuation**
   - Goal: make result pages, history, regenerate, edit, and style-copy flows stay pinned to the originating provider
   - Requirements: `PROV-03`, `PROV-04`, `OED-01`, `OED-02`, `OED-03`
+  - Required skills: `mockup-openai-dual-provider`, `mockup-openai-workflows`, `mockup-openai-image-runtime`, `mockup-precision-edit`, `mockup-openai-cli-smoke`
+  - Required prompt refs: `.codex/skills/mockup-openai-workflows/references/workflow-matrix.md`, `.codex/skills/mockup-openai-workflows/references/prompt-playbook.md`, `.codex/skills/mockup-precision-edit/references/gpt-image-2-notes.md`
   - Success criteria:
     1. Result and history views clearly show provider/model for every generation
     2. Regenerate reuses the original provider and saved inputs/options instead of silently switching engines
@@ -84,6 +91,8 @@
 **Goal**: Add an OpenAI GPT Image 2 version of the `IP 변경` workflow that matches current product expectations
 **Depends on**: Phase 7
 **Requirements**: PROV-01, OIP-01, OIP-02, OIP-03
+**Required Skills**: `mockup-openai-dual-provider`, `mockup-openai-workflows`, `mockup-openai-image-runtime`, `mockup-ip-change`, `mockup-openai-cli-smoke`
+**Required Prompt Refs**: `.codex/skills/mockup-openai-workflows/references/workflow-matrix.md`, `.codex/skills/mockup-openai-workflows/references/prompt-playbook.md`, `.codex/skills/mockup-ip-change/references/gpt-image-2-notes.md`
 **Success Criteria** (what must be TRUE):
   1. Users can enter the OpenAI IP Change flow from the same project context as Gemini
   2. OpenAI IP Change returns two candidates and preserves structure/viewpoint/hardware constraints
@@ -94,6 +103,8 @@
 **Goal**: Add an OpenAI GPT Image 2 version of `스케치 실사화` with the same design-preservation contract
 **Depends on**: Phase 7
 **Requirements**: PROV-02, OSR-01, OSR-02, OSR-03
+**Required Skills**: `mockup-openai-dual-provider`, `mockup-openai-workflows`, `mockup-openai-image-runtime`, `mockup-sketch-realization`, `mockup-openai-cli-smoke`
+**Required Prompt Refs**: `.codex/skills/mockup-openai-workflows/references/workflow-matrix.md`, `.codex/skills/mockup-openai-workflows/references/prompt-playbook.md`, `.codex/skills/mockup-sketch-realization/references/gpt-image-2-notes.md`
 **Success Criteria** (what must be TRUE):
   1. Users can enter the OpenAI Sketch to Real flow from the same project context as Gemini
   2. OpenAI Sketch to Real returns two candidates from sketch plus optional texture input
@@ -104,6 +115,8 @@
 **Goal**: Make result pages, history, regenerate, edit, and style-copy flows stay pinned to the originating provider
 **Depends on**: Phases 8 and 9
 **Requirements**: PROV-03, PROV-04, OED-01, OED-02, OED-03
+**Required Skills**: `mockup-openai-dual-provider`, `mockup-openai-workflows`, `mockup-openai-image-runtime`, `mockup-precision-edit`, `mockup-openai-cli-smoke`
+**Required Prompt Refs**: `.codex/skills/mockup-openai-workflows/references/workflow-matrix.md`, `.codex/skills/mockup-openai-workflows/references/prompt-playbook.md`, `.codex/skills/mockup-precision-edit/references/gpt-image-2-notes.md`
 **Success Criteria** (what must be TRUE):
   1. Result and history views clearly show provider/model for every generation
   2. Regenerate reuses the original provider and saved inputs/options instead of silently switching engines
@@ -116,10 +129,10 @@
 | Milestone | Phases | Plans | Status | Shipped |
 |-----------|--------|-------|--------|---------|
 | v1.0 AI Mockup Admin Panel | 1-6 | 18/18 | Shipped | 2026-04-23 |
-| v1.1 OpenAI GPT Image 2 Dual Provider | 7-10 | 4/4 | In Progress | — |
+| v1.1 OpenAI GPT Image 2 Dual Provider | 7-10 | 4/8 | In Progress | — |
 
 ## Next
 
-**Phase 8: OpenAI IP Change Parity** — add the OpenAI GPT Image 2 `IP 변경` workflow while preserving the existing Gemini flow.
+**Phase 8: OpenAI IP Change Parity** — planned in 4 execution plans; ready to implement the OpenAI GPT Image 2 `IP 변경` workflow while preserving the existing Gemini flow.
 
-Run `$gsd-discuss-phase 8` to gather implementation context, or `$gsd-plan-phase 8` to move directly into planning.
+Run `$gsd-execute-phase 8` to implement the plans.
