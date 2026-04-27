@@ -1,7 +1,7 @@
 ---
 phase: 9
 slug: openai-sketch-to-real-parity
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-04-27
@@ -155,7 +155,7 @@ Additional required copy:
 | Save CTA | `히스토리에 저장` |
 | Save success | `히스토리에 저장되었습니다` |
 | Save error | `저장에 실패했습니다. 잠시 후 다시 시도해주세요.` |
-| Download CTA | `다운로드` |
+| Download CTA | `선택 이미지 다운로드` |
 | Disabled follow-up copy | `v2 후속 편집은 다음 업데이트에서 지원됩니다` |
 | Transparent post-process error | `배경 제거에 실패했습니다. 원본 결과를 저장하거나 다시 생성해주세요.` |
 
@@ -190,7 +190,7 @@ Destructive actions in this phase:
 | Candidate selection | Clicking a candidate updates local selected state immediately and persists selection through the existing `/select` endpoint. Selection state must survive save, reopen, and download. |
 | Save lifecycle | `히스토리에 저장` saves the currently selected candidate through the existing image save lifecycle. Show success/error message near the action stack for 3 seconds; do not navigate away automatically. |
 | History reopen | v2 history cards open the same result route. The result page derives the `v2` label from stored provider/version data and keeps unsupported follow-up actions disabled. |
-| Download lifecycle | `다운로드` downloads the selected candidate only. If no candidate is selected, the control is disabled rather than downloading the first image silently. |
+| Download lifecycle | `선택 이미지 다운로드` downloads the selected candidate only. If no candidate is selected, the control is disabled rather than downloading the first image silently. |
 | Unsupported v2 follow-ups | For v2 in Phase 9, `부분 수정`, both `스타일 복사` actions, and `동일 조건 재생성` must not execute. Render them disabled with the guided copy `v2 후속 편집은 다음 업데이트에서 지원됩니다`. |
 | Condition edit | `조건 수정` may remain enabled for v2, but it must route back to `/projects/:id/sketch-to-real/openai`, not the v1 route. |
 | Failure state | Failed v2 Sketch to Real generations show the error copy above, the backend message only if it is already Korean/actionable, and a `다시 시도` action that returns to `/projects/:id/sketch-to-real/openai`. |
@@ -261,11 +261,11 @@ Safety decision: use existing local UI only. No third-party registry code enters
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: PASS
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved 2026-04-27
