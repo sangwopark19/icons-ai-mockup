@@ -88,14 +88,19 @@ Out of scope:
 - `.planning/phases/07-provider-foundation-and-key-separation/07-VERIFICATION.md` - confirms Phase 7 provider foundation is complete and OpenAI runtime intentionally unsupported until Phase 8.
 
 ### OpenAI Workflow Guidance
+- `.planning/OPENAI-SKILL-GUARDRAILS.md` - mandatory skill-use matrix for OpenAI phases; Phase 8 must use dual-provider, workflow, runtime, IP Change, and CLI smoke guidance.
 - `.codex/skills/mockup-openai-dual-provider/SKILL.md` - project rule: add OpenAI as a parallel provider and keep Gemini intact.
 - `.codex/skills/mockup-openai-dual-provider/references/project-rollout.md` - recommended parallel menu, runtime split, metadata, and history shape.
 - `.codex/skills/mockup-openai-dual-provider/references/official-source-map.md` - official OpenAI docs map and practical constraints.
+- `.codex/skills/mockup-openai-image-runtime/SKILL.md` - runtime implementation guidance for a parallel OpenAI image service, worker dispatch, OpenAI request IDs, and metadata capture.
+- `.codex/skills/mockup-openai-image-runtime/references/endpoint-matrix.md` - confirms Image API edit is the right first-pass endpoint for IP Change and documents later follow-up workflow choices.
+- `.codex/skills/mockup-openai-image-runtime/references/node-runtime.md` - OpenAI Node SDK usage, request ID capture, and service-file guidance.
 - `.codex/skills/mockup-openai-workflows/SKILL.md` - workflow behavior mapping for IP Change, edits, style copy, and regeneration.
 - `.codex/skills/mockup-openai-workflows/references/workflow-matrix.md` - recommends Image API edit for IP Change.
 - `.codex/skills/mockup-openai-workflows/references/prompt-playbook.md` - structured prompt rules for multi-image edits and preservation constraints.
 - `.codex/skills/mockup-ip-change/SKILL.md` - IP replacement prompt contract and option mapping.
 - `.codex/skills/mockup-ip-change/references/gpt-image-2-notes.md` - GPT Image 2 notes for IP Change, quality, sizing, transparent-background constraint, and Image API vs Responses API choice.
+- `.codex/skills/mockup-openai-cli-smoke/SKILL.md` - smoke-test guidance for real OpenAI edit calls, request ID capture, and transparent-background constraint checks.
 
 ### Official OpenAI Docs Checked During Discussion
 - `https://developers.openai.com/api/docs/models/gpt-image-2` - GPT Image 2 supports image generation/editing, high-fidelity image inputs, Image API edit endpoint, and model snapshot metadata.
@@ -146,6 +151,26 @@ Out of scope:
 - Ensure result/history payloads expose enough version/provider data for v1/v2 badges while keeping user-facing labels model-free.
 
 </code_context>
+
+<skill_guardrails>
+## Required Skill Usage For Phase 8
+
+Planning, execution, review, and verification for this phase must use:
+
+- `.planning/OPENAI-SKILL-GUARDRAILS.md`
+- `mockup-openai-dual-provider`
+- `mockup-openai-workflows`
+- `mockup-openai-image-runtime`
+- `mockup-ip-change`
+- `mockup-openai-cli-smoke` when validating real OpenAI runtime behavior or command-line smoke checks
+
+The phase plan should list these skills and the following prompting references in `read_first` before touching route, service, worker, prompt, or smoke-test implementation:
+
+- `.codex/skills/mockup-openai-workflows/references/workflow-matrix.md`
+- `.codex/skills/mockup-openai-workflows/references/prompt-playbook.md`
+- `.codex/skills/mockup-ip-change/references/gpt-image-2-notes.md`
+
+</skill_guardrails>
 
 <specifics>
 ## Specific Ideas
