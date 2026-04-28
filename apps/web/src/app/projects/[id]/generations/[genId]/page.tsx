@@ -94,6 +94,9 @@ export default function GenerationResultPage() {
   const isV2 = generation?.provider === 'openai';
   const isV2SketchToReal = Boolean(isV2 && generation?.mode === 'sketch_to_real');
   const v2WorkflowCopy = isV2 && generation ? getV2WorkflowCopy(generation.mode) : null;
+  const styleCopyIpChangeLabel = isV2SketchToReal
+    ? '🎨 스타일 복사'
+    : '🎨 스타일 복사 (IP 변경)';
   const disabledFollowupId = 'v2-disabled-followups';
 
   // Interval 관리를 위한 ref
@@ -543,6 +546,7 @@ export default function GenerationResultPage() {
                 className="w-full"
                 onClick={() => setShowEditModal(true)}
                 disabled={isV2}
+                aria-disabled={isV2}
                 aria-describedby={isV2 ? disabledFollowupId : undefined}
               >
                 ✏️ 부분 수정
@@ -560,15 +564,17 @@ export default function GenerationResultPage() {
                 className="w-full"
                 onClick={() => handleStyleCopy('ip-change')}
                 disabled={isV2}
+                aria-disabled={isV2}
                 aria-describedby={isV2 ? disabledFollowupId : undefined}
               >
-                🎨 스타일 복사 (IP 변경)
+                {styleCopyIpChangeLabel}
               </Button>
               <Button
                 variant="secondary"
                 className="w-full"
                 onClick={() => handleStyleCopy('new-product')}
                 disabled={isV2}
+                aria-disabled={isV2}
                 aria-describedby={isV2 ? disabledFollowupId : undefined}
               >
                 🧩 스타일 복사 (새 제품 적용)
@@ -582,6 +588,7 @@ export default function GenerationResultPage() {
                 onClick={handleRegenerateWithSameInputs}
                 isLoading={isRegenerating}
                 disabled={isV2}
+                aria-disabled={isV2}
                 aria-describedby={isV2 ? disabledFollowupId : undefined}
               >
                 🔁 동일 조건 재생성
