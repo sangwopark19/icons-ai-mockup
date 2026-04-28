@@ -9,6 +9,12 @@ export type ApiKeyProvider = 'gemini' | 'openai';
 type ActiveApiKeyStats = { alias: string; callCount: number };
 type StoredGenerationOptions = Record<string, unknown>;
 type StoredGenerationPromptData = Record<string, unknown>;
+type OpenAIRequestAccounting = {
+  openaiExternalRequestCount: number | null;
+  openaiOutputCount: number | null;
+  openaiSdkMaxRetries: number | null;
+  openaiQueueAttempts: number | null;
+};
 
 const API_KEY_PROVIDER_LABELS: Record<ApiKeyProvider, string> = {
   gemini: 'Gemini',
@@ -36,6 +42,29 @@ function booleanValue(options: StoredGenerationOptions, key: string, fallback: b
 
 function outputCountValue(value: unknown): number {
   return typeof value === 'number' ? value : 2;
+}
+
+function traceNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function getOpenAIRequestAccounting(providerTrace: unknown): OpenAIRequestAccounting {
+  if (!providerTrace || typeof providerTrace !== 'object' || Array.isArray(providerTrace)) {
+    return {
+      openaiExternalRequestCount: null,
+      openaiOutputCount: null,
+      openaiSdkMaxRetries: null,
+      openaiQueueAttempts: null,
+    };
+  }
+
+  const trace = providerTrace as Record<string, unknown>;
+  return {
+    openaiExternalRequestCount: traceNumber(trace.externalRequestCount),
+    openaiOutputCount: traceNumber(trace.outputCount),
+    openaiSdkMaxRetries: traceNumber(trace.sdkMaxRetries),
+    openaiQueueAttempts: traceNumber(trace.queueAttempts),
+  };
 }
 
 function qualityValue(value: unknown): GenerationJobData['options']['quality'] {
@@ -149,6 +178,10 @@ export interface ListGenerationsResult {
     openaiResponseId: string | null;
     openaiImageCallId: string | null;
     openaiRevisedPrompt: string | null;
+    openaiExternalRequestCount: number | null;
+    openaiOutputCount: number | null;
+    openaiSdkMaxRetries: number | null;
+    openaiQueueAttempts: number | null;
     promptData: unknown;
     options: unknown;
     createdAt: Date;
@@ -474,6 +507,7 @@ export class AdminService {
 
     return {
       generations: generations.map((g) => ({
+        ...getOpenAIRequestAccounting(g.providerTrace),
         id: g.id,
         mode: g.mode,
         status: g.status,

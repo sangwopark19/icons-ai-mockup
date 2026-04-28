@@ -139,7 +139,7 @@ export default function DashboardPage() {
               }
             />
             <KpiCard
-              label="OpenAI 활성 키"
+              label="OpenAI Image API 호출"
               value={
                 stats.activeApiKeysByProvider.openai
                   ? stats.activeApiKeysByProvider.openai.callCount
@@ -148,7 +148,7 @@ export default function DashboardPage() {
               icon={<Key className="h-5 w-5" />}
               subtitle={
                 stats.activeApiKeysByProvider.openai
-                  ? `키: ${stats.activeApiKeysByProvider.openai.alias}`
+                  ? '앱 호출 수 · 브라우저/토큰 제외'
                   : '활성 키 미설정'
               }
             />

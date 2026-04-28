@@ -406,6 +406,10 @@ describe('GenerationService - provider contract', () => {
         provider: 'openai',
         model: 'gpt-image-2',
         endpoint: 'images.edit',
+        externalRequestCount: 1,
+        outputCount: 2,
+        sdkMaxRetries: 0,
+        queueAttempts: 1,
       },
     });
 
@@ -420,6 +424,10 @@ describe('GenerationService - provider contract', () => {
           provider: 'openai',
           model: 'gpt-image-2',
           endpoint: 'images.edit',
+          externalRequestCount: 1,
+          outputCount: 2,
+          sdkMaxRetries: 0,
+          queueAttempts: 1,
         },
       },
     });

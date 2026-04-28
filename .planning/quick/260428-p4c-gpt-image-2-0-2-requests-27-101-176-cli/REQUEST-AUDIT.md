@@ -87,6 +87,13 @@ After implementation:
 | Output candidates | 2 |
 | App admin `callCount` delta | +1 after vendor response |
 
+Admin/API after-fix display:
+
+- `/api/admin/generations` includes nullable safe fields derived from `providerTrace`: `openaiExternalRequestCount`, `openaiOutputCount`, `openaiSdkMaxRetries`, `openaiQueueAttempts`.
+- Admin generation detail renders those safe fields in `지원 정보` alongside request IDs.
+- Admin dashboard labels the OpenAI active-key KPI as app-recorded Image API calls, explicitly excluding browser polling and OpenAI token usage.
+- Raw `providerTrace`, API keys, base64 image bytes, and raw vendor responses remain hidden from admin UI.
+
 Remaining live checks after services are available:
 
 1. Start local or remote verified services.
