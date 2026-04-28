@@ -184,7 +184,6 @@ export default function OpenAISketchToRealPage() {
           providerModel: 'gpt-image-2',
           sourceImagePath,
           textureImagePath,
-          prompt: trimmedInstructions || undefined,
           options: {
             outputCount: 2,
             quality,
