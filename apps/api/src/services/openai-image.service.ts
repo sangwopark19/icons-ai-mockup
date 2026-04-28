@@ -17,6 +17,20 @@ export interface OpenAIIPChangeOptions {
   prompt?: string;
 }
 
+export interface OpenAISketchToRealOptions {
+  preserveStructure?: boolean;
+  transparentBackground?: boolean;
+  fixedBackground?: boolean;
+  fixedViewpoint?: boolean;
+  userInstructions?: string;
+  productCategory?: string;
+  productCategoryOther?: string;
+  materialPreset?: string;
+  materialOther?: string;
+  quality?: OpenAIQuality;
+  prompt?: string;
+}
+
 export interface OpenAIImageGenerationResult {
   images: Buffer[];
   requestIds: string[];
@@ -129,6 +143,101 @@ export class OpenAIImageService {
     };
   }
 
+  async generateSketchToReal(
+    apiKey: string,
+    sketchImageBase64: string,
+    textureImageBase64OrNull: string | null,
+    options: OpenAISketchToRealOptions
+  ): Promise<OpenAIImageGenerationResult> {
+    const client = new OpenAI({
+      apiKey,
+      maxRetries: 2,
+      timeout: 60_000,
+    });
+    const prompt = this.buildSketchToRealPrompt(options);
+    const quality = options.quality ?? 'medium';
+    const images: Buffer[] = [];
+    const requestIds: string[] = [];
+    const imageCallIds: string[] = [];
+    const revisedPrompts: string[] = [];
+    const candidates: Array<Record<string, unknown>> = [];
+    const sketchBuffer = this.decodeBase64Image(sketchImageBase64);
+    const sketchMimeType = this.detectMimeType(sketchBuffer);
+    const sketchImage = await toFile(
+      sketchBuffer,
+      `designer-sketch.${this.extensionForMimeType(sketchMimeType)}`,
+      { type: sketchMimeType }
+    );
+    const inputImages = [sketchImage];
+
+    if (textureImageBase64OrNull) {
+      const textureBuffer = this.decodeBase64Image(textureImageBase64OrNull);
+      const textureMimeType = this.detectMimeType(textureBuffer);
+      const textureImage = await toFile(
+        textureBuffer,
+        `material-texture-reference.${this.extensionForMimeType(textureMimeType)}`,
+        { type: textureMimeType }
+      );
+      inputImages.push(textureImage);
+    }
+
+    const response = (await client.images.edit({
+      model: this.model,
+      image: inputImages,
+      prompt,
+      quality,
+      n: 2,
+      size: '1024x1024',
+      output_format: 'png',
+    })) as OpenAIImageResponse;
+
+    const responseImages = response.data ?? [];
+    if (responseImages.length < 2) {
+      throw new Error('OpenAI 스케치 실사화 결과 이미지가 부족합니다');
+    }
+
+    if (response._request_id) requestIds.push(response._request_id);
+
+    for (const [index, image] of responseImages.slice(0, 2).entries()) {
+      if (!image?.b64_json) {
+        throw new Error('OpenAI 스케치 실사화 결과 이미지가 없습니다');
+      }
+
+      images.push(Buffer.from(image.b64_json, 'base64'));
+
+      if (image.id) imageCallIds.push(image.id);
+      if (image.call_id) imageCallIds.push(image.call_id);
+      if (image.revised_prompt) revisedPrompts.push(image.revised_prompt);
+
+      candidates.push({
+        index: index + 1,
+        requestId: response._request_id ?? null,
+        responseId: response.id ?? null,
+        imageCallId: image.id ?? image.call_id ?? null,
+        revisedPrompt: image.revised_prompt ?? null,
+      });
+    }
+
+    return {
+      images,
+      requestIds,
+      responseId: response.id,
+      imageCallIds,
+      revisedPrompt: revisedPrompts[0],
+      providerTrace: {
+        provider: 'openai',
+        model: this.model,
+        endpoint: 'images.edit',
+        workflow: 'sketch_to_real',
+        quality,
+        outputCount: images.length,
+        inputImageCount: inputImages.length,
+        externalRequestCount: 1,
+        candidates,
+      },
+    };
+  }
+
   buildIPChangePrompt(options: OpenAIIPChangeOptions): string {
     const preserveRules = [
       'Preserve product geometry, dimensions, crop, camera viewpoint, perspective, material, lighting, hardware, label placement, non-character text, and non-target areas.',
@@ -190,6 +299,83 @@ ${[userInstruction, extraPrompt].filter(Boolean).join('\n')}`
 
 Output:
 - Production-quality product mockup suitable for internal design review.`;
+  }
+
+  buildSketchToRealPrompt(options: OpenAISketchToRealOptions): string {
+    const category = [options.productCategory, options.productCategoryOther]
+      .map((value) => value?.trim())
+      .filter(Boolean)
+      .join(' / ');
+    const material = [options.materialPreset, options.materialOther]
+      .map((value) => value?.trim())
+      .filter(Boolean)
+      .join(' / ');
+    const userContent = [options.userInstructions?.trim(), options.prompt?.trim()]
+      .filter(Boolean)
+      .join('\n');
+    const preserveRules = [
+      'Preserve exact layout, silhouette, proportions, face details, product construction, and perspective from Image 1.',
+      'Preserve all designed contours, handle/rim/base positions, product category cues, physical construction, and camera viewpoint from Image 1.',
+    ];
+
+    if (options.preserveStructure) {
+      preserveRules.push('Keep the sketch structure locked; do not simplify or redesign the form.');
+    }
+
+    if (options.fixedViewpoint) {
+      preserveRules.push('Use the same camera angle, crop, lens feel, and perspective as Image 1.');
+    }
+
+    const outputRules = [
+      'Return exactly two clean product-review mockup candidates.',
+      options.fixedBackground
+        ? 'Use a clean opaque light product-review background without scene objects.'
+        : 'Keep the presentation clean, neutral, and product-review focused.',
+    ];
+
+    if (options.transparentBackground) {
+      outputRules.push(
+        'For transparent-background requests, generate an opaque image on a clean uniform light/near-white product-review background suitable for local background removal.'
+      );
+    }
+
+    return `Task:
+Edit Image 1 into a photorealistic product mockup.
+
+Image roles:
+- Image 1: designer sketch. Treat it as the locked design spec.
+- Image 2, optional: material/texture reference. Apply only the material, texture, finish, and color behavior from this image.
+- Image 2 is not a style reference, scene reference, product-shape reference, character reference, logo reference, or text reference.
+
+Product category:
+- ${category || 'Not specified. Derive product structure from Image 1, the requested prompt, and normal product construction only.'}
+- Product category and Image 1 control product structure. Texture reference never changes the product shape.
+
+Material guidance:
+- ${material || 'No explicit material preset. Infer suitable manufacturing material from the product category, Image 1, and prompt.'}
+- If Image 2 is present, it takes priority only for material, texture, finish, and color behavior.
+- If Image 2 is absent, infer a believable material such as ceramic, plastic, fabric, acrylic, resin, vinyl, rubber, metal, or transparent material.
+
+Must preserve:
+${preserveRules.map((rule) => `- ${rule}`).join('\n')}
+
+Must add:
+- Add only photorealistic material, lighting, surface finish, form shading, stitching, molded edges, glaze, or manufacturing detail appropriate to the product category.
+- Convert the sketch into a believable manufactured product while keeping every core design detail locked.
+
+User instructions:
+${userContent ? `- Apply only if it does not conflict with Must preserve or the hard constraints below:\n${userContent}` : '- None provided.'}
+
+Hard constraints:
+- These hard constraints override any conflicting user instructions.
+- Do not add new characters, text, logos, decorations, props, background objects, or scene staging.
+- Do not import product shape, scene, logos, text, props, or character details from Image 2.
+- Do not import pattern placement, background, props, or decorative layout from Image 2.
+- Do not change form, proportions, face details, product construction, camera perspective, or product category.
+- Do not ask for or create direct transparent output from GPT Image 2.
+
+Output:
+${outputRules.map((rule) => `- ${rule}`).join('\n')}`;
   }
 
   private decodeBase64Image(value: string): Buffer {
