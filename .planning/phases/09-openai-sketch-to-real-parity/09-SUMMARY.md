@@ -1,13 +1,37 @@
 ---
 phase: 09-openai-sketch-to-real-parity
 artifact: release-smoke-summary
-status: checkpoint
-updated: 2026-04-28T02:31:08Z
+status: blocked
+updated: 2026-04-28T02:45:33Z
 ---
 
 # Phase 9 Release Smoke Summary
 
-Phase 9 automated verification passed. Real OpenAI Sketch smoke, authenticated browser verification, and transparent-background visual evidence remain `manual_needed` because live/runtime prerequisites were not fully available in this executor environment.
+Phase 9 automated verification passed. Checkpoint continuation on 2026-04-28 received approved sample images and approval to transmit them to OpenAI, but live/browser release smoke remains `blocked` by external runtime and account gates.
+
+## Checkpoint Continuation Attempt
+
+Inputs approved by the user:
+
+- Sketch image: `/Users/sangwopark19/icons_file/3_IPIC/6_모드 B/5 패브릭.png`
+- Texture/material reference image: `/Users/sangwopark19/icons_file/3_IPIC/6_모드 B/12 세안밴드 페브릭 질감 참고.png`
+- Approved destination: OpenAI Images Edit API for GPT Image 2 smoke.
+
+Results:
+
+- Direct OpenAI Images Edit smoke reached OpenAI but failed with HTTP 403 before generation.
+- Request ID: `req_b57b1a36a28c45b09029c3c7890dc2d7`
+- Blocker: the OpenAI organization must be verified before using `gpt-image-2`.
+- Forbidden parameter check: the smoke request did not include `background: "transparent"` or `input_fidelity`.
+- Output count and transparent-background evidence remain unavailable because no image was produced.
+
+Browser/runtime results:
+
+- The user-provided browser URL `http://100.69.75.47:3000` was reachable and authenticated.
+- That server is not running the current Phase 09 branch: its served project bundle lacks `sketch-to-real/openai` and `스케치 실사화 v2`, while the current branch source contains both.
+- The process on port 3000 belongs to `/Users/sangwopark19/icons/grapit`, not `/Users/sangwopark19/icons/icons-ai-mockup`.
+- Attempting to start the current branch API locally failed because local Postgres credentials were invalid and Redis was unavailable.
+- Therefore authenticated browser smoke for the current branch could not be completed in this environment.
 
 ## Automated Verification
 
@@ -27,13 +51,16 @@ Static/source evidence:
 
 ## Browser Verification
 
-browser verification: `manual_needed - authenticated target app runtime unavailable`.
+browser verification: `blocked - provided authenticated URL is a stale/non-current build`.
 
 Attempted automation:
 
 - Codex in-app Browser backend was unavailable in this session.
 - Playwright opened `http://localhost:3000`, but that port served an unrelated `Grabit - 공연 티켓 예매` app, not this repo's MockupAI web app.
 - `localhost:4000` was not listening, so the MockupAI API was not available for authenticated project/result/history flows.
+- After user login, Codex in-app Browser opened `http://100.69.75.47:3000/projects/0ab5db3e-ee8e-4840-9480-4750771fe68e`; the visible project page showed only the old `스케치 실사화` entry, not the Phase 09 `스케치 실사화 v1` and `스케치 실사화 v2` entries.
+- Static inspection of the served Next chunk from `100.69.75.47:3000` confirmed it lacks `sketch-to-real/openai`; current branch source contains that route and copy.
+- Starting this repo's API locally was blocked by invalid local Postgres credentials and unavailable Redis.
 
 Source-reviewed items that still need runtime confirmation:
 
@@ -52,15 +79,16 @@ Manual browser checklist still required:
 
 ## Real OpenAI Sketch Smoke
 
-OpenAI Sketch real smoke: `manual_needed - OPENAI_API_KEY unavailable in the executed shell environment`.
+OpenAI Sketch real smoke: `blocked - OpenAI organization verification required for gpt-image-2`.
 
-Additional blockers:
+Additional blockers and evidence:
 
-- `.env` appears to contain an `OPENAI_API_KEY` entry, but it was not used because the smoke command environment did not export it.
-- No representative sketch image and optional texture/material reference image were explicitly provided for live smoke.
-- Existing local uploaded/generated image files were not treated as representative sample inputs and were not uploaded to OpenAI.
-- Explicit approval to transmit selected local sample image files to OpenAI was not available.
-- Authenticated app/project state for upload access was not available.
+- The user explicitly provided representative sketch and texture/material sample paths and approved OpenAI transmission.
+- Direct OpenAI Images Edit smoke was attempted with `model=gpt-image-2`, `quality=medium`, `n=2`, the approved sketch image as Image 1, and the approved texture image as Image 2.
+- OpenAI returned HTTP 403 before generation.
+- Request ID: `req_b57b1a36a28c45b09029c3c7890dc2d7`
+- Error category: organization verification required for `gpt-image-2`.
+- Authenticated app/project runtime for the current branch remained unavailable.
 
 Required live evidence before marking this passed:
 
@@ -97,16 +125,21 @@ Required evidence before marking this passed:
 | Automated web type-check | passed |
 | Forbidden parameter source check | passed |
 | Prompt structure source/test check | passed |
-| Browser project page | manual_needed |
-| Browser v2 form | manual_needed |
-| Browser result page | manual_needed |
-| Browser history page | manual_needed |
-| Provider/model visible-copy audit | manual_needed; source review found only internal identifiers, not runtime visual evidence |
-| Sketch-vs-IP visible-copy audit | manual_needed |
-| Candidate order persistence | manual_needed because live/browser evidence was unavailable |
-| OpenAI request ID | manual_needed |
-| Transparent final asset alpha/ratio/composite | manual_needed |
+| Browser project page | blocked; provided URL serves stale/non-current build without Sketch v2 |
+| Browser v2 form | blocked by stale/non-current build and local runtime DB/Redis prerequisites |
+| Browser result page | blocked by stale/non-current build and no live generation |
+| Browser history page | blocked by stale/non-current build and no live generation |
+| Provider/model visible-copy audit | blocked in browser; source review found only internal identifiers, not runtime visual evidence |
+| Sketch-vs-IP visible-copy audit | blocked in browser |
+| Candidate order persistence | blocked because live generation did not produce outputs |
+| OpenAI request ID | captured: `req_b57b1a36a28c45b09029c3c7890dc2d7` |
+| Transparent final asset alpha/ratio/composite | blocked because OpenAI 403 prevented output creation |
 
 ## Release Decision
 
-Automated release verification is green. Phase 9 should not be marked fully live-smoke verified until a human or authenticated runtime executor provides the real OpenAI request evidence, browser walkthrough evidence, and transparent-background composite evidence listed above.
+Automated release verification is green, but Phase 9 should not be marked fully live-smoke verified until:
+
+1. The served web/API runtime is updated to the current `gsd/phase-09-openai-sketch-to-real-parity` branch or an equivalent build containing `sketch-to-real/openai`.
+2. Local/runtime dependencies are healthy: Postgres credentials valid, Redis available, API worker running.
+3. The OpenAI organization is verified for `gpt-image-2`.
+4. A new live smoke produces two outputs and records request ID, candidate order, browser reopen evidence, and transparent-background alpha/ratio/dark-composite evidence.

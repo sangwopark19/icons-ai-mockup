@@ -13,7 +13,7 @@ requires:
     provides: Sketch v2 result and history lifecycle
 provides:
   - Phase 9 smoke checklist covering automated, browser, real OpenAI, transparent-background, and evidence checks
-  - Phase 9 release smoke summary with automated pass status and manual-needed live/browser blockers
+  - Phase 9 release smoke summary with automated pass status and blocked live/browser gates
   - Execute-plan completion contract for Plan 09-04
 affects: [phase-09, phase-10, release-verification, openai-sketch-to-real]
 
@@ -31,9 +31,9 @@ key-files:
 
 key-decisions:
   - "Automated Phase 9 verification is green: API tests, API type-check, and web type-check all passed."
-  - "Real OpenAI Sketch smoke was not marked passed without request ID evidence."
-  - "Browser smoke was marked manual_needed because the in-app Browser backend was unavailable and localhost:3000 served an unrelated app."
-  - "Local sample images were not uploaded to OpenAI without explicit representative sample selection and outbound upload approval."
+  - "Real OpenAI Sketch smoke was attempted after user sample/transfer approval, but OpenAI returned 403 because the organization is not verified for gpt-image-2."
+  - "Browser smoke remains blocked because the user-provided authenticated URL serves a stale/non-current build without the Phase 09 Sketch v2 route."
+  - "Current branch local runtime could not be started fully because local Postgres credentials were invalid and Redis was unavailable."
   - "STATE.md and ROADMAP.md were intentionally not updated because the orchestrator owns those writes."
 
 patterns-established:
@@ -48,7 +48,7 @@ completed: 2026-04-28
 
 # Phase 09 Plan 04: Phase 9 Smoke And Release Verification Summary
 
-**Phase 9 release evidence checklist plus automated verification pass, with live OpenAI/browser/transparent evidence honestly gated as manual_needed**
+**Phase 9 release evidence checklist plus automated verification pass, with live OpenAI/browser/transparent evidence blocked by account/runtime gates**
 
 ## Performance
 
@@ -62,7 +62,8 @@ completed: 2026-04-28
 
 - Created `09-SMOKE.md` with automated, browser, real OpenAI Sketch, transparent-background, and evidence-recording sections.
 - Ran final Phase 9 automated checks twice; API tests, API type-check, and web type-check all exited 0.
-- Created `09-SUMMARY.md` with passed automated evidence and manual-needed blockers for live OpenAI smoke, browser walkthrough, candidate order persistence, and transparent-output composite evidence.
+- Created `09-SUMMARY.md` with passed automated evidence and blockers for live OpenAI smoke, browser walkthrough, candidate order persistence, and transparent-output composite evidence.
+- Continued the checkpoint after the user provided sample images and OpenAI transmission approval; captured OpenAI request ID `req_b57b1a36a28c45b09029c3c7890dc2d7` from the failed GPT Image 2 smoke.
 - Kept API keys, sample assets, and OpenAI outputs out of committed artifacts.
 
 ## Task Commits
@@ -98,19 +99,19 @@ Static smoke spot-checks passed:
 
 Real OpenAI/browser verification remains blocked:
 
-- `OPENAI_API_KEY` was not exported in the executed shell environment. A `.env` entry exists but was not used for live smoke because other prerequisites were missing.
-- No representative sketch/texture sample images were explicitly provided.
-- Existing local uploaded/generated images were not treated as representative samples and were not transmitted to OpenAI.
-- Explicit outbound upload approval for selected sample files was unavailable.
-- Codex in-app Browser backend was unavailable.
-- Playwright reached `http://localhost:3000`, but that port served an unrelated `Grabit` app.
-- `localhost:4000` was not listening, so authenticated MockupAI project/result/history browser flows were unavailable.
+- OpenAI direct smoke was attempted with the user-approved sketch and texture/material sample files.
+- OpenAI returned HTTP 403 before image generation: the organization must be verified before using `gpt-image-2`.
+- Request ID: `req_b57b1a36a28c45b09029c3c7890dc2d7`
+- The user-provided authenticated browser URL `http://100.69.75.47:3000` is not running the current branch; the served bundle lacks `sketch-to-real/openai` and `스케치 실사화 v2`.
+- The process on port 3000 belongs to `/Users/sangwopark19/icons/grapit`, not this repo.
+- Attempting to start this repo's current API locally failed because local Postgres credentials were invalid and Redis was unavailable.
+- Because no live output was generated, transparent-background alpha/ratio/dark-composite evidence could not be produced.
 
 ## Decisions Made
 
-- Do not fabricate live OpenAI evidence without request IDs and output paths.
-- Do not upload arbitrary local image files to OpenAI as representative samples.
-- Record browser smoke as manual-needed rather than source-review-only passed.
+- Do not fabricate live OpenAI evidence without successful request IDs and output paths.
+- Do not mark a stale served build as Phase 09 browser evidence.
+- Record browser smoke as blocked rather than source-review-only passed.
 - Preserve orchestrator ownership of `.planning/STATE.md` and `.planning/ROADMAP.md`.
 
 ## Deviations from Plan
@@ -148,16 +149,16 @@ None. This plan added documentation and `.gitignore` coverage only; no new endpo
 
 To complete live verification:
 
-- Export `OPENAI_API_KEY` into the smoke command environment.
-- Provide or approve one representative sketch image and optional texture/material reference image for OpenAI upload.
-- Run the MockupAI web/API stack for this repo, not the unrelated app on `localhost:3000`.
+- Verify the OpenAI organization for `gpt-image-2` access.
+- Run the MockupAI web/API stack for this repo/current branch, not the stale build on `100.69.75.47:3000`.
+- Fix local runtime prerequisites: valid Postgres credentials and running Redis.
 - Provide authenticated project access with upload permissions.
 - Execute the browser checklist in `09-SMOKE.md` at desktop and 360px widths.
 - Record request IDs, output paths, candidate-order evidence, and transparent-background alpha/ratio/dark-composite evidence in `09-SUMMARY.md`.
 
 ## Next Phase Readiness
 
-Automated Phase 9 checks are green and release smoke documentation is ready. Phase 10 can proceed from automated confidence, but release sign-off for Phase 9 still needs the manual/live evidence checkpoint before claiming real OpenAI/browser smoke passed.
+Automated Phase 9 checks are green and release smoke documentation is ready. Phase 10 can proceed from automated confidence only if the team accepts the open release-smoke blockers; Phase 9 must not be claimed live-smoke verified until the OpenAI organization, current branch runtime, browser walkthrough, and transparent-output evidence gates pass.
 
 ## Self-Check: PASSED
 
