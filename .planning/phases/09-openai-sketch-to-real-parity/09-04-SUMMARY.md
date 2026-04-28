@@ -13,7 +13,7 @@ requires:
     provides: Sketch v2 result and history lifecycle
 provides:
   - Phase 9 smoke checklist covering automated, browser, real OpenAI, transparent-background, and evidence checks
-  - Phase 9 release smoke summary with automated pass status and blocked live/browser gates
+  - Phase 9 release smoke summary with automated pass status, opaque live-smoke pass evidence, and remaining transparent/deployment gates
   - Execute-plan completion contract for Plan 09-04
 affects: [phase-09, phase-10, release-verification, openai-sketch-to-real]
 
@@ -31,14 +31,15 @@ key-files:
 
 key-decisions:
   - "Automated Phase 9 verification is green: API tests, API type-check, and web type-check all passed."
-  - "Real OpenAI Sketch smoke was attempted after user sample/transfer approval, but OpenAI returned 403 because the organization is not verified for gpt-image-2."
+  - "Real OpenAI Sketch smoke initially returned 403 before organization verification propagated, then opaque Sketch v2 completed successfully after BullMQ retry."
+  - "Transparent-background Sketch v2 still returned 403, so alpha/ratio/dark-composite evidence remains blocked."
   - "The user-provided authenticated URL serves a stale/non-current build without the Phase 09 Sketch v2 route."
   - "A current-branch Docker smoke stack was launched on isolated loopback ports; fresh migrations passed and browser verification covered the project page plus Sketch v2 form."
   - "App-level worker smoke reached OpenAI through the real queue/worker path, then failed with the same organization-verification gate for gpt-image-2."
   - "STATE.md and ROADMAP.md were intentionally not updated because the orchestrator owns those writes."
 
 patterns-established:
-  - "Smoke summaries distinguish passed automated checks from manual_needed live/browser evidence."
+  - "Smoke summaries distinguish passed automated checks, passed opaque live evidence, and blocked transparent/deployment evidence."
   - "Transparent-background release evidence requires alpha, ratio, border, and dark-composite checks rather than alpha existence only."
 
 requirements-completed: [PROV-02, OSR-01, OSR-02, OSR-03]
@@ -49,7 +50,7 @@ completed: 2026-04-28
 
 # Phase 09 Plan 04: Phase 9 Smoke And Release Verification Summary
 
-**Phase 9 release evidence checklist plus automated verification pass, with live OpenAI/browser/transparent evidence blocked by account/runtime gates**
+**Phase 9 release evidence checklist plus automated verification pass, current-branch Docker smoke, opaque live OpenAI pass, and remaining transparent/deployment gates**
 
 ## Performance
 
@@ -98,7 +99,7 @@ Static smoke spot-checks passed:
 
 ## Manual Checkpoint
 
-Real OpenAI/browser verification remains blocked:
+Full OpenAI/browser verification remains partially blocked:
 
 - OpenAI direct smoke was attempted with the user-approved sketch and texture/material sample files.
 - OpenAI returned HTTP 403 before image generation: the organization must be verified before using `gpt-image-2`.
@@ -110,14 +111,17 @@ Real OpenAI/browser verification remains blocked:
 - Browser verification on the current Docker build confirmed the project page entries and Sketch v2 form defaults.
 - App-level worker smoke created generation `36061eae-6559-48ea-bc3d-d943b0ca69c1`, reached OpenAI, and failed with HTTP 403 organization verification.
 - Worker retry request IDs observed: `req_ed6f526471d44adfbee781588c51cc90`, `req_e36c700853544b7a87a4145844909ae6`.
-- After the user completed organization verification, app-level worker smoke was retried with generation `834cbc00-4523-4150-8ee4-f2220356c236`; it still returned HTTP 403, with request ID `req_3ab87964ac324ed9ab39600dcbe6b68b`.
-- Because no live output was generated, result/history candidate-order and transparent-background alpha/ratio/dark-composite evidence could not be produced.
+- After the user completed organization verification, app-level worker smoke was retried with generation `834cbc00-4523-4150-8ee4-f2220356c236`; the first worker attempt returned HTTP 403 with request ID `req_3ab87964ac324ed9ab39600dcbe6b68b`, then a BullMQ retry completed successfully.
+- Successful opaque retry request ID: `req_b78ef6875e7e4b889486726a42e304fc`.
+- Opaque output paths were recorded for `output_1.png` and `output_2.png`.
+- Browser verification confirmed result page, candidate 2 selection, reload persistence, save-to-history, history `스케치 실사화 v2` badge, and result reopen with candidate 2 still selected.
+- Transparent-background generation `7418ceef-19cf-41fa-b317-cbf5cf711dfe` still failed with OpenAI HTTP 403, so alpha/ratio/dark-composite evidence could not be produced.
 
 ## Decisions Made
 
 - Do not fabricate live OpenAI evidence without successful request IDs and output paths.
 - Do not mark a stale served build as Phase 09 browser evidence.
-- Record browser smoke as blocked rather than source-review-only passed.
+- Record opaque browser smoke as passed rather than source-review-only, while keeping transparent output evidence blocked.
 - Preserve orchestrator ownership of `.planning/STATE.md` and `.planning/ROADMAP.md`.
 
 ## Deviations from Plan
@@ -141,12 +145,12 @@ Real OpenAI/browser verification remains blocked:
 
 - Browser Use IAB backend was unavailable, so Playwright fallback was used only to inspect `localhost:3000`.
 - The process listening on `localhost:3000` was unrelated to this repo, preventing authenticated MockupAI browser verification.
-- Live OpenAI smoke could not be run safely without representative sample images and explicit approval to transmit them.
+- Initial live OpenAI smoke could not be run safely without representative sample images and explicit approval to transmit them; after approval, opaque live smoke completed successfully.
 - The default Docker project used a stale/inconsistent Postgres volume and conflicted with other local services on 3000/5432; isolated project/ports resolved current-branch runtime verification without deleting existing volumes.
 
 ## Known Stubs
 
-None. The `manual_needed` entries are release verification gates, not implementation stubs.
+None. The remaining transparent/deployment entries are release verification gates, not implementation stubs.
 
 ## Threat Flags
 
@@ -154,18 +158,16 @@ None. This plan added documentation and `.gitignore` coverage only; no new endpo
 
 ## User Setup Required
 
-To complete live verification:
+To complete full live verification:
 
-- Verify the OpenAI organization for `gpt-image-2` access.
-- Wait for verification propagation or generate a new API key if the old active key continues returning not-verified errors.
+- Retry transparent-background generation after verification fully propagates.
 - Run the deployment target from this repo/current branch, not the stale build on `100.69.75.47:3000`.
-- Provide authenticated project access with upload permissions.
-- Execute the browser checklist in `09-SMOKE.md` at desktop and 360px widths.
-- Record request IDs, output paths, candidate-order evidence, and transparent-background alpha/ratio/dark-composite evidence in `09-SUMMARY.md`.
+- Execute the browser checklist at desktop and additional mobile widths if release requires visual coverage beyond the current in-app browser smoke.
+- Record transparent-background alpha/ratio/dark-composite evidence in `09-SUMMARY.md`.
 
 ## Next Phase Readiness
 
-Automated Phase 9 checks are green and the current branch Docker runtime is usable for project/form browser verification. Phase 10 can proceed from automated confidence only if the team accepts the open release-smoke blockers; Phase 9 must not be claimed live-smoke verified until the OpenAI organization, generated-output result/history walkthrough, and transparent-output evidence gates pass.
+Automated Phase 9 checks are green, the current branch Docker runtime is usable, and opaque Sketch v2 live smoke passed through generated output, result, and history flows. Phase 10 can proceed from automated and opaque-live confidence only if the team accepts the remaining release-smoke blockers; Phase 9 must not be claimed fully live-smoke verified until transparent-output evidence and deployment-target freshness are covered.
 
 ## Self-Check: PASSED
 

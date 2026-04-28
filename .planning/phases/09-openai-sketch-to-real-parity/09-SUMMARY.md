@@ -2,12 +2,12 @@
 phase: 09-openai-sketch-to-real-parity
 artifact: release-smoke-summary
 status: blocked
-updated: 2026-04-28T03:22:38Z
+updated: 2026-04-28T03:28:03Z
 ---
 
 # Phase 9 Release Smoke Summary
 
-Phase 9 automated verification passed. Checkpoint continuation on 2026-04-28 received approved sample images and approval to transmit them to OpenAI. A fresh local Docker stack for the current branch was brought up and authenticated browser/API smoke reached the OpenAI worker path, but live output evidence remains `blocked` by OpenAI organization verification for `gpt-image-2`.
+Phase 9 automated verification passed. Checkpoint continuation on 2026-04-28 received approved sample images and approval to transmit them to OpenAI. A fresh local Docker stack for the current branch was brought up, authenticated browser/API smoke reached the OpenAI worker path, and the opaque Sketch v2 live smoke produced two outputs. Full live-smoke verification remains `blocked` on transparent-background output evidence and deployment-target freshness.
 
 ## Checkpoint Continuation Attempt
 
@@ -39,8 +39,15 @@ Browser/runtime results:
 - App API upload accepted both approved sample images, generation creation returned `provider: openai`, `providerModel: gpt-image-2`, and the worker reached OpenAI.
 - App worker generation ID `36061eae-6559-48ea-bc3d-d943b0ca69c1` failed with OpenAI HTTP 403 because the organization must be verified for `gpt-image-2`.
 - Worker OpenAI request IDs observed during retry: `req_ed6f526471d44adfbee781588c51cc90`, `req_e36c700853544b7a87a4145844909ae6`.
-- After the user completed organization verification, app-level worker smoke was retried with generation `834cbc00-4523-4150-8ee4-f2220356c236`; it still returned HTTP 403, likely because verification had not propagated yet or the API key needs regeneration.
-- Post-verification retry OpenAI request ID: `req_3ab87964ac324ed9ab39600dcbe6b68b`.
+- After the user completed organization verification, app-level worker smoke was retried with generation `834cbc00-4523-4150-8ee4-f2220356c236`; the first worker attempt still returned HTTP 403 with request ID `req_3ab87964ac324ed9ab39600dcbe6b68b`, but a BullMQ retry later completed successfully.
+- Successful app-level opaque Sketch v2 generation: `834cbc00-4523-4150-8ee4-f2220356c236`.
+- Successful OpenAI request ID recorded in DB: `req_b78ef6875e7e4b889486726a42e304fc`.
+- Opaque output paths:
+  - `generations/b82dead3-b8a7-47d3-9182-d6934c1027e2/49a2fa60-5010-47e9-a4f2-6bfc0b9c1ca8/834cbc00-4523-4150-8ee4-f2220356c236/output_1.png`
+  - `generations/b82dead3-b8a7-47d3-9182-d6934c1027e2/49a2fa60-5010-47e9-a4f2-6bfc0b9c1ca8/834cbc00-4523-4150-8ee4-f2220356c236/output_2.png`
+- Authenticated result page verified `후보 1`, `후보 2`, selected-candidate state, and save-to-history behavior.
+- Candidate order evidence: `output_1.png -> 후보 1`, `output_2.png -> 후보 2`; after selecting candidate 2, saving, reloading, opening history, and reopening the result, `후보 2` remained selected and candidate order was unchanged.
+- Transparent-background retry generation `7418ceef-19cf-41fa-b317-cbf5cf711dfe` still failed with OpenAI HTTP 403 during propagation.
 
 ## Automated Verification
 
@@ -60,7 +67,7 @@ Static/source evidence:
 
 ## Browser Verification
 
-browser verification: `partial - current branch Docker browser smoke verified project page and v2 form; result/history remain blocked because OpenAI 403 produced no outputs`.
+browser verification: `partial - current branch Docker browser smoke verified project page, v2 form, opaque result page, candidate order, and history; transparent-result evidence remains blocked`.
 
 Attempted automation:
 
@@ -68,26 +75,26 @@ Attempted automation:
 - A current-branch Docker stack was then launched on isolated loopback ports to avoid the unrelated `grapit` runtime.
 - In-app Browser opened `http://127.0.0.1:13000/projects/49a2fa60-5010-47e9-a4f2-6bfc0b9c1ca8/sketch-to-real/openai`.
 - The project page and v2 form were verified against the current build.
-- Result and history pages could not be verified with generated outputs because OpenAI returned 403 before producing images.
+- After organization verification propagated, opaque result and history pages were verified with generation `834cbc00-4523-4150-8ee4-f2220356c236`.
+- Transparent result/history pages could not be verified because transparent generation `7418ceef-19cf-41fa-b317-cbf5cf711dfe` returned OpenAI 403 before producing images.
 
 Source-reviewed items that still need runtime confirmation:
 
 - Project page runtime contains `IP 변경 v1`, `IP 변경 v2`, `스케치 실사화 v1`, `스케치 실사화 v2`, and `히스토리`.
 - v2 form runtime contains the expected defaults/copy for `균형모드`, `구조 우선 유지`, `시점 고정`, `배경 고정`, `재질/질감 참조 이미지 (선택)`, and `투명 배경 (누끼)`.
-- Result page source contains `후보 1`, `후보 2`, `생성된 이미지 (2개)`, `선택 이미지 다운로드`, and disabled v2 follow-up copy.
-- History source renders Sketch/IP `v1`/`v2` badges from `item.provider`.
+- Result page runtime contains `후보 1`, `후보 2`, `생성된 이미지 (2개)`, `선택 이미지 다운로드`, and disabled v2 follow-up copy.
+- History runtime renders `스케치 실사화` with a `v2` badge.
 
 Manual browser checklist still required:
 
-- Project page, v2 form, result page, and history page at desktop width.
-- Same flow at 360px mobile width with no button/chip/badge text overflow.
-- Product UI did not visibly show `OpenAI`, `Gemini`, `GPT Image 2`, or `gpt-image-2`: not verified in browser; `manual_needed`.
-- Sketch v2 result/history did not show `IP 변경`, `캐릭터`, or `character`: not verified in browser; `manual_needed`.
-- Select candidate 2, reload result page, save, open history, reopen result, and confirm `후보 1`/`후보 2` order is preserved.
+- Desktop-width visual pass still required.
+- Additional narrow/mobile pass remains recommended, though the in-app browser narrow viewport did not show obvious button/chip/badge overflow during the verified flow.
+- Product UI did not visibly show `OpenAI`, `Gemini`, `GPT Image 2`, or `gpt-image-2` in the verified project/form/result/history flow.
+- Sketch v2 result/history did not show `IP 변경`, `캐릭터`, or `character` in the verified flow.
 
 ## Real OpenAI Sketch Smoke
 
-OpenAI Sketch real smoke: `blocked - OpenAI organization verification required for gpt-image-2`.
+OpenAI Sketch real smoke: `partial - opaque Sketch v2 live smoke passed; transparent-background live smoke still blocked by intermittent organization verification 403`.
 
 Additional blockers and evidence:
 
@@ -100,24 +107,32 @@ Additional blockers and evidence:
 - App-level worker smoke created generation `36061eae-6559-48ea-bc3d-d943b0ca69c1` and reached OpenAI through the real worker.
 - Worker OpenAI request IDs observed during retry: `req_ed6f526471d44adfbee781588c51cc90`, `req_e36c700853544b7a87a4145844909ae6`.
 - App-level error category remained organization verification required for `gpt-image-2`.
-- Post-verification retry generation `834cbc00-4523-4150-8ee4-f2220356c236` also failed with organization verification required.
-- Post-verification retry request ID: `req_3ab87964ac324ed9ab39600dcbe6b68b`.
+- Post-verification retry generation `834cbc00-4523-4150-8ee4-f2220356c236` initially failed with organization verification request ID `req_3ab87964ac324ed9ab39600dcbe6b68b`, then completed on BullMQ retry.
+- Successful opaque retry request ID: `req_b78ef6875e7e4b889486726a42e304fc`.
+- Opaque retry produced exactly two output images: `output_1.png` and `output_2.png`.
+- Result/history candidate-order persistence was verified in browser.
 
-Required live evidence before marking this passed:
+Opaque live evidence captured:
 
-- Request ID.
-- Sketch image path.
-- Texture image path or `none`.
-- Selected quality value.
-- Two output image paths.
+- Request ID: `req_b78ef6875e7e4b889486726a42e304fc`.
+- Sketch image path: `/Users/sangwopark19/icons_file/3_IPIC/6_모드 B/5 패브릭.png`.
+- Texture image path: `/Users/sangwopark19/icons_file/3_IPIC/6_모드 B/12 세안밴드 페브릭 질감 참고.png`.
+- Selected quality value: `medium`.
+- Two output image paths captured.
 - Candidate order evidence: `output_1.png -> 후보 1`, `output_2.png -> 후보 2`, unchanged after candidate 2 selection, reload, save, history open, and reopen.
-- Confirmation that `background: "transparent"` was not sent.
-- Confirmation that `input_fidelity` was not sent.
-- Confirmation that the texture reference affected only material/finish behavior.
+- Source checks confirm `background: "transparent"` was not sent.
+- Source checks confirm `input_fidelity` was not sent.
 
 ## Transparent-Background Verification
 
-transparent-background verification: `manual_needed - live transparent output and dark-composite evidence unavailable`.
+transparent-background verification: `blocked - live transparent output and dark-composite evidence unavailable because transparent generation still hit OpenAI 403`.
+
+Attempted transparent generation:
+
+- Generation ID: `7418ceef-19cf-41fa-b317-cbf5cf711dfe`
+- Request IDs observed during retry failures: `req_5e3e30e9b855443691e4fdacc148c216`, `req_17c851718d45451e8279160ffdf63975`, `req_06becc0fe71c4ac7aa2a46e8d2803333`
+- Final status: `failed`
+- Error category: organization verification required for `gpt-image-2`
 
 Required evidence before marking this passed:
 
@@ -140,18 +155,18 @@ Required evidence before marking this passed:
 | Prompt structure source/test check | passed |
 | Browser project page | passed on local Docker current branch; stale provided Tailscale URL still non-current |
 | Browser v2 form | passed on local Docker current branch |
-| Browser result page | blocked because OpenAI 403 prevented live outputs |
-| Browser history page | blocked because OpenAI 403 prevented live outputs |
-| Provider/model visible-copy audit | partial; project/v2 form runtime did not expose provider/model labels, result/history blocked |
-| Sketch-vs-IP visible-copy audit | partial; project/v2 form runtime copy verified, result/history blocked |
-| Candidate order persistence | blocked because live generation did not produce outputs |
-| OpenAI request ID | captured: `req_b57b1a36a28c45b09029c3c7890dc2d7`; worker retries captured `req_ed6f526471d44adfbee781588c51cc90`, `req_e36c700853544b7a87a4145844909ae6`; post-verification retry captured `req_3ab87964ac324ed9ab39600dcbe6b68b` |
-| Transparent final asset alpha/ratio/composite | blocked because OpenAI 403 prevented output creation |
+| Browser result page | passed for opaque Sketch v2 output on local Docker current branch |
+| Browser history page | passed for saved opaque Sketch v2 output on local Docker current branch |
+| Provider/model visible-copy audit | passed for verified project/form/result/history flow |
+| Sketch-vs-IP visible-copy audit | passed for verified result/history flow |
+| Candidate order persistence | passed for opaque generation `834cbc00-4523-4150-8ee4-f2220356c236` |
+| OpenAI request ID | opaque success captured: `req_b78ef6875e7e4b889486726a42e304fc`; earlier/transparent failures also captured |
+| Transparent final asset alpha/ratio/composite | blocked because transparent generation `7418ceef-19cf-41fa-b317-cbf5cf711dfe` hit OpenAI 403 before output creation |
 
 ## Release Decision
 
-Automated release verification is green and the current branch can run locally through Docker, but Phase 9 should not be marked fully live-smoke verified until:
+Automated release verification is green, the current branch can run locally through Docker, and opaque Sketch v2 live smoke passed. Phase 9 should not be marked fully live-smoke verified until:
 
 1. The deployment target users will actually access is updated to the current `gsd/phase-09-openai-sketch-to-real-parity` branch or an equivalent build containing `sketch-to-real/openai`.
-2. The OpenAI organization verification status propagates for `gpt-image-2`; if the old key still fails, generate and activate a new API key.
-3. A new live smoke produces two outputs and records request ID, candidate order, browser reopen evidence, and transparent-background alpha/ratio/dark-composite evidence.
+2. Transparent-background live smoke succeeds and records alpha/ratio/dark-composite evidence.
+3. Desktop and additional mobile-width browser passes are recorded if release requires visual coverage beyond the current in-app browser smoke.
