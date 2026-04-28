@@ -2,12 +2,12 @@
 phase: 09-openai-sketch-to-real-parity
 artifact: release-smoke-summary
 status: blocked
-updated: 2026-04-28T02:45:33Z
+updated: 2026-04-28T03:10:11Z
 ---
 
 # Phase 9 Release Smoke Summary
 
-Phase 9 automated verification passed. Checkpoint continuation on 2026-04-28 received approved sample images and approval to transmit them to OpenAI, but live/browser release smoke remains `blocked` by external runtime and account gates.
+Phase 9 automated verification passed. Checkpoint continuation on 2026-04-28 received approved sample images and approval to transmit them to OpenAI. A fresh local Docker stack for the current branch was brought up and authenticated browser/API smoke reached the OpenAI worker path, but live output evidence remains `blocked` by OpenAI organization verification for `gpt-image-2`.
 
 ## Checkpoint Continuation Attempt
 
@@ -30,8 +30,15 @@ Browser/runtime results:
 - The user-provided browser URL `http://100.69.75.47:3000` was reachable and authenticated.
 - That server is not running the current Phase 09 branch: its served project bundle lacks `sketch-to-real/openai` and `스케치 실사화 v2`, while the current branch source contains both.
 - The process on port 3000 belongs to `/Users/sangwopark19/icons/grapit`, not `/Users/sangwopark19/icons/icons-ai-mockup`.
-- Attempting to start the current branch API locally failed because local Postgres credentials were invalid and Redis was unavailable.
-- Therefore authenticated browser smoke for the current branch could not be completed in this environment.
+- Initial local start attempts were blocked by stale/invalid default runtime state.
+- A fresh Docker Compose project `icons-ai-mockup-phase09` was started with isolated ports and volumes: web `http://127.0.0.1:13000`, API `http://127.0.0.1:14000`.
+- Fresh DB migration succeeded for all 6 Prisma migrations.
+- Seed admin login succeeded.
+- Authenticated browser smoke on the current branch verified the project page entries `IP 변경 v1`, `IP 변경 v2`, `스케치 실사화 v1`, `스케치 실사화 v2`, and `히스토리`.
+- Authenticated browser smoke on `/sketch-to-real/openai` verified the v2 form and default options: `균형모드`, `구조 우선 유지`, `시점 고정`, and `배경 고정`.
+- App API upload accepted both approved sample images, generation creation returned `provider: openai`, `providerModel: gpt-image-2`, and the worker reached OpenAI.
+- App worker generation ID `36061eae-6559-48ea-bc3d-d943b0ca69c1` failed with OpenAI HTTP 403 because the organization must be verified for `gpt-image-2`.
+- Worker OpenAI request IDs observed during retry: `req_ed6f526471d44adfbee781588c51cc90`, `req_e36c700853544b7a87a4145844909ae6`.
 
 ## Automated Verification
 
@@ -51,21 +58,20 @@ Static/source evidence:
 
 ## Browser Verification
 
-browser verification: `blocked - provided authenticated URL is a stale/non-current build`.
+browser verification: `partial - current branch Docker browser smoke verified project page and v2 form; result/history remain blocked because OpenAI 403 produced no outputs`.
 
 Attempted automation:
 
-- Codex in-app Browser backend was unavailable in this session.
-- Playwright opened `http://localhost:3000`, but that port served an unrelated `Grabit - 공연 티켓 예매` app, not this repo's MockupAI web app.
-- `localhost:4000` was not listening, so the MockupAI API was not available for authenticated project/result/history flows.
-- After user login, Codex in-app Browser opened `http://100.69.75.47:3000/projects/0ab5db3e-ee8e-4840-9480-4750771fe68e`; the visible project page showed only the old `스케치 실사화` entry, not the Phase 09 `스케치 실사화 v1` and `스케치 실사화 v2` entries.
-- Static inspection of the served Next chunk from `100.69.75.47:3000` confirmed it lacks `sketch-to-real/openai`; current branch source contains that route and copy.
-- Starting this repo's API locally was blocked by invalid local Postgres credentials and unavailable Redis.
+- The stale authenticated URL `http://100.69.75.47:3000` was inspected first; it did not contain Phase 09 Sketch v2.
+- A current-branch Docker stack was then launched on isolated loopback ports to avoid the unrelated `grapit` runtime.
+- In-app Browser opened `http://127.0.0.1:13000/projects/49a2fa60-5010-47e9-a4f2-6bfc0b9c1ca8/sketch-to-real/openai`.
+- The project page and v2 form were verified against the current build.
+- Result and history pages could not be verified with generated outputs because OpenAI returned 403 before producing images.
 
 Source-reviewed items that still need runtime confirmation:
 
-- Project page source contains `IP 변경 v1`, `IP 변경 v2`, `스케치 실사화 v1`, `스케치 실사화 v2`, and `히스토리`.
-- v2 form source contains the expected defaults/copy for `균형모드`, `구조 우선 유지`, `시점 고정`, `배경 고정`, `재질/질감 참조 이미지 (선택)`, and `투명 배경 (누끼)`.
+- Project page runtime contains `IP 변경 v1`, `IP 변경 v2`, `스케치 실사화 v1`, `스케치 실사화 v2`, and `히스토리`.
+- v2 form runtime contains the expected defaults/copy for `균형모드`, `구조 우선 유지`, `시점 고정`, `배경 고정`, `재질/질감 참조 이미지 (선택)`, and `투명 배경 (누끼)`.
 - Result page source contains `후보 1`, `후보 2`, `생성된 이미지 (2개)`, `선택 이미지 다운로드`, and disabled v2 follow-up copy.
 - History source renders Sketch/IP `v1`/`v2` badges from `item.provider`.
 
@@ -88,7 +94,10 @@ Additional blockers and evidence:
 - OpenAI returned HTTP 403 before generation.
 - Request ID: `req_b57b1a36a28c45b09029c3c7890dc2d7`
 - Error category: organization verification required for `gpt-image-2`.
-- Authenticated app/project runtime for the current branch remained unavailable.
+- Authenticated app/project runtime for the current branch was later verified through the isolated Docker stack.
+- App-level worker smoke created generation `36061eae-6559-48ea-bc3d-d943b0ca69c1` and reached OpenAI through the real worker.
+- Worker OpenAI request IDs observed during retry: `req_ed6f526471d44adfbee781588c51cc90`, `req_e36c700853544b7a87a4145844909ae6`.
+- App-level error category remained organization verification required for `gpt-image-2`.
 
 Required live evidence before marking this passed:
 
@@ -125,21 +134,20 @@ Required evidence before marking this passed:
 | Automated web type-check | passed |
 | Forbidden parameter source check | passed |
 | Prompt structure source/test check | passed |
-| Browser project page | blocked; provided URL serves stale/non-current build without Sketch v2 |
-| Browser v2 form | blocked by stale/non-current build and local runtime DB/Redis prerequisites |
-| Browser result page | blocked by stale/non-current build and no live generation |
-| Browser history page | blocked by stale/non-current build and no live generation |
-| Provider/model visible-copy audit | blocked in browser; source review found only internal identifiers, not runtime visual evidence |
-| Sketch-vs-IP visible-copy audit | blocked in browser |
+| Browser project page | passed on local Docker current branch; stale provided Tailscale URL still non-current |
+| Browser v2 form | passed on local Docker current branch |
+| Browser result page | blocked because OpenAI 403 prevented live outputs |
+| Browser history page | blocked because OpenAI 403 prevented live outputs |
+| Provider/model visible-copy audit | partial; project/v2 form runtime did not expose provider/model labels, result/history blocked |
+| Sketch-vs-IP visible-copy audit | partial; project/v2 form runtime copy verified, result/history blocked |
 | Candidate order persistence | blocked because live generation did not produce outputs |
-| OpenAI request ID | captured: `req_b57b1a36a28c45b09029c3c7890dc2d7` |
+| OpenAI request ID | captured: `req_b57b1a36a28c45b09029c3c7890dc2d7`; worker retries captured `req_ed6f526471d44adfbee781588c51cc90`, `req_e36c700853544b7a87a4145844909ae6` |
 | Transparent final asset alpha/ratio/composite | blocked because OpenAI 403 prevented output creation |
 
 ## Release Decision
 
-Automated release verification is green, but Phase 9 should not be marked fully live-smoke verified until:
+Automated release verification is green and the current branch can run locally through Docker, but Phase 9 should not be marked fully live-smoke verified until:
 
-1. The served web/API runtime is updated to the current `gsd/phase-09-openai-sketch-to-real-parity` branch or an equivalent build containing `sketch-to-real/openai`.
-2. Local/runtime dependencies are healthy: Postgres credentials valid, Redis available, API worker running.
-3. The OpenAI organization is verified for `gpt-image-2`.
-4. A new live smoke produces two outputs and records request ID, candidate order, browser reopen evidence, and transparent-background alpha/ratio/dark-composite evidence.
+1. The deployment target users will actually access is updated to the current `gsd/phase-09-openai-sketch-to-real-parity` branch or an equivalent build containing `sketch-to-real/openai`.
+2. The OpenAI organization is verified for `gpt-image-2`.
+3. A new live smoke produces two outputs and records request ID, candidate order, browser reopen evidence, and transparent-background alpha/ratio/dark-composite evidence.

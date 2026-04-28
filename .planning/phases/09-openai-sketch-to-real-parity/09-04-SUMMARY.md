@@ -32,8 +32,9 @@ key-files:
 key-decisions:
   - "Automated Phase 9 verification is green: API tests, API type-check, and web type-check all passed."
   - "Real OpenAI Sketch smoke was attempted after user sample/transfer approval, but OpenAI returned 403 because the organization is not verified for gpt-image-2."
-  - "Browser smoke remains blocked because the user-provided authenticated URL serves a stale/non-current build without the Phase 09 Sketch v2 route."
-  - "Current branch local runtime could not be started fully because local Postgres credentials were invalid and Redis was unavailable."
+  - "The user-provided authenticated URL serves a stale/non-current build without the Phase 09 Sketch v2 route."
+  - "A current-branch Docker smoke stack was launched on isolated loopback ports; fresh migrations passed and browser verification covered the project page plus Sketch v2 form."
+  - "App-level worker smoke reached OpenAI through the real queue/worker path, then failed with the same organization-verification gate for gpt-image-2."
   - "STATE.md and ROADMAP.md were intentionally not updated because the orchestrator owns those writes."
 
 patterns-established:
@@ -104,8 +105,12 @@ Real OpenAI/browser verification remains blocked:
 - Request ID: `req_b57b1a36a28c45b09029c3c7890dc2d7`
 - The user-provided authenticated browser URL `http://100.69.75.47:3000` is not running the current branch; the served bundle lacks `sketch-to-real/openai` and `스케치 실사화 v2`.
 - The process on port 3000 belongs to `/Users/sangwopark19/icons/grapit`, not this repo.
-- Attempting to start this repo's current API locally failed because local Postgres credentials were invalid and Redis was unavailable.
-- Because no live output was generated, transparent-background alpha/ratio/dark-composite evidence could not be produced.
+- A separate Docker Compose project `icons-ai-mockup-phase09` was launched with web `http://127.0.0.1:13000` and API `http://127.0.0.1:14000`, avoiding existing port/volume conflicts.
+- Fresh Docker DB migration applied all 6 migrations successfully, and seed admin login worked.
+- Browser verification on the current Docker build confirmed the project page entries and Sketch v2 form defaults.
+- App-level worker smoke created generation `36061eae-6559-48ea-bc3d-d943b0ca69c1`, reached OpenAI, and failed with HTTP 403 organization verification.
+- Worker retry request IDs observed: `req_ed6f526471d44adfbee781588c51cc90`, `req_e36c700853544b7a87a4145844909ae6`.
+- Because no live output was generated, result/history candidate-order and transparent-background alpha/ratio/dark-composite evidence could not be produced.
 
 ## Decisions Made
 
@@ -136,6 +141,7 @@ Real OpenAI/browser verification remains blocked:
 - Browser Use IAB backend was unavailable, so Playwright fallback was used only to inspect `localhost:3000`.
 - The process listening on `localhost:3000` was unrelated to this repo, preventing authenticated MockupAI browser verification.
 - Live OpenAI smoke could not be run safely without representative sample images and explicit approval to transmit them.
+- The default Docker project used a stale/inconsistent Postgres volume and conflicted with other local services on 3000/5432; isolated project/ports resolved current-branch runtime verification without deleting existing volumes.
 
 ## Known Stubs
 
@@ -150,15 +156,14 @@ None. This plan added documentation and `.gitignore` coverage only; no new endpo
 To complete live verification:
 
 - Verify the OpenAI organization for `gpt-image-2` access.
-- Run the MockupAI web/API stack for this repo/current branch, not the stale build on `100.69.75.47:3000`.
-- Fix local runtime prerequisites: valid Postgres credentials and running Redis.
+- Run the deployment target from this repo/current branch, not the stale build on `100.69.75.47:3000`.
 - Provide authenticated project access with upload permissions.
 - Execute the browser checklist in `09-SMOKE.md` at desktop and 360px widths.
 - Record request IDs, output paths, candidate-order evidence, and transparent-background alpha/ratio/dark-composite evidence in `09-SUMMARY.md`.
 
 ## Next Phase Readiness
 
-Automated Phase 9 checks are green and release smoke documentation is ready. Phase 10 can proceed from automated confidence only if the team accepts the open release-smoke blockers; Phase 9 must not be claimed live-smoke verified until the OpenAI organization, current branch runtime, browser walkthrough, and transparent-output evidence gates pass.
+Automated Phase 9 checks are green and the current branch Docker runtime is usable for project/form browser verification. Phase 10 can proceed from automated confidence only if the team accepts the open release-smoke blockers; Phase 9 must not be claimed live-smoke verified until the OpenAI organization, generated-output result/history walkthrough, and transparent-output evidence gates pass.
 
 ## Self-Check: PASSED
 
