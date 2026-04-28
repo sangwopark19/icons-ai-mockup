@@ -41,6 +41,8 @@ User-facing product screens use `v1` and `v2` as the provider/model signal. Do n
 | `/projects/:id/history` | Every history card must show the workflow label plus `v1`/`v2` badge derived from persisted provider data. Reopening a card must preserve the provider-pinned result behavior. |
 | Admin/ops surfaces | Raw `provider`, `providerModel`, OpenAI request IDs, response IDs, image-call IDs, revised prompts, and provider trace metadata may remain visible only in operational surfaces already designed for debugging. |
 
+Result-page visual priority: selected result image first, `v1`/`v2` badge second, continuation actions third.
+
 ---
 
 ## Version Badge Contract
@@ -151,7 +153,7 @@ Required result-page copy:
 | Regenerate action | `동일 조건 재생성` |
 | Modify conditions action | `조건 수정` |
 | Regenerate loading | `동일 조건으로 다시 생성 중...` |
-| Regenerate error | `원본 입력을 확인할 수 없어 동일 조건 재생성을 시작하지 못했습니다.` |
+| Regenerate error | `원본 입력을 확인할 수 없어 동일 조건 재생성을 시작하지 못했습니다. 조건 수정을 열어 새로 생성해주세요.` |
 | Provider mismatch error | `이 결과의 버전 정보를 확인할 수 없습니다. 히스토리에서 다시 열거나 새로 생성해주세요.` |
 
 Required partial-edit modal copy:
@@ -166,7 +168,7 @@ Required partial-edit modal copy:
 | Submit CTA | `수정 요청` |
 | Submit loading | `수정 결과 생성 중...` |
 | Submit error | `부분 수정 요청에 실패했습니다. 선택 이미지와 요청 내용을 확인한 뒤 다시 시도해주세요.` |
-| Cancel | `취소` |
+| Cancel edit action | `수정 취소` |
 
 Required OpenAI style-copy page copy:
 
@@ -213,7 +215,7 @@ Destructive actions in this phase:
 | Partial edit preservation | Modal copy must communicate surgical edit behavior: only the requested target changes; product body, camera angle, crop, background, lighting, labels, hardware, and non-target details remain preserved. |
 | Same-condition regeneration | Clicking `동일 조건 재생성` sends no editable form data. It reuses the original provider, provider model, stored input assets, prompt, and options from the source generation. |
 | V2 regeneration output | OpenAI v2 regeneration returns exactly two candidates and uses the existing candidate selection, save, reopen, and download lifecycle. |
-| Regeneration missing inputs | If stored inputs are missing or invalid, show `원본 입력을 확인할 수 없어 동일 조건 재생성을 시작하지 못했습니다.` and stay on the current result page. |
+| Regeneration missing inputs | If stored inputs are missing or invalid, show `원본 입력을 확인할 수 없어 동일 조건 재생성을 시작하지 못했습니다. 조건 수정을 열어 새로 생성해주세요.` and stay on the current result page. |
 | Gemini follow-up isolation | Existing v1 edit, regeneration, and style-copy behavior remains available and must continue using Gemini-only state such as `thoughtSignature` where applicable. |
 | OpenAI follow-up isolation | v2 partial edit, style copy, and regeneration must not read or send Gemini `thoughtSignature`. OpenAI lineage uses OpenAI response/image linkage where available. |
 | Style-copy routing | For v2 results, both style-copy buttons route to `/projects/:id/style-copy/openai` with `styleRef`, `copyTarget`, and `imageId` query params. For v1 results, preserve the existing Gemini style-copy route behavior unless implementation intentionally refactors it without changing behavior. |
@@ -248,7 +250,7 @@ No text may overflow buttons, badges, cards, modal, upload zones, or thumbnails 
 |------|-------------|
 | Version labels | `v1`/`v2` badges must appear as visible text and remain in the accessible name or nearby text context. |
 | Follow-up buttons | Buttons are keyboard reachable, expose loading/disabled state, and keep stable labels while loading. Use `aria-describedby` for action-specific error/help text when disabled. |
-| Partial edit modal | Use dialog semantics or existing modal behavior with focus trap, Escape/Cancel dismissal, labelled title, and focus return to the `부분 수정` button after close. |
+| Partial edit modal | Use dialog semantics or existing modal behavior with focus trap, Escape key or `수정 취소` dismissal, labelled title, and focus return to the `부분 수정` button after close. |
 | Partial edit input | The input must be associated with `수정 요청`; empty validation text must be announced or placed adjacent to the field. |
 | Candidate thumbnails | Buttons need `aria-label` values: `후보 1 선택`, `후보 2 선택`. Selected candidate exposes visible `선택됨` text and `aria-pressed=true` or equivalent selected state. |
 | One-result edit output | One-result partial edit pages should not expose fake candidate buttons. The selected image alt text is `선택된 v2 부분 수정 결과`. |
