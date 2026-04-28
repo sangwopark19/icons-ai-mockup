@@ -198,16 +198,40 @@ export default function GenerationResultPage() {
   const handleSelectImage = async (imageId: string) => {
     if (!accessToken) return;
 
+    const previousImageId = selectedImageId;
     setSelectedImageId(imageId);
+    setSaveMessage(null);
 
-    await apiFetch(`/api/generations/${genId}/select`, {
-      method: 'POST',
-      token: accessToken,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ imageId }),
-    });
+    try {
+      const response = await apiFetch(`/api/generations/${genId}/select`, {
+        method: 'POST',
+        token: accessToken,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ imageId }),
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error?.message || '이미지 선택에 실패했습니다.');
+      }
+
+      setGeneration((current) =>
+        current
+          ? {
+              ...current,
+              images: current.images.map((image) => ({
+                ...image,
+                isSelected: image.id === imageId,
+              })),
+            }
+          : current
+      );
+    } catch (error) {
+      setSelectedImageId(previousImageId);
+      setSaveMessage(error instanceof Error ? error.message : '이미지 선택에 실패했습니다.');
+    }
   };
 
   /**
