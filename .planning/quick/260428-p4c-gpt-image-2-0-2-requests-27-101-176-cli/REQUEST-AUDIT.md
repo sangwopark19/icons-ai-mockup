@@ -42,6 +42,8 @@ Worst-case request multiplier before fix:
 
 Live browser reproduction is currently blocked because neither the web app (`:3000`) nor the API (`:4000`) is listening locally, and the DB/Redis dependencies are also down. A prior Playwright console artifact only shows a local page load and an auth refresh failure; it does not include a GPT Image 2 generation click or a `/api/generations` POST.
 
+Post-fix browser attempt: Playwright MCP could not open a new page because its Chrome profile was already locked by another browser session. Fallback CLI checks confirmed `curl http://localhost:3000/admin/dashboard` and `curl http://localhost:4000/health` both failed with connection refused, matching the listener checks above.
+
 Static browser-code finding:
 
 - `apps/web/src/app/projects/[id]/ip-change/openai/page.tsx` calls `apiFetch('/api/generations', { method: 'POST', ... })` once after two upload calls.

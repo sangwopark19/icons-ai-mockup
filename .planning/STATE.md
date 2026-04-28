@@ -4,8 +4,8 @@ milestone: v1.1
 milestone_name: OpenAI GPT Image 2 Dual Provider
 status: "Ready to execute"
 stopped_at: Phase 10 planned
-last_updated: "2026-04-28T08:38:25.777Z"
-last_activity: 2026-04-28 -- Phase 10 planning complete
+last_updated: "2026-04-28T09:31:32Z"
+last_activity: 2026-04-28 -- Quick GPT Image 2 request accounting fix complete
 progress:
   total_phases: 4
   completed_phases: 3
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-04-24)
 Phase: 10 (provider-aware-result-continuation) — READY
 Plan: 0 of 7
 Status: Ready to execute
-Last activity: 2026-04-28 -- Phase 10 planning complete
+Last activity: 2026-04-28 -- Quick GPT Image 2 request accounting fix complete
 
 Progress: [███████░░░] 68%
 
@@ -56,6 +56,7 @@ Progress: [███████░░░] 68%
 | Phase 07-provider-foundation-and-key-separation P02 | 11 min | 2 tasks | 3 files |
 | Phase 07-provider-foundation-and-key-separation P03 | 6 min | 3 tasks | 5 files |
 | Phase 07-provider-foundation-and-key-separation P04 | 7 min | 3 tasks | 5 files |
+| Quick 260428-p4c-gpt-image-2-0-2-requests-27-101-176-cli | 19 min | 3 tasks | 13 files |
 
 ## Accumulated Context
 
@@ -119,6 +120,8 @@ Progress: [███████░░░] 68%
 - GPT Image 2 prompt work must also read workflow-specific prompt references: prompt-playbook/workflow-matrix plus the relevant `gpt-image-2-notes.md` for IP Change, Sketch Realization, or Precision Edit.
 - [Phase 09 ship]: User accepted merging PR #4 with transparent-background live evidence deferred to follow-up work.
 - [Phase 09 ship]: Merging to `main` triggers CI/CD deployment to the remote Mac server; stale pre-merge Tailscale/runtime evidence is not a merge blocker.
+- [Quick 260428-p4c]: OpenAI image jobs use SDK `maxRetries: 0` and BullMQ `attempts: 1`; Gemini keeps the existing default queue retry behavior.
+- [Quick 260428-p4c]: OpenAI active-key `callCount` is app-recorded Image API external request count after vendor response, not browser polling or OpenAI token usage.
 
 ### Pending Todos
 
@@ -137,6 +140,7 @@ Progress: [███████░░░] 68%
 | 1 | admin 대시보드 흰배경 흰글자 색상 수정 | 2026-03-12 | 7238c61 | [1-admin](./quick/1-admin/) |
 | 2 | Mac 서버 ENCRYPTION_KEY 배포 누락 및 admin 대시보드 빈 상태 수정 | 2026-04-23 | 6de9087 | [260423-l20-mac-encryption-key-api-admin-dashboard](./quick/260423-l20-mac-encryption-key-api-admin-dashboard/) |
 | 3 | Mac 서버 로그인 만료 시간 1일 및 자동 refresh 처리 | 2026-04-24 | e41c6ba | [260424-eex-auth-session-refresh](./quick/260424-eex-auth-session-refresh/) |
+| 4 | GPT Image 2 요청 수/토큰 사용량 급증 원인 조사 및 request budget 수정 | 2026-04-28 | d3e3739 | [260428-p4c-gpt-image-2-0-2-requests-27-101-176-cli](./quick/260428-p4c-gpt-image-2-0-2-requests-27-101-176-cli/) |
 
 ## Deferred Items
 
@@ -151,7 +155,7 @@ Items acknowledged and deferred at milestone close on 2026-04-23:
 
 ## Session Continuity
 
-Last session: 2026-04-28T07:34:25.668Z
+Last session: 2026-04-28T09:31:32Z
 Stopped at: Phase 10 planned
 Resume file: .planning/phases/10-provider-aware-result-continuation/10-01-PLAN.md
 
