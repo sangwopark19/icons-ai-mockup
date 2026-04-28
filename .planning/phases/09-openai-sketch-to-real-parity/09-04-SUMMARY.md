@@ -110,6 +110,7 @@ Real OpenAI/browser verification remains blocked:
 - Browser verification on the current Docker build confirmed the project page entries and Sketch v2 form defaults.
 - App-level worker smoke created generation `36061eae-6559-48ea-bc3d-d943b0ca69c1`, reached OpenAI, and failed with HTTP 403 organization verification.
 - Worker retry request IDs observed: `req_ed6f526471d44adfbee781588c51cc90`, `req_e36c700853544b7a87a4145844909ae6`.
+- After the user completed organization verification, app-level worker smoke was retried with generation `834cbc00-4523-4150-8ee4-f2220356c236`; it still returned HTTP 403, with request ID `req_3ab87964ac324ed9ab39600dcbe6b68b`.
 - Because no live output was generated, result/history candidate-order and transparent-background alpha/ratio/dark-composite evidence could not be produced.
 
 ## Decisions Made
@@ -156,6 +157,7 @@ None. This plan added documentation and `.gitignore` coverage only; no new endpo
 To complete live verification:
 
 - Verify the OpenAI organization for `gpt-image-2` access.
+- Wait for verification propagation or generate a new API key if the old active key continues returning not-verified errors.
 - Run the deployment target from this repo/current branch, not the stale build on `100.69.75.47:3000`.
 - Provide authenticated project access with upload permissions.
 - Execute the browser checklist in `09-SMOKE.md` at desktop and 360px widths.

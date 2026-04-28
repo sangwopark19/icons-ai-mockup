@@ -2,7 +2,7 @@
 phase: 09-openai-sketch-to-real-parity
 artifact: release-smoke-summary
 status: blocked
-updated: 2026-04-28T03:10:11Z
+updated: 2026-04-28T03:22:38Z
 ---
 
 # Phase 9 Release Smoke Summary
@@ -39,6 +39,8 @@ Browser/runtime results:
 - App API upload accepted both approved sample images, generation creation returned `provider: openai`, `providerModel: gpt-image-2`, and the worker reached OpenAI.
 - App worker generation ID `36061eae-6559-48ea-bc3d-d943b0ca69c1` failed with OpenAI HTTP 403 because the organization must be verified for `gpt-image-2`.
 - Worker OpenAI request IDs observed during retry: `req_ed6f526471d44adfbee781588c51cc90`, `req_e36c700853544b7a87a4145844909ae6`.
+- After the user completed organization verification, app-level worker smoke was retried with generation `834cbc00-4523-4150-8ee4-f2220356c236`; it still returned HTTP 403, likely because verification had not propagated yet or the API key needs regeneration.
+- Post-verification retry OpenAI request ID: `req_3ab87964ac324ed9ab39600dcbe6b68b`.
 
 ## Automated Verification
 
@@ -98,6 +100,8 @@ Additional blockers and evidence:
 - App-level worker smoke created generation `36061eae-6559-48ea-bc3d-d943b0ca69c1` and reached OpenAI through the real worker.
 - Worker OpenAI request IDs observed during retry: `req_ed6f526471d44adfbee781588c51cc90`, `req_e36c700853544b7a87a4145844909ae6`.
 - App-level error category remained organization verification required for `gpt-image-2`.
+- Post-verification retry generation `834cbc00-4523-4150-8ee4-f2220356c236` also failed with organization verification required.
+- Post-verification retry request ID: `req_3ab87964ac324ed9ab39600dcbe6b68b`.
 
 Required live evidence before marking this passed:
 
@@ -141,7 +145,7 @@ Required evidence before marking this passed:
 | Provider/model visible-copy audit | partial; project/v2 form runtime did not expose provider/model labels, result/history blocked |
 | Sketch-vs-IP visible-copy audit | partial; project/v2 form runtime copy verified, result/history blocked |
 | Candidate order persistence | blocked because live generation did not produce outputs |
-| OpenAI request ID | captured: `req_b57b1a36a28c45b09029c3c7890dc2d7`; worker retries captured `req_ed6f526471d44adfbee781588c51cc90`, `req_e36c700853544b7a87a4145844909ae6` |
+| OpenAI request ID | captured: `req_b57b1a36a28c45b09029c3c7890dc2d7`; worker retries captured `req_ed6f526471d44adfbee781588c51cc90`, `req_e36c700853544b7a87a4145844909ae6`; post-verification retry captured `req_3ab87964ac324ed9ab39600dcbe6b68b` |
 | Transparent final asset alpha/ratio/composite | blocked because OpenAI 403 prevented output creation |
 
 ## Release Decision
@@ -149,5 +153,5 @@ Required evidence before marking this passed:
 Automated release verification is green and the current branch can run locally through Docker, but Phase 9 should not be marked fully live-smoke verified until:
 
 1. The deployment target users will actually access is updated to the current `gsd/phase-09-openai-sketch-to-real-parity` branch or an equivalent build containing `sketch-to-real/openai`.
-2. The OpenAI organization is verified for `gpt-image-2`.
+2. The OpenAI organization verification status propagates for `gpt-image-2`; if the old key still fails, generate and activate a new API key.
 3. A new live smoke produces two outputs and records request ID, candidate order, browser reopen evidence, and transparent-background alpha/ratio/dark-composite evidence.
