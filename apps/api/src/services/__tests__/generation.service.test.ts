@@ -202,6 +202,39 @@ describe('GenerationService - provider contract', () => {
     });
   });
 
+  it('uses shared lock defaults when fixed background and viewpoint are omitted', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { addGenerationJob } = await import('../../lib/queue.js');
+    const { generationService } = await import('../generation.service.js');
+
+    vi.mocked(prisma.project.findFirst).mockResolvedValue({ id: 'proj1', userId: 'u1' } as any);
+    vi.mocked(prisma.generation.create).mockResolvedValue({
+      id: 'gen1',
+      projectId: 'proj1',
+      status: 'pending',
+      mode: 'sketch_to_real',
+      provider: 'openai',
+      providerModel: 'gpt-image-2',
+    } as any);
+
+    await generationService.create('u1', {
+      projectId: 'proj1',
+      mode: 'sketch_to_real',
+      provider: 'openai',
+      providerModel: 'gpt-image-2',
+      sourceImagePath: 'uploads/u1/proj1/source.png',
+    });
+
+    expect(vi.mocked(prisma.generation.create).mock.calls[0][0].data.options).toMatchObject({
+      fixedBackground: true,
+      fixedViewpoint: true,
+    });
+    expect(vi.mocked(addGenerationJob).mock.calls[0][0].options).toMatchObject({
+      fixedBackground: true,
+      fixedViewpoint: true,
+    });
+  });
+
   it('rejects OpenAI sketch_to_real when providerModel is wrong', async () => {
     const { prisma } = await import('../../lib/prisma.js');
     const { addGenerationJob } = await import('../../lib/queue.js');
