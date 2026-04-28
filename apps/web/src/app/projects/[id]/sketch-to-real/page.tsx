@@ -159,14 +159,16 @@ export default function SketchToRealPage() {
             >
               ← 뒤로
             </Link>
-            <h1 className="text-lg font-semibold text-[var(--text-primary)]">✏️ 스케치 실사화</h1>
+            <h1 className="text-lg font-semibold text-[var(--text-primary)]">✏️ 스케치 실사화 v1</h1>
           </div>
         </div>
       </header>
 
       {/* 메인 */}
       <main className="mx-auto max-w-5xl px-4 py-8">
-        <p className="mb-8 text-[var(--text-secondary)]">2D 스케치를 실제 제품처럼 변환합니다</p>
+        <p className="mb-8 text-[var(--text-secondary)]">
+          기존 방식으로 2D 스케치를 실제 제품처럼 변환합니다.
+        </p>
 
         {error && <div className="mb-6 rounded-lg bg-red-500/10 p-4 text-red-500">{error}</div>}
 
