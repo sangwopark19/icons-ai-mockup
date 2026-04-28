@@ -1,13 +1,13 @@
 ---
 phase: 09-openai-sketch-to-real-parity
 artifact: release-smoke-summary
-status: blocked
-updated: 2026-04-28T03:28:03Z
+status: accepted_with_deferred_followup
+updated: 2026-04-28T06:23:30Z
 ---
 
 # Phase 9 Release Smoke Summary
 
-Phase 9 automated verification passed. Checkpoint continuation on 2026-04-28 received approved sample images and approval to transmit them to OpenAI. A fresh local Docker stack for the current branch was brought up, authenticated browser/API smoke reached the OpenAI worker path, and the opaque Sketch v2 live smoke produced two outputs. Full live-smoke verification remains `blocked` on transparent-background output evidence and deployment-target freshness.
+Phase 9 automated verification passed. Checkpoint continuation on 2026-04-28 received approved sample images and approval to transmit them to OpenAI. A fresh local Docker stack for the current branch was brought up, authenticated browser/API smoke reached the OpenAI worker path, and the opaque Sketch v2 live smoke produced two outputs. On 2026-04-28, the user accepted merging with transparent-background live evidence deferred to follow-up work. Deployment-target freshness is handled by merging to `main`, which triggers CI/CD deployment to the remote Mac server.
 
 ## Checkpoint Continuation Attempt
 
@@ -165,8 +165,8 @@ Required evidence before marking this passed:
 
 ## Release Decision
 
-Automated release verification is green, the current branch can run locally through Docker, and opaque Sketch v2 live smoke passed. Phase 9 should not be marked fully live-smoke verified until:
+Automated release verification is green, the current branch can run locally through Docker, and opaque Sketch v2 live smoke passed. On 2026-04-28, the user approved proceeding with merge under these release assumptions:
 
-1. The deployment target users will actually access is updated to the current `gsd/phase-09-openai-sketch-to-real-parity` branch or an equivalent build containing `sketch-to-real/openai`.
-2. Transparent-background live smoke succeeds and records alpha/ratio/dark-composite evidence.
-3. Desktop and additional mobile-width browser passes are recorded if release requires visual coverage beyond the current in-app browser smoke.
+1. Transparent-background live smoke evidence is deferred to follow-up work and must still record alpha/ratio/dark-composite evidence before Phase 09 is claimed fully live-smoke verified.
+2. Deployment-target freshness is not a pre-merge blocker because merging to `main` triggers CI/CD deployment to the remote Mac server.
+3. Desktop and additional mobile-width browser passes remain optional follow-up evidence if release policy requires visual coverage beyond the current in-app browser smoke.

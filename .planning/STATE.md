@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: OpenAI GPT Image 2 Dual Provider
-status: verifying
-stopped_at: Phase 09 draft PR #4 with verification blockers
-last_updated: "2026-04-28T06:08:27.890Z"
-last_activity: 2026-04-28 -- Draft PR #4 created; transparent verification blockers remain
+status: shipping
+stopped_at: Phase 09 PR #4 approved for merge with deferred transparent evidence
+last_updated: "2026-04-28T06:23:30Z"
+last_activity: 2026-04-28 -- PR #4 approved for merge; transparent evidence deferred
 progress:
   total_phases: 4
   completed_phases: 3
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-04-24)
 
 ## Current Position
 
-Phase: 09 (openai-sketch-to-real-parity) — DRAFT PR
+Phase: 09 (openai-sketch-to-real-parity) — SHIPPING
 Plan: 4 of 4
-Status: Phase 09 draft PR created - verification blockers remain - PR #4
-Last activity: 2026-04-28 -- Draft PR #4 created; transparent verification blockers remain
+Status: Phase 09 PR #4 approved for merge - transparent evidence deferred
+Last activity: 2026-04-28 -- PR #4 approved for merge; transparent evidence deferred
 
 Progress: [██████████] 100%
 
@@ -117,10 +117,12 @@ Progress: [██████████] 100%
 - Admin monitoring exposes safe provider/model/OpenAI support identifiers while keeping providerTrace backend-only.
 - OpenAI phases must use `.planning/OPENAI-SKILL-GUARDRAILS.md`; Phase 8 requires dual-provider, workflow, image-runtime, IP Change, and CLI smoke skill guidance.
 - GPT Image 2 prompt work must also read workflow-specific prompt references: prompt-playbook/workflow-matrix plus the relevant `gpt-image-2-notes.md` for IP Change, Sketch Realization, or Precision Edit.
+- [Phase 09 ship]: User accepted merging PR #4 with transparent-background live evidence deferred to follow-up work.
+- [Phase 09 ship]: Merging to `main` triggers CI/CD deployment to the remote Mac server; stale pre-merge Tailscale/runtime evidence is not a merge blocker.
 
 ### Pending Todos
 
-None yet.
+- [Phase 09 follow-up]: Retry transparent-background Sketch v2 live smoke after merge/deployment and record final PNG alpha, transparent pixel ratio, border ratio, dark-composite luma, and composite output evidence.
 
 ### Blockers/Concerns
 
@@ -145,6 +147,7 @@ Items acknowledged and deferred at milestone close on 2026-04-23:
 | verification | v1.0 auth foundation: 01-VERIFICATION.md | human_needed runtime/browser checks |
 | verification | v1.0 dashboard/user management: 02-VERIFICATION.md | human_needed runtime/browser checks |
 | verification | v1.0 generation/content monitoring: 03-VERIFICATION.md | human_needed runtime/browser checks |
+| verification | Phase 09 transparent-background live smoke evidence | deferred after PR #4 merge/deploy; record alpha/ratio/dark-composite evidence |
 
 ## Session Continuity
 
