@@ -12,9 +12,65 @@ import {
   getValidAccessToken,
   type GenerationDetail,
   type GenerationImage,
+  type GenerationMode,
 } from '@/lib/api';
 
 const V2_CANDIDATE_LABELS = ['후보 1', '후보 2'];
+
+const V2_WORKFLOW_COPY: Record<
+  GenerationMode,
+  {
+    loadingHeading: string;
+    loadingBody: string;
+    failedBody: string;
+    formPath: string;
+    selectedAlt: string;
+    candidateAltPrefix: string;
+    downloadLabel: string;
+  }
+> = {
+  ip_change: {
+    loadingHeading: 'v2 목업을 생성하고 있습니다...',
+    loadingBody: '두 후보를 준비 중입니다. 완료되면 바로 선택할 수 있습니다.',
+    failedBody: 'v2 IP 변경 생성에 실패했습니다. 이미지를 확인한 뒤 다시 시도해주세요.',
+    formPath: 'ip-change/openai',
+    selectedAlt: '선택된 v2 IP 변경 결과',
+    candidateAltPrefix: 'v2 IP 변경 후보',
+    downloadLabel: '다운로드',
+  },
+  sketch_to_real: {
+    loadingHeading: 'v2 목업을 생성하고 있습니다...',
+    loadingBody: '스케치 구조를 보존한 두 후보를 준비 중입니다. 완료되면 바로 선택할 수 있습니다.',
+    failedBody:
+      'v2 스케치 실사화 생성에 실패했습니다. 스케치와 재질 정보를 확인한 뒤 다시 시도해주세요.',
+    formPath: 'sketch-to-real/openai',
+    selectedAlt: '선택된 v2 스케치 실사화 결과',
+    candidateAltPrefix: 'v2 스케치 실사화 후보',
+    downloadLabel: '선택 이미지 다운로드',
+  },
+};
+
+function getV2WorkflowCopy(mode: GenerationMode) {
+  return V2_WORKFLOW_COPY[mode];
+}
+
+function getV2WorkflowPath(projectId: string, mode: GenerationMode) {
+  return `/projects/${projectId}/${getV2WorkflowCopy(mode).formPath}`;
+}
+
+function getOutputIndex(image: GenerationImage, fallbackIndex: number) {
+  const path = image.filePath || image.thumbnailPath || '';
+  const match = path.match(/output[_-](\d+)/i);
+
+  return match ? Number(match[1]) : fallbackIndex + 1;
+}
+
+function getImagesInOutputOrder(images: GenerationImage[]) {
+  return images
+    .map((image, index) => ({ image, index, outputIndex: getOutputIndex(image, index) }))
+    .sort((a, b) => a.outputIndex - b.outputIndex || a.index - b.index)
+    .map(({ image }) => image);
+}
 
 /**
  * 생성 결과 페이지
@@ -35,7 +91,9 @@ export default function GenerationResultPage() {
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
-  const isV2 = Boolean(generation && generation.provider === 'openai' && generation.mode === 'ip_change');
+  const isV2 = generation?.provider === 'openai';
+  const isV2SketchToReal = Boolean(isV2 && generation?.mode === 'sketch_to_real');
+  const v2WorkflowCopy = isV2 && generation ? getV2WorkflowCopy(generation.mode) : null;
   const disabledFollowupId = 'v2-disabled-followups';
 
   // Interval 관리를 위한 ref
@@ -62,18 +120,21 @@ export default function GenerationResultPage() {
       const data = await response.json();
 
       if (data.success) {
-        setGeneration(data.data);
+        const fetchedGeneration = data.data as GenerationDetail;
+        const orderedImages = getImagesInOutputOrder(fetchedGeneration.images);
+
+        setGeneration(fetchedGeneration);
 
         // 선택된 이미지 설정
-        const selected = data.data.images.find((img: GenerationImage) => img.isSelected);
+        const selected = orderedImages.find((img: GenerationImage) => img.isSelected);
         if (selected) {
           setSelectedImageId(selected.id);
-        } else if (data.data.images.length > 0) {
-          setSelectedImageId(data.data.images[0].id);
+        } else if (orderedImages.length > 0) {
+          setSelectedImageId(orderedImages[0].id);
         }
 
         // 완료되면 폴링 중지
-        if (data.data.status === 'completed' || data.data.status === 'failed') {
+        if (fetchedGeneration.status === 'completed' || fetchedGeneration.status === 'failed') {
           setIsPolling(false);
         }
       }
@@ -275,8 +336,8 @@ export default function GenerationResultPage() {
    */
   const handleModifyConditions = () => {
     // 모드에 따라 해당 페이지로 이동
-    if (isV2) {
-      router.push(`/projects/${projectId}/ip-change/openai`);
+    if (generation?.provider === 'openai') {
+      router.push(getV2WorkflowPath(projectId, generation.mode));
     } else if (generation?.mode === 'ip_change') {
       router.push(`/projects/${projectId}/ip-change`);
     } else if (generation?.mode === 'sketch_to_real') {
@@ -306,21 +367,22 @@ export default function GenerationResultPage() {
 
   // 로딩 중
   if (!generation || generation.status === 'pending' || generation.status === 'processing') {
-    const pendingIsV2 = generation?.provider === 'openai' && generation.mode === 'ip_change';
+    const pendingCopy =
+      generation?.provider === 'openai' ? getV2WorkflowCopy(generation.mode) : null;
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--bg-primary)]">
         <div className="border-brand-500 mb-4 h-12 w-12 animate-spin rounded-full border-4 border-t-transparent" />
         <h2 className="text-xl font-semibold text-[var(--text-primary)]">
-          {pendingIsV2 ? 'v2 목업을 생성하고 있습니다...' : '목업을 생성하고 있습니다...'}
+          {pendingCopy ? pendingCopy.loadingHeading : '목업을 생성하고 있습니다...'}
         </h2>
         <p className="mt-2 text-[var(--text-secondary)]">
-          {pendingIsV2
-            ? '두 후보를 준비 중입니다. 완료되면 바로 선택할 수 있습니다.'
+          {pendingCopy
+            ? pendingCopy.loadingBody
             : generation?.status === 'processing'
               ? 'AI가 이미지를 생성 중입니다'
               : '작업 대기 중...'}
         </p>
-        {!pendingIsV2 && (
+        {!pendingCopy && (
           <p className="mt-3 max-w-md text-center text-sm text-[var(--text-secondary)]">
             고품질 결과를 위해 고성능 AI로 처리 중이라 시간이 오래 걸릴 수 있습니다. 완료까지
             잠시만 다른작업을 하면서 기다려주세요.
@@ -337,14 +399,16 @@ export default function GenerationResultPage() {
         <div className="mb-4 text-5xl">❌</div>
         <h2 className="text-xl font-semibold text-[var(--text-primary)]">생성에 실패했습니다</h2>
         <p className="mt-2 text-[var(--text-secondary)]">
-          {isV2
-            ? 'v2 IP 변경 생성에 실패했습니다. 이미지를 확인한 뒤 다시 시도해주세요.'
+          {v2WorkflowCopy
+            ? v2WorkflowCopy.failedBody
             : generation.errorMessage || '알 수 없는 오류가 발생했습니다'}
         </p>
         <Button
           className="mt-6"
           onClick={() =>
-            isV2 ? router.push(`/projects/${projectId}/ip-change/openai`) : router.back()
+            v2WorkflowCopy
+              ? router.push(getV2WorkflowPath(projectId, generation.mode))
+              : router.back()
           }
         >
           다시 시도
@@ -353,7 +417,30 @@ export default function GenerationResultPage() {
     );
   }
 
-  const selectedImage = generation.images.find((img) => img.id === selectedImageId);
+  const orderedImages = getImagesInOutputOrder(generation.images);
+
+  if (isV2SketchToReal && orderedImages.length !== 2) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--bg-primary)] px-4 text-center">
+        <div className="mb-4 text-5xl">❌</div>
+        <h2 className="text-xl font-semibold text-[var(--text-primary)]">
+          v2 스케치 실사화 결과를 확인할 수 없습니다
+        </h2>
+        <p className="mt-2 max-w-md text-[var(--text-secondary)]">
+          후보 2개가 필요하지만 현재 {orderedImages.length}개가 저장되어 있습니다. 스케치와 재질
+          정보를 확인한 뒤 다시 생성해주세요.
+        </p>
+        <Button
+          className="mt-6"
+          onClick={() => router.push(`/projects/${projectId}/sketch-to-real/openai`)}
+        >
+          다시 시도
+        </Button>
+      </div>
+    );
+  }
+
+  const selectedImage = orderedImages.find((img) => img.id === selectedImageId);
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)]">
@@ -369,7 +456,7 @@ export default function GenerationResultPage() {
             </Link>
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-semibold text-[var(--text-primary)]">생성 결과</h1>
-              {generation.mode === 'ip_change' && (
+              {(generation.mode === 'ip_change' || generation.mode === 'sketch_to_real') && (
                 <span className="rounded bg-[var(--bg-tertiary)] px-1.5 py-0.5 text-xs font-semibold text-[var(--text-tertiary)]">
                   {isV2 ? 'v2' : 'v1'}
                 </span>
@@ -381,7 +468,7 @@ export default function GenerationResultPage() {
               onClick={() => selectedImageId && handleDownload(selectedImageId)}
               disabled={!selectedImageId}
             >
-              다운로드
+              {v2WorkflowCopy?.downloadLabel ?? '다운로드'}
             </Button>
           </div>
         </div>
@@ -395,7 +482,7 @@ export default function GenerationResultPage() {
             {selectedImage && (
               <img
                 src={`${API_URL}/uploads/${selectedImage.filePath}`}
-                alt={isV2 ? '선택된 v2 IP 변경 결과' : '생성된 목업 결과'}
+                alt={v2WorkflowCopy?.selectedAlt ?? '생성된 목업 결과'}
                 className="max-h-[600px] rounded-lg object-contain"
               />
             )}
@@ -404,10 +491,10 @@ export default function GenerationResultPage() {
           {/* 이미지 목록 */}
           <div className="space-y-4">
             <h3 className="font-medium text-[var(--text-primary)]">
-              {isV2 ? '생성된 이미지 (2개)' : `생성된 이미지 (${generation.images.length}개)`}
+              {isV2 ? '생성된 이미지 (2개)' : `생성된 이미지 (${orderedImages.length}개)`}
             </h3>
             <div className="grid grid-cols-2 gap-3">
-              {generation.images.map((image, index) => (
+              {orderedImages.map((image, index) => (
                 <button
                   key={image.id}
                   onClick={() => handleSelectImage(image.id)}
@@ -421,7 +508,11 @@ export default function GenerationResultPage() {
                 >
                   <img
                     src={`${API_URL}/uploads/${image.thumbnailPath || image.filePath}`}
-                    alt={isV2 ? `v2 IP 변경 후보 ${index + 1}` : `생성 후보 ${index + 1}`}
+                    alt={
+                      v2WorkflowCopy
+                        ? `${v2WorkflowCopy.candidateAltPrefix} ${index + 1}`
+                        : `생성 후보 ${index + 1}`
+                    }
                     className="aspect-square w-full object-cover"
                   />
                   {isV2 && (
