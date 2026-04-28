@@ -68,6 +68,7 @@ describe('OpenAIImageService', () => {
 
   it('calls images.edit with GPT Image 2 and omits forbidden parameters', async () => {
     const { openaiImageService } = await import('../openai-image.service.js');
+    const OpenAI = vi.mocked((await import('openai')).default);
 
     await openaiImageService.generateIPChange(
       'sk-test',
@@ -82,6 +83,13 @@ describe('OpenAIImageService', () => {
       }
     );
 
+    expect(OpenAI).toHaveBeenCalledWith({
+      apiKey: 'sk-test',
+      maxRetries: 0,
+      timeout: 60_000,
+    });
+    expect(mocks.edit).toHaveBeenCalledTimes(1);
+
     const firstCall = mocks.edit.mock.calls[0][0];
     expect(firstCall).toMatchObject({
       model: 'gpt-image-2',
@@ -93,6 +101,44 @@ describe('OpenAIImageService', () => {
     expect(firstCall.image).toHaveLength(2);
     expect(firstCall.background).toBeUndefined();
     expect(firstCall.input_fidelity).toBeUndefined();
+  });
+
+  it('records one external OpenAI request and safe candidate accounting', async () => {
+    const { openaiImageService } = await import('../openai-image.service.js');
+
+    const result = await openaiImageService.generateIPChange(
+      'sk-test',
+      pngBase64,
+      pngBase64,
+      {
+        preserveStructure: true,
+        transparentBackground: false,
+      }
+    );
+
+    expect(result.providerTrace).toMatchObject({
+      provider: 'openai',
+      model: 'gpt-image-2',
+      endpoint: 'images.edit',
+      externalRequestCount: 1,
+      outputCount: 2,
+      candidateCount: 2,
+      sdkMaxRetries: 0,
+      candidates: [
+        {
+          index: 1,
+          requestId: 'req_1',
+          responseId: 'resp_1',
+          imageCallId: 'img_1',
+        },
+        {
+          index: 2,
+          requestId: 'req_1',
+          responseId: 'resp_1',
+          imageCallId: 'img_2',
+        },
+      ],
+    });
   });
 
   it('builds a strict IP replacement prompt with required sections', async () => {

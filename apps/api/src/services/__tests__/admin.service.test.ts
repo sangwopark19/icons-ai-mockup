@@ -1272,4 +1272,23 @@ describe('AdminService - incrementCallCount', () => {
       })
     );
   });
+
+  it('should increment callCount by an explicit amount', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.apiKey.updateMany).mockResolvedValue({ count: 1 });
+
+    await adminService.incrementCallCount('openai', 'k1', 3);
+
+    expect(vi.mocked(prisma.apiKey.updateMany)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'k1', provider: 'openai' },
+        data: expect.objectContaining({
+          callCount: { increment: 3 },
+          lastUsedAt: expect.any(Date),
+        }),
+      })
+    );
+  });
 });
