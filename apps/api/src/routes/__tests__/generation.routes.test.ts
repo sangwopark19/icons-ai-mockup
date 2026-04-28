@@ -4,6 +4,9 @@ import Fastify, { type FastifyInstance } from 'fastify';
 vi.mock('../../services/generation.service.js', () => ({
   generationService: {
     create: vi.fn(),
+    selectImage: vi.fn(),
+    copyStyle: vi.fn(),
+    getProjectHistory: vi.fn(),
   },
 }));
 
@@ -133,6 +136,65 @@ describe('generation routes', () => {
       },
     });
     expect(vi.mocked(generationService.create)).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
+  it('returns a structured 400 for invalid select-image payloads', async () => {
+    const app = await buildTestApp();
+    const { generationService } = await import('../../services/generation.service.js');
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/00000000-0000-0000-0000-000000000001/select',
+      payload: { imageId: 'not-a-uuid' },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(JSON.parse(response.body)).toMatchObject({
+      success: false,
+      error: { code: 'INVALID_REQUEST' },
+    });
+    expect(vi.mocked(generationService.selectImage)).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
+  it('returns a structured 400 for invalid copy-style payloads', async () => {
+    const app = await buildTestApp();
+    const { generationService } = await import('../../services/generation.service.js');
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/00000000-0000-0000-0000-000000000001/copy-style',
+      payload: { characterImagePath: 123 },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(JSON.parse(response.body)).toMatchObject({
+      success: false,
+      error: { code: 'INVALID_REQUEST' },
+    });
+    expect(vi.mocked(generationService.copyStyle)).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
+  it('returns a structured 400 for invalid history query params', async () => {
+    const app = await buildTestApp();
+    const { generationService } = await import('../../services/generation.service.js');
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/project/00000000-0000-0000-0000-000000000001/history?page=0&limit=20',
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(JSON.parse(response.body)).toMatchObject({
+      success: false,
+      error: { code: 'INVALID_REQUEST' },
+    });
+    expect(vi.mocked(generationService.getProjectHistory)).not.toHaveBeenCalled();
 
     await app.close();
   });

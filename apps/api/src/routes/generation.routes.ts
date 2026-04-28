@@ -1,4 +1,4 @@
-import { FastifyPluginAsync } from 'fastify';
+import { FastifyPluginAsync, type FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { generationService } from '../services/generation.service.js';
 
@@ -131,6 +131,13 @@ const HistoryQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
 
+function sendInvalidRequest(reply: FastifyReply, message: string) {
+  return reply.code(400).send({
+    success: false,
+    error: { code: 'INVALID_REQUEST', message },
+  });
+}
+
 /**
  * 생성 라우트
  */
@@ -233,7 +240,16 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post('/:id/select', async (request, reply) => {
     const user = (request as any).user;
     const { id } = request.params as { id: string };
-    const body = SelectImageSchema.parse(request.body);
+    const parsed = SelectImageSchema.safeParse(request.body);
+
+    if (!parsed.success) {
+      return sendInvalidRequest(
+        reply,
+        parsed.error.issues[0]?.message ?? '요청이 유효하지 않습니다'
+      );
+    }
+
+    const body = parsed.data;
 
     try {
       const image = await generationService.selectImage(user.id, id, body.imageId);
@@ -298,13 +314,19 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post('/:id/copy-style', async (request, reply) => {
     const user = (request as any).user;
     const { id } = request.params as { id: string };
-    const body = CopyStyleSchema.parse(request.body);
+    const parsed = CopyStyleSchema.safeParse(request.body);
+
+    if (!parsed.success) {
+      return sendInvalidRequest(
+        reply,
+        parsed.error.issues[0]?.message ?? '요청이 유효하지 않습니다'
+      );
+    }
+
+    const body = parsed.data;
 
     if (!body.characterImagePath && !body.sourceImagePath) {
-      return reply.code(400).send({
-        success: false,
-        error: { code: 'INVALID_REQUEST', message: '새 캐릭터 또는 제품 이미지를 제공해야 합니다' },
-      });
+      return sendInvalidRequest(reply, '새 캐릭터 또는 제품 이미지를 제공해야 합니다');
     }
 
     try {
@@ -359,7 +381,16 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get('/project/:projectId/history', async (request, reply) => {
     const user = (request as any).user;
     const { projectId } = request.params as { projectId: string };
-    const { page, limit } = HistoryQuerySchema.parse(request.query);
+    const parsed = HistoryQuerySchema.safeParse(request.query);
+
+    if (!parsed.success) {
+      return sendInvalidRequest(
+        reply,
+        parsed.error.issues[0]?.message ?? '요청이 유효하지 않습니다'
+      );
+    }
+
+    const { page, limit } = parsed.data;
 
     try {
       const { generations, total } = await generationService.getProjectHistory(
