@@ -65,6 +65,7 @@ export const generationQueue = new Queue<GenerationJobData>('generation', {
 export async function addGenerationJob(data: GenerationJobData): Promise<Job<GenerationJobData>> {
   return generationQueue.add('generate', data, {
     priority: 1,
+    ...(data.provider === 'openai' ? { attempts: 1 } : {}),
   });
 }
 

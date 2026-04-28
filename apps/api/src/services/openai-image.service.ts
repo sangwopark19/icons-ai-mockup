@@ -53,6 +53,7 @@ interface OpenAIImageResponse {
 
 export class OpenAIImageService {
   private readonly model = 'gpt-image-2';
+  private readonly sdkMaxRetries = 0;
 
   async generateIPChange(
     apiKey: string,
@@ -62,7 +63,7 @@ export class OpenAIImageService {
   ): Promise<OpenAIImageGenerationResult> {
     const client = new OpenAI({
       apiKey,
-      maxRetries: 2,
+      maxRetries: this.sdkMaxRetries,
       timeout: 60_000,
     });
     const prompt = this.buildIPChangePrompt(options);
@@ -137,7 +138,9 @@ export class OpenAIImageService {
         endpoint: 'images.edit',
         quality,
         outputCount: images.length,
+        candidateCount: images.length,
         externalRequestCount: 1,
+        sdkMaxRetries: this.sdkMaxRetries,
         candidates,
       },
     };
@@ -151,7 +154,7 @@ export class OpenAIImageService {
   ): Promise<OpenAIImageGenerationResult> {
     const client = new OpenAI({
       apiKey,
-      maxRetries: 2,
+      maxRetries: this.sdkMaxRetries,
       timeout: 60_000,
     });
     const prompt = this.buildSketchToRealPrompt(options);
@@ -231,8 +234,10 @@ export class OpenAIImageService {
         workflow: 'sketch_to_real',
         quality,
         outputCount: images.length,
+        candidateCount: images.length,
         inputImageCount: inputImages.length,
         externalRequestCount: 1,
+        sdkMaxRetries: this.sdkMaxRetries,
         candidates,
       },
     };

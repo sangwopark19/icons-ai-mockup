@@ -26,6 +26,22 @@ const toOpenAIMetadataPayload = (metadata: OpenAIImageGenerationResult) => ({
 const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every((item) => typeof item === 'string');
 
+const getPositiveNumber = (value: unknown, fallback: number): number =>
+  typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback;
+
+const attachOpenAIWorkerTrace = (
+  metadata: OpenAIImageGenerationResult,
+  job: Job<GenerationJobData>
+): OpenAIImageGenerationResult => ({
+  ...metadata,
+  providerTrace: {
+    ...metadata.providerTrace,
+    queueJobId: job.id ?? null,
+    queueAttempts: job.attemptsMade + 1,
+    queueConfiguredAttempts: job.opts.attempts ?? null,
+  },
+});
+
 const parseDate = (value: unknown): Date | null => {
   if (value instanceof Date) return value;
   if (typeof value === 'string') {
@@ -126,7 +142,6 @@ const generationWorker = new Worker<GenerationJobData>(
             throw new Error('OpenAI IP 변경 v2는 스타일 참조를 지원하지 않습니다');
           }
 
-          await adminService.incrementCallCount(provider, activeKeyId);
           const result = await openaiImageService.generateIPChange(
             activeApiKey,
             sourceImageBase64,
@@ -145,8 +160,14 @@ const generationWorker = new Worker<GenerationJobData>(
               prompt: job.data.prompt,
             }
           );
-          generatedImages = result.images;
-          openAIMetadata = result;
+          const tracedResult = attachOpenAIWorkerTrace(result, job);
+          await adminService.incrementCallCount(
+            provider,
+            activeKeyId,
+            getPositiveNumber(tracedResult.providerTrace.externalRequestCount, 1)
+          );
+          generatedImages = tracedResult.images;
+          openAIMetadata = tracedResult;
         } else if (job.data.styleReferenceId) {
           const reference = await generationService.getById(userId, job.data.styleReferenceId);
           if (!reference) {
@@ -235,7 +256,6 @@ const generationWorker = new Worker<GenerationJobData>(
             throw new Error('OpenAI 스케치 실사화 v2는 스타일 참조를 지원하지 않습니다');
           }
 
-          await adminService.incrementCallCount(provider, activeKeyId);
           const result = await openaiImageService.generateSketchToReal(
             activeApiKey,
             sourceImageBase64,
@@ -254,8 +274,14 @@ const generationWorker = new Worker<GenerationJobData>(
               prompt: job.data.prompt,
             }
           );
-          generatedImages = result.images;
-          openAIMetadata = result;
+          const tracedResult = attachOpenAIWorkerTrace(result, job);
+          await adminService.incrementCallCount(
+            provider,
+            activeKeyId,
+            getPositiveNumber(tracedResult.providerTrace.externalRequestCount, 1)
+          );
+          generatedImages = tracedResult.images;
+          openAIMetadata = tracedResult;
         } else {
           await adminService.incrementCallCount(provider, activeKeyId);
           const result = await geminiService.generateSketchToReal(

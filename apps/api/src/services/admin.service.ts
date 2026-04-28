@@ -796,16 +796,21 @@ export class AdminService {
     return { id: activeKey.id, provider: activeKey.provider, key: decryptedKey };
   }
 
-  async incrementCallCount(provider: ApiKeyProvider, id: string): Promise<void>;
+  async incrementCallCount(provider: ApiKeyProvider, id: string, amount?: number): Promise<void>;
   async incrementCallCount(id: string): Promise<void>;
-  async incrementCallCount(provider: ApiKeyProvider | string, id?: string): Promise<void> {
+  async incrementCallCount(
+    provider: ApiKeyProvider | string,
+    id?: string,
+    amount = 1
+  ): Promise<void> {
     const resolvedProvider: ApiKeyProvider = id ? (provider as ApiKeyProvider) : 'gemini';
     const resolvedId = id ?? provider;
+    const incrementBy = Number.isFinite(amount) && amount > 0 ? Math.trunc(amount) : 1;
 
     const result = await prisma.apiKey.updateMany({
       where: { id: resolvedId, provider: resolvedProvider },
       data: {
-        callCount: { increment: 1 },
+        callCount: { increment: incrementBy },
         lastUsedAt: new Date(),
       },
     });
