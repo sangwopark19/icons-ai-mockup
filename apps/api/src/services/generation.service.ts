@@ -626,7 +626,8 @@ export class GenerationService {
     generationId: string,
     filePath: string,
     thumbnailPath: string | null,
-    metadata: { width: number; height: number; size: number }
+    metadata: { width: number; height: number; size: number },
+    options?: { hasTransparency?: boolean }
   ): Promise<GeneratedImage> {
     return prisma.generatedImage.create({
       data: {
@@ -635,7 +636,7 @@ export class GenerationService {
         thumbnailPath,
         type: 'output',
         isSelected: false,
-        hasTransparency: false,
+        hasTransparency: options?.hasTransparency ?? false,
         width: metadata.width,
         height: metadata.height,
         fileSize: metadata.size,

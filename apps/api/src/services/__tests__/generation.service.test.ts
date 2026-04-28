@@ -14,6 +14,7 @@ vi.mock('../../lib/prisma.js', () => ({
       update: vi.fn(),
     },
     generatedImage: {
+      create: vi.fn(),
       findFirst: vi.fn(),
       updateMany: vi.fn(),
       update: vi.fn(),
@@ -364,6 +365,63 @@ describe('GenerationService - getById', () => {
       'generations/u1/gen1/output_1.png',
       'generations/u1/gen1/output_2.png',
     ]);
+  });
+});
+
+describe('GenerationService - saveGeneratedImage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('keeps the old signature backward-compatible with hasTransparency false', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { generationService } = await import('../generation.service.js');
+
+    vi.mocked(prisma.generatedImage.create).mockResolvedValue({
+      id: 'img1',
+      generationId: 'gen1',
+      hasTransparency: false,
+    } as any);
+
+    await generationService.saveGeneratedImage(
+      'gen1',
+      'generations/u1/proj1/gen1/output_1.png',
+      'generations/u1/proj1/gen1/thumb_output_1.jpg',
+      { width: 128, height: 128, size: 1024 }
+    );
+
+    expect(vi.mocked(prisma.generatedImage.create)).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        generationId: 'gen1',
+        hasTransparency: false,
+      }),
+    });
+  });
+
+  it('persists hasTransparency true when explicitly provided', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { generationService } = await import('../generation.service.js');
+
+    vi.mocked(prisma.generatedImage.create).mockResolvedValue({
+      id: 'img1',
+      generationId: 'gen1',
+      hasTransparency: true,
+    } as any);
+
+    await generationService.saveGeneratedImage(
+      'gen1',
+      'generations/u1/proj1/gen1/output_1.png',
+      'generations/u1/proj1/gen1/thumb_output_1.jpg',
+      { width: 128, height: 128, size: 1024 },
+      { hasTransparency: true }
+    );
+
+    expect(vi.mocked(prisma.generatedImage.create)).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        generationId: 'gen1',
+        hasTransparency: true,
+      }),
+    });
   });
 });
 
