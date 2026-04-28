@@ -161,13 +161,13 @@ const generationWorker = new Worker<GenerationJobData>(
             }
           );
           const tracedResult = attachOpenAIWorkerTrace(result, job);
+          openAIMetadata = tracedResult;
           await adminService.incrementCallCount(
             provider,
             activeKeyId,
             getPositiveNumber(tracedResult.providerTrace.externalRequestCount, 1)
           );
           generatedImages = tracedResult.images;
-          openAIMetadata = tracedResult;
         } else if (job.data.styleReferenceId) {
           const reference = await generationService.getById(userId, job.data.styleReferenceId);
           if (!reference) {
@@ -275,13 +275,13 @@ const generationWorker = new Worker<GenerationJobData>(
             }
           );
           const tracedResult = attachOpenAIWorkerTrace(result, job);
+          openAIMetadata = tracedResult;
           await adminService.incrementCallCount(
             provider,
             activeKeyId,
             getPositiveNumber(tracedResult.providerTrace.externalRequestCount, 1)
           );
           generatedImages = tracedResult.images;
-          openAIMetadata = tracedResult;
         } else {
           await adminService.incrementCallCount(provider, activeKeyId);
           const result = await geminiService.generateSketchToReal(
