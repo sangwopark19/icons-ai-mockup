@@ -15,6 +15,14 @@ type ProcessedGeneratedImage = {
   hasTransparency: boolean;
 };
 
+const toOpenAIMetadataPayload = (metadata: OpenAIImageGenerationResult) => ({
+  requestIds: metadata.requestIds,
+  responseId: metadata.responseId,
+  imageCallIds: metadata.imageCallIds,
+  revisedPrompt: metadata.revisedPrompt,
+  providerTrace: metadata.providerTrace,
+});
+
 const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every((item) => typeof item === 'string');
 
@@ -58,6 +66,8 @@ const generationWorker = new Worker<GenerationJobData>(
   'generation',
   async (job: Job<GenerationJobData>) => {
     const { generationId, userId, projectId, options } = job.data;
+    let openAIMetadata: OpenAIImageGenerationResult | undefined;
+    let openAIMetadataSaved = false;
     console.log(`🚀 생성 작업 시작: ${generationId}`);
 
     try {
@@ -105,7 +115,6 @@ const generationWorker = new Worker<GenerationJobData>(
 
       let generatedImages: Buffer[];
       let thoughtSignatures: ThoughtSignatureData[] = [];
-      let openAIMetadata: OpenAIImageGenerationResult | undefined;
 
       if (mode === 'ip_change') {
         if (!sourceImageBase64 || !characterImageBase64) {
@@ -273,6 +282,14 @@ const generationWorker = new Worker<GenerationJobData>(
         throw new Error(`알 수 없는 생성 모드: ${mode}`);
       }
 
+      if (openAIMetadata) {
+        await generationService.updateOpenAIMetadata(
+          generationId,
+          toOpenAIMetadataPayload(openAIMetadata)
+        );
+        openAIMetadataSaved = true;
+      }
+
       const processedImages: ProcessedGeneratedImage[] = [];
       for (const image of generatedImages) {
         if (provider === 'openai' && mode === 'sketch_to_real' && options.transparentBackground) {
@@ -316,16 +333,6 @@ const generationWorker = new Worker<GenerationJobData>(
         await generationService.updateThoughtSignatures(generationId, thoughtSignatures);
       }
 
-      if (openAIMetadata) {
-        await generationService.updateOpenAIMetadata(generationId, {
-          requestIds: openAIMetadata.requestIds,
-          responseId: openAIMetadata.responseId,
-          imageCallIds: openAIMetadata.imageCallIds,
-          revisedPrompt: openAIMetadata.revisedPrompt,
-          providerTrace: openAIMetadata.providerTrace,
-        });
-      }
-
       // 완료 상태로 업데이트
       await generationService.updateStatus(generationId, 'completed');
       console.log(`✅ 생성 작업 완료: ${generationId}`);
@@ -334,6 +341,14 @@ const generationWorker = new Worker<GenerationJobData>(
     } catch (error) {
       const message = error instanceof Error ? error.message : '알 수 없는 오류';
       console.error(`❌ 생성 작업 실패: ${generationId}`, error);
+
+      if (openAIMetadata && !openAIMetadataSaved) {
+        await generationService
+          .updateOpenAIMetadata(generationId, toOpenAIMetadataPayload(openAIMetadata))
+          .catch((metadataError) => {
+            console.error(`❌ OpenAI 메타데이터 저장 실패: ${generationId}`, metadataError);
+          });
+      }
 
       await generationService.updateStatus(generationId, 'failed', message);
       throw error;
