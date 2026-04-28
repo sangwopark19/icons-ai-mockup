@@ -8,6 +8,11 @@ import { Button } from '@/components/ui/button';
 import { formatRelativeTime } from '@/lib/utils';
 import { API_URL, apiFetch, type HistoryGenerationItem } from '@/lib/api';
 
+const HISTORY_MODE_COPY: Record<HistoryGenerationItem['mode'], { icon: string; label: string }> = {
+  ip_change: { icon: '⚡', label: 'IP 변경' },
+  sketch_to_real: { icon: '✏️', label: '스케치 실사화' },
+};
+
 /**
  * 히스토리 페이지
  */
@@ -130,63 +135,68 @@ export default function HistoryPage() {
           <>
             {/* 갤러리 그리드 */}
             <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-              {history.map((item) => (
-                <Link
-                  key={item.id}
-                  href={`/projects/${projectId}/generations/${item.id}`}
-                  className="hover:border-brand-500 group overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--bg-secondary)] transition-all hover:shadow-lg"
-                >
-                  <div className="aspect-square bg-[var(--bg-tertiary)]">
-                    {item.selectedImage ? (
-                      <img
-                        src={`${API_URL}/uploads/${item.selectedImage.thumbnailPath || item.selectedImage.filePath}`}
-                        alt="저장된 목업"
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full items-center justify-center text-4xl text-[var(--text-tertiary)]">
-                        🖼️
-                      </div>
-                    )}
-                  </div>
+              {history.map((item) => {
+                const modeCopy = HISTORY_MODE_COPY[item.mode];
+                const isVersionedMode =
+                  item.mode === 'ip_change' || item.mode === 'sketch_to_real';
+                const character = item.mode === 'ip_change' ? item.character : null;
 
-                  <div className="p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-sm">
-                        <span>{item.mode === 'ip_change' ? '⚡' : '✏️'}</span>
-                        <span className="text-[var(--text-secondary)]">
-                          {item.mode === 'ip_change' ? 'IP 변경' : '스케치 실사화'}
-                        </span>
-                        {item.mode === 'ip_change' && (
-                          <span className="rounded bg-[var(--bg-tertiary)] px-1.5 py-0.5 text-xs font-semibold text-[var(--text-tertiary)]">
-                            {item.provider === 'openai' ? 'v2' : 'v1'}
-                          </span>
-                        )}
-                      </div>
-                      <button
-                        onClick={(e) => handleDeleteGeneration(e, item.id)}
-                        disabled={deletingId === item.id}
-                        className="rounded-full p-1.5 text-[var(--text-tertiary)] transition-colors hover:bg-red-500/10 hover:text-red-500 disabled:opacity-50"
-                        title="히스토리 삭제"
-                      >
-                        {deletingId === item.id ? (
-                          <span className="block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                        ) : (
-                          <span className="text-base">🗑️</span>
-                        )}
-                      </button>
+                return (
+                  <Link
+                    key={item.id}
+                    href={`/projects/${projectId}/generations/${item.id}`}
+                    className="hover:border-brand-500 group overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--bg-secondary)] transition-all hover:shadow-lg"
+                  >
+                    <div className="aspect-square bg-[var(--bg-tertiary)]">
+                      {item.selectedImage ? (
+                        <img
+                          src={`${API_URL}/uploads/${item.selectedImage.thumbnailPath || item.selectedImage.filePath}`}
+                          alt="저장된 목업"
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-4xl text-[var(--text-tertiary)]">
+                          🖼️
+                        </div>
+                      )}
                     </div>
-                    {item.character && (
+
+                    <div className="p-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-sm">
+                          <span>{modeCopy.icon}</span>
+                          <span className="text-[var(--text-secondary)]">{modeCopy.label}</span>
+                          {isVersionedMode && (
+                            <span className="rounded bg-[var(--bg-tertiary)] px-1.5 py-0.5 text-xs font-semibold text-[var(--text-tertiary)]">
+                              {item.provider === 'openai' ? 'v2' : 'v1'}
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          onClick={(e) => handleDeleteGeneration(e, item.id)}
+                          disabled={deletingId === item.id}
+                          className="rounded-full p-1.5 text-[var(--text-tertiary)] transition-colors hover:bg-red-500/10 hover:text-red-500 disabled:opacity-50"
+                          title="히스토리 삭제"
+                        >
+                          {deletingId === item.id ? (
+                            <span className="block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                          ) : (
+                            <span className="text-base">🗑️</span>
+                          )}
+                        </button>
+                      </div>
+                      {character && (
+                        <p className="mt-1 text-xs text-[var(--text-tertiary)]">
+                          캐릭터: {character.name}
+                        </p>
+                      )}
                       <p className="mt-1 text-xs text-[var(--text-tertiary)]">
-                        캐릭터: {item.character.name}
+                        {formatRelativeTime(item.createdAt)}
                       </p>
-                    )}
-                    <p className="mt-1 text-xs text-[var(--text-tertiary)]">
-                      {formatRelativeTime(item.createdAt)}
-                    </p>
-                  </div>
-                </Link>
-              ))}
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
 
             {/* 페이지네이션 */}
@@ -221,7 +231,7 @@ export default function HistoryPage() {
               아직 저장된 목업이 없습니다
             </h3>
             <p className="mb-4 text-[var(--text-secondary)]">
-              IP 변경 결과를 저장하면 여기에서 다시 열 수 있습니다.
+              스케치 실사화 결과를 저장하면 여기에서 다시 열 수 있습니다.
             </p>
             <Button onClick={() => router.push(`/projects/${projectId}`)}>목업 생성하기</Button>
           </div>
