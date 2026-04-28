@@ -40,6 +40,10 @@ interface CreateGenerationInput {
     removeShadows?: boolean;
     userInstructions?: string;
     hardwareSpecInput?: string;
+    productCategory?: string;
+    productCategoryOther?: string;
+    materialPreset?: string;
+    materialOther?: string;
     quality?: 'low' | 'medium' | 'high';
     hardwareSpecs?: {
       items: Array<{
@@ -119,8 +123,8 @@ function validateCreateGenerationInput(
   input: CreateGenerationInput,
   provider: GenerationProvider
 ): void {
-  if (provider === 'openai' && input.mode !== 'ip_change') {
-    throw new Error('OpenAI provider는 현재 IP 변경 v2만 지원합니다');
+  if (provider === 'openai' && !['ip_change', 'sketch_to_real'].includes(input.mode)) {
+    throw new Error('OpenAI provider는 현재 IP 변경 v2와 스케치 실사화 v2만 지원합니다');
   }
 
   if (input.mode === 'ip_change') {
@@ -137,7 +141,11 @@ function validateCreateGenerationInput(
     throw new Error('스케치 실사화에는 원본 이미지가 필요합니다');
   }
 
-  if (provider === 'openai' && input.options?.transparentBackground) {
+  if (
+    provider === 'openai' &&
+    input.mode === 'ip_change' &&
+    input.options?.transparentBackground
+  ) {
     throw new Error('OpenAI IP 변경 v2는 투명 배경을 아직 지원하지 않습니다');
   }
 
@@ -146,8 +154,32 @@ function validateCreateGenerationInput(
     input.options?.outputCount !== undefined &&
     input.options.outputCount !== 2
   ) {
-    throw new Error('OpenAI IP 변경 v2는 후보 2개 생성만 지원합니다');
+    throw new Error('OpenAI v2는 후보 2개 생성만 지원합니다');
   }
+}
+
+function getOutputIndex(filePath: string): number | null {
+  const match = filePath.match(/output_(\d+)\.png$/);
+  return match ? Number.parseInt(match[1], 10) : null;
+}
+
+function sortGeneratedImagesByOutputIndex(images: GeneratedImage[]): GeneratedImage[] {
+  return [...images].sort((a, b) => {
+    const aIndex = getOutputIndex(a.filePath);
+    const bIndex = getOutputIndex(b.filePath);
+
+    if (aIndex !== null && bIndex !== null && aIndex !== bIndex) {
+      return aIndex - bIndex;
+    }
+
+    if (aIndex !== null && bIndex === null) return -1;
+    if (aIndex === null && bIndex !== null) return 1;
+
+    const filePathOrder = a.filePath.localeCompare(b.filePath);
+    if (filePathOrder !== 0) return filePathOrder;
+
+    return a.createdAt.getTime() - b.createdAt.getTime();
+  });
 }
 
 /**
@@ -188,6 +220,10 @@ export class GenerationService {
 
     const userInstructions = input.options?.userInstructions?.trim();
     const hardwareSpecInput = input.options?.hardwareSpecInput?.trim();
+    const productCategory = input.options?.productCategory?.trim();
+    const productCategoryOther = input.options?.productCategoryOther?.trim();
+    const materialPreset = input.options?.materialPreset?.trim();
+    const materialOther = input.options?.materialOther?.trim();
     const validatedPaths = await validateGenerationImagePaths(userId, input.projectId, {
       sourceImagePath: input.sourceImagePath,
       characterImagePath,
@@ -212,6 +248,10 @@ export class GenerationService {
           characterImagePath,
           textureImagePath: validatedPaths.textureImagePath,
           userPrompt: input.prompt,
+          productCategory: productCategory || undefined,
+          productCategoryOther: productCategoryOther || undefined,
+          materialPreset: materialPreset || undefined,
+          materialOther: materialOther || undefined,
           regenerationMeta: input.regenerationMeta,
         },
         options: {
@@ -223,6 +263,10 @@ export class GenerationService {
           removeShadows: input.options?.removeShadows ?? false,
           userInstructions: userInstructions || undefined,
           hardwareSpecInput: hardwareSpecInput || undefined,
+          productCategory: productCategory || undefined,
+          productCategoryOther: productCategoryOther || undefined,
+          materialPreset: materialPreset || undefined,
+          materialOther: materialOther || undefined,
           quality: input.options?.quality,
           hardwareSpecs: input.options?.hardwareSpecs,
           outputCount: input.options?.outputCount ?? 2,
@@ -252,6 +296,10 @@ export class GenerationService {
         removeShadows: input.options?.removeShadows ?? false,
         userInstructions: userInstructions || undefined,
         hardwareSpecInput: hardwareSpecInput || undefined,
+        productCategory: productCategory || undefined,
+        productCategoryOther: productCategoryOther || undefined,
+        materialPreset: materialPreset || undefined,
+        materialOther: materialOther || undefined,
         quality: input.options?.quality,
         hardwareSpecs: input.options?.hardwareSpecs,
         outputCount: input.options?.outputCount ?? 2,
@@ -282,7 +330,7 @@ export class GenerationService {
       return null;
     }
 
-    return generation;
+    return { ...generation, images: sortGeneratedImagesByOutputIndex(generation.images) };
   }
 
   /**
@@ -420,6 +468,10 @@ export class GenerationService {
           original.userInstructions ??
           undefined,
         hardwareSpecInput: (options.hardwareSpecInput as string | undefined) ?? undefined,
+        productCategory: (options.productCategory as string | undefined) ?? undefined,
+        productCategoryOther: (options.productCategoryOther as string | undefined) ?? undefined,
+        materialPreset: (options.materialPreset as string | undefined) ?? undefined,
+        materialOther: (options.materialOther as string | undefined) ?? undefined,
         quality: (options.quality as 'low' | 'medium' | 'high' | undefined) ?? undefined,
         hardwareSpecs: (options.hardwareSpecs as HardwareSpecOption | undefined) ?? undefined,
         outputCount: (options.outputCount as number | undefined) ?? 2,
@@ -497,6 +549,10 @@ export class GenerationService {
         removeShadows: options.removeShadows ?? false,
         userInstructions: options.userInstructions ?? null,
         hardwareSpecInput: options.hardwareSpecInput ?? null,
+        productCategory: options.productCategory ?? null,
+        productCategoryOther: options.productCategoryOther ?? null,
+        materialPreset: options.materialPreset ?? null,
+        materialOther: options.materialOther ?? null,
         quality: options.quality ?? null,
         hardwareSpecs: options.hardwareSpecs ?? null,
         outputCount: options.outputCount ?? 2,
@@ -552,6 +608,10 @@ export class GenerationService {
           original.userInstructions ??
           undefined,
         hardwareSpecInput: (options.hardwareSpecInput as string | undefined) ?? undefined,
+        productCategory: (options.productCategory as string | undefined) ?? undefined,
+        productCategoryOther: (options.productCategoryOther as string | undefined) ?? undefined,
+        materialPreset: (options.materialPreset as string | undefined) ?? undefined,
+        materialOther: (options.materialOther as string | undefined) ?? undefined,
         quality: (options.quality as 'low' | 'medium' | 'high' | undefined) ?? undefined,
         hardwareSpecs: (options.hardwareSpecs as HardwareSpecOption | undefined) ?? undefined,
         outputCount: (options.outputCount as number | undefined) ?? 2,

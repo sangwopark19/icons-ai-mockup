@@ -26,6 +26,10 @@ const CreateGenerationSchema = z
         removeShadows: z.boolean().optional(),
         userInstructions: z.string().max(2000).optional(),
         hardwareSpecInput: z.string().max(2000).optional(),
+        productCategory: z.string().max(100).optional(),
+        productCategoryOther: z.string().max(500).optional(),
+        materialPreset: z.string().max(100).optional(),
+        materialOther: z.string().max(500).optional(),
         quality: z.enum(['low', 'medium', 'high']).optional(),
         hardwareSpecs: z
           .object({
@@ -45,11 +49,22 @@ const CreateGenerationSchema = z
       .optional(),
   })
   .superRefine((value, ctx) => {
-    if (value.provider === 'openai' && value.mode !== 'ip_change') {
+    if (value.provider === 'openai' && value.providerModel !== undefined) {
+      const providerModel = value.providerModel.trim();
+      if (providerModel !== 'gpt-image-2') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['providerModel'],
+          message: 'OpenAI providerModel은 gpt-image-2여야 합니다',
+        });
+      }
+    }
+
+    if (value.provider === 'openai' && !['ip_change', 'sketch_to_real'].includes(value.mode)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['provider'],
-        message: 'OpenAI provider는 현재 IP 변경 v2만 지원합니다',
+        message: 'OpenAI provider는 현재 IP 변경 v2와 스케치 실사화 v2만 지원합니다',
       });
     }
 
@@ -77,7 +92,11 @@ const CreateGenerationSchema = z
       });
     }
 
-    if (value.provider === 'openai' && value.options?.transparentBackground) {
+    if (
+      value.provider === 'openai' &&
+      value.mode === 'ip_change' &&
+      value.options?.transparentBackground
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['options', 'transparentBackground'],
@@ -93,7 +112,7 @@ const CreateGenerationSchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['options', 'outputCount'],
-        message: 'OpenAI IP 변경 v2는 후보 2개 생성만 지원합니다',
+        message: 'OpenAI v2는 후보 2개 생성만 지원합니다',
       });
     }
   });
