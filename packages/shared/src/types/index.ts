@@ -79,6 +79,10 @@ export const GenerationOptionsSchema = z.object({
   removeShadows: z.boolean().default(false),
   userInstructions: z.string().max(2000).optional(),
   hardwareSpecInput: z.string().max(2000).optional(),
+  productCategory: z.string().max(100).optional(),
+  productCategoryOther: z.string().max(500).optional(),
+  materialPreset: z.string().max(100).optional(),
+  materialOther: z.string().max(500).optional(),
   quality: z.enum(['low', 'medium', 'high']).optional(),
   hardwareSpecs: z
     .object({
@@ -123,7 +127,10 @@ export const CreateGenerationSchema = z.object({
   provider: GenerationProviderEnum.optional(),
   providerModel: z.string().min(1).optional(),
   sourceImageId: z.string().uuid().optional(),
+  sourceImagePath: z.string().optional(),
   characterId: z.string().uuid().optional(),
+  characterImagePath: z.string().optional(),
+  textureImagePath: z.string().optional(),
   prompt: z.string().max(2000).optional(),
   options: GenerationOptionsSchema.optional(),
 });

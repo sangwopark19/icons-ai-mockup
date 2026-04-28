@@ -1,6 +1,10 @@
-import { FastifyPluginAsync } from 'fastify';
+import { FastifyPluginAsync, type FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { generationService } from '../services/generation.service.js';
+
+function hasTrimmedValue(value: string | undefined): boolean {
+  return typeof value === 'string' && value.trim().length > 0;
+}
 
 /**
  * 요청 스키마
@@ -26,6 +30,10 @@ const CreateGenerationSchema = z
         removeShadows: z.boolean().optional(),
         userInstructions: z.string().max(2000).optional(),
         hardwareSpecInput: z.string().max(2000).optional(),
+        productCategory: z.string().max(100).optional(),
+        productCategoryOther: z.string().max(500).optional(),
+        materialPreset: z.string().max(100).optional(),
+        materialOther: z.string().max(500).optional(),
         quality: z.enum(['low', 'medium', 'high']).optional(),
         hardwareSpecs: z
           .object({
@@ -45,11 +53,22 @@ const CreateGenerationSchema = z
       .optional(),
   })
   .superRefine((value, ctx) => {
-    if (value.provider === 'openai' && value.mode !== 'ip_change') {
+    if (value.provider === 'openai' && value.providerModel !== undefined) {
+      const providerModel = value.providerModel.trim();
+      if (providerModel !== 'gpt-image-2') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['providerModel'],
+          message: 'OpenAI providerModel은 gpt-image-2여야 합니다',
+        });
+      }
+    }
+
+    if (value.provider === 'openai' && !['ip_change', 'sketch_to_real'].includes(value.mode)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['provider'],
-        message: 'OpenAI provider는 현재 IP 변경 v2만 지원합니다',
+        message: 'OpenAI provider는 현재 IP 변경 v2와 스케치 실사화 v2만 지원합니다',
       });
     }
 
@@ -77,7 +96,11 @@ const CreateGenerationSchema = z
       });
     }
 
-    if (value.provider === 'openai' && value.options?.transparentBackground) {
+    if (
+      value.provider === 'openai' &&
+      value.mode === 'ip_change' &&
+      value.options?.transparentBackground
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['options', 'transparentBackground'],
@@ -93,8 +116,46 @@ const CreateGenerationSchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['options', 'outputCount'],
-        message: 'OpenAI IP 변경 v2는 후보 2개 생성만 지원합니다',
+        message: 'OpenAI v2는 후보 2개 생성만 지원합니다',
       });
+    }
+
+    if (value.provider === 'openai' && value.mode === 'sketch_to_real') {
+      const { options } = value;
+      if (!hasTrimmedValue(options?.productCategory)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['options', 'productCategory'],
+          message: 'OpenAI 스케치 실사화 v2에는 제품 종류가 필요합니다',
+        });
+      }
+
+      if (!hasTrimmedValue(options?.materialPreset)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['options', 'materialPreset'],
+          message: 'OpenAI 스케치 실사화 v2에는 재질 가이드가 필요합니다',
+        });
+      }
+
+      if (
+        options?.productCategory?.trim() === '기타' &&
+        !hasTrimmedValue(options.productCategoryOther)
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['options', 'productCategoryOther'],
+          message: '기타 제품 종류를 선택한 경우 상세 내용을 입력해주세요',
+        });
+      }
+
+      if (options?.materialPreset?.trim() === '기타' && !hasTrimmedValue(options.materialOther)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['options', 'materialOther'],
+          message: '기타 재질을 선택한 경우 상세 내용을 입력해주세요',
+        });
+      }
     }
   });
 
@@ -111,6 +172,13 @@ const HistoryQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
+
+function sendInvalidRequest(reply: FastifyReply, message: string) {
+  return reply.code(400).send({
+    success: false,
+    error: { code: 'INVALID_REQUEST', message },
+  });
+}
 
 /**
  * 생성 라우트
@@ -214,7 +282,16 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post('/:id/select', async (request, reply) => {
     const user = (request as any).user;
     const { id } = request.params as { id: string };
-    const body = SelectImageSchema.parse(request.body);
+    const parsed = SelectImageSchema.safeParse(request.body);
+
+    if (!parsed.success) {
+      return sendInvalidRequest(
+        reply,
+        parsed.error.issues[0]?.message ?? '요청이 유효하지 않습니다'
+      );
+    }
+
+    const body = parsed.data;
 
     try {
       const image = await generationService.selectImage(user.id, id, body.imageId);
@@ -279,13 +356,19 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post('/:id/copy-style', async (request, reply) => {
     const user = (request as any).user;
     const { id } = request.params as { id: string };
-    const body = CopyStyleSchema.parse(request.body);
+    const parsed = CopyStyleSchema.safeParse(request.body);
+
+    if (!parsed.success) {
+      return sendInvalidRequest(
+        reply,
+        parsed.error.issues[0]?.message ?? '요청이 유효하지 않습니다'
+      );
+    }
+
+    const body = parsed.data;
 
     if (!body.characterImagePath && !body.sourceImagePath) {
-      return reply.code(400).send({
-        success: false,
-        error: { code: 'INVALID_REQUEST', message: '새 캐릭터 또는 제품 이미지를 제공해야 합니다' },
-      });
+      return sendInvalidRequest(reply, '새 캐릭터 또는 제품 이미지를 제공해야 합니다');
     }
 
     try {
@@ -340,7 +423,16 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get('/project/:projectId/history', async (request, reply) => {
     const user = (request as any).user;
     const { projectId } = request.params as { projectId: string };
-    const { page, limit } = HistoryQuerySchema.parse(request.query);
+    const parsed = HistoryQuerySchema.safeParse(request.query);
+
+    if (!parsed.success) {
+      return sendInvalidRequest(
+        reply,
+        parsed.error.issues[0]?.message ?? '요청이 유효하지 않습니다'
+      );
+    }
+
+    const { page, limit } = parsed.data;
 
     try {
       const { generations, total } = await generationService.getProjectHistory(
@@ -359,9 +451,7 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
           providerModel: g.providerModel,
           createdAt: g.createdAt,
           selectedImage: g.images[0] || null,
-          character: g.ipCharacter
-            ? { id: g.ipCharacter.id, name: g.ipCharacter.name }
-            : null,
+          character: g.ipCharacter ? { id: g.ipCharacter.id, name: g.ipCharacter.name } : null,
         })),
         pagination: {
           page,

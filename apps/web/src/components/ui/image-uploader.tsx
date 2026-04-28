@@ -18,6 +18,9 @@ interface ImageUploaderProps {
   preview?: string | null;
   isLoading?: boolean;
   className?: string;
+  invalidTypeMessage?: string;
+  maxSizeMessage?: string;
+  removeAriaLabel?: string;
 }
 
 /**
@@ -34,6 +37,9 @@ export function ImageUploader({
   preview,
   isLoading,
   className,
+  invalidTypeMessage = 'PNG, JPG, WEBP 파일만 업로드할 수 있습니다',
+  maxSizeMessage,
+  removeAriaLabel = '이미지 제거',
 }: ImageUploaderProps) {
   const [isDragging, setIsDragging] = React.useState(false);
   const [localPreview, setLocalPreview] = React.useState<string | null>(null);
@@ -49,13 +55,13 @@ export function ImageUploader({
     // 타입 검사
     const allowedTypes = accept.split(',').map((t) => t.trim());
     if (!allowedTypes.includes(file.type)) {
-      onError?.('PNG, JPG, WEBP 파일만 업로드할 수 있습니다');
+      onError?.(invalidTypeMessage);
       return false;
     }
 
     // 크기 검사
     if (file.size > maxSize) {
-      onError?.(`파일 크기가 ${Math.round(maxSize / 1024 / 1024)}MB를 초과합니다`);
+      onError?.(maxSizeMessage || `파일 크기가 ${Math.round(maxSize / 1024 / 1024)}MB를 초과합니다`);
       return false;
     }
 
@@ -185,7 +191,9 @@ export function ImageUploader({
               className="max-h-40 rounded-lg object-contain"
             />
             <button
+              type="button"
               onClick={handleRemove}
+              aria-label={removeAriaLabel}
               className="absolute right-2 top-2 rounded-full bg-[var(--bg-primary)] p-1.5 text-[var(--text-secondary)] hover:bg-red-500 hover:text-white"
             >
               ✕

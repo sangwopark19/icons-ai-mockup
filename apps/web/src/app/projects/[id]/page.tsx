@@ -112,7 +112,16 @@ export default function ProjectDetailPage() {
                   className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
                 >
                   <span>✏️</span>
-                  <span>스케치 실사화</span>
+                  <span>스케치 실사화 v1</span>
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href={`/projects/${projectId}/sketch-to-real/openai`}
+                  className="flex items-center gap-3 rounded-lg border border-brand-500/30 px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+                >
+                  <span>✏️</span>
+                  <span>스케치 실사화 v2</span>
                 </Link>
               </li>
               <li>
@@ -209,11 +218,36 @@ export default function ProjectDetailPage() {
               <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-green-500/10 text-2xl">
                 ✏️
               </div>
-              <h3 className="mb-2 text-lg font-medium text-[var(--text-primary)] group-hover:text-brand-500">
-                스케치 실사화
-              </h3>
+              <div className="mb-2 flex items-center gap-2">
+                <h3 className="text-lg font-medium text-[var(--text-primary)] group-hover:text-brand-500">
+                  스케치 실사화 v1
+                </h3>
+                <span className="rounded border border-[var(--border-default)] px-1.5 py-0.5 text-xs font-semibold text-[var(--text-tertiary)]">
+                  v1
+                </span>
+              </div>
               <p className="text-sm text-[var(--text-tertiary)]">
-                2D 스케치를 실제 제품처럼 변환합니다
+                기존 방식으로 2D 스케치를 실제 제품처럼 변환합니다.
+              </p>
+            </Link>
+
+            <Link
+              href={`/projects/${projectId}/sketch-to-real/openai`}
+              className="group rounded-xl border border-brand-500/60 bg-[var(--bg-secondary)] p-6 transition-all hover:border-brand-400 hover:shadow-lg"
+            >
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-brand-500/10 text-2xl">
+                ✏️
+              </div>
+              <div className="mb-2 flex items-center gap-2">
+                <h3 className="text-lg font-medium text-[var(--text-primary)] group-hover:text-brand-500">
+                  스케치 실사화 v2
+                </h3>
+                <span className="rounded bg-brand-500/10 px-1.5 py-0.5 text-xs font-semibold text-brand-400">
+                  v2
+                </span>
+              </div>
+              <p className="text-sm text-[var(--text-tertiary)]">
+                스케치 구조를 보존하면서 재질과 제조 디테일을 더 현실적으로 적용합니다.
               </p>
             </Link>
           </div>

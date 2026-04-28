@@ -40,6 +40,10 @@ interface CreateGenerationInput {
     removeShadows?: boolean;
     userInstructions?: string;
     hardwareSpecInput?: string;
+    productCategory?: string;
+    productCategoryOther?: string;
+    materialPreset?: string;
+    materialOther?: string;
     quality?: 'low' | 'medium' | 'high';
     hardwareSpecs?: {
       items: Array<{
@@ -55,6 +59,10 @@ interface CreateGenerationInput {
 }
 
 type HardwareSpecOption = NonNullable<CreateGenerationInput['options']>['hardwareSpecs'];
+
+function hasTrimmedValue(value: string | undefined): boolean {
+  return typeof value === 'string' && value.trim().length > 0;
+}
 
 async function validateOwnedStoragePath(
   value: string | undefined,
@@ -119,8 +127,8 @@ function validateCreateGenerationInput(
   input: CreateGenerationInput,
   provider: GenerationProvider
 ): void {
-  if (provider === 'openai' && input.mode !== 'ip_change') {
-    throw new Error('OpenAI provider는 현재 IP 변경 v2만 지원합니다');
+  if (provider === 'openai' && !['ip_change', 'sketch_to_real'].includes(input.mode)) {
+    throw new Error('OpenAI provider는 현재 IP 변경 v2와 스케치 실사화 v2만 지원합니다');
   }
 
   if (input.mode === 'ip_change') {
@@ -137,7 +145,7 @@ function validateCreateGenerationInput(
     throw new Error('스케치 실사화에는 원본 이미지가 필요합니다');
   }
 
-  if (provider === 'openai' && input.options?.transparentBackground) {
+  if (provider === 'openai' && input.mode === 'ip_change' && input.options?.transparentBackground) {
     throw new Error('OpenAI IP 변경 v2는 투명 배경을 아직 지원하지 않습니다');
   }
 
@@ -146,8 +154,56 @@ function validateCreateGenerationInput(
     input.options?.outputCount !== undefined &&
     input.options.outputCount !== 2
   ) {
-    throw new Error('OpenAI IP 변경 v2는 후보 2개 생성만 지원합니다');
+    throw new Error('OpenAI v2는 후보 2개 생성만 지원합니다');
   }
+
+  if (provider === 'openai' && input.mode === 'sketch_to_real') {
+    if (!hasTrimmedValue(input.options?.productCategory)) {
+      throw new Error('OpenAI 스케치 실사화 v2에는 제품 종류가 필요합니다');
+    }
+
+    if (!hasTrimmedValue(input.options?.materialPreset)) {
+      throw new Error('OpenAI 스케치 실사화 v2에는 재질 가이드가 필요합니다');
+    }
+
+    if (
+      input.options?.productCategory?.trim() === '기타' &&
+      !hasTrimmedValue(input.options.productCategoryOther)
+    ) {
+      throw new Error('기타 제품 종류를 선택한 경우 상세 내용을 입력해주세요');
+    }
+
+    if (
+      input.options?.materialPreset?.trim() === '기타' &&
+      !hasTrimmedValue(input.options.materialOther)
+    ) {
+      throw new Error('기타 재질을 선택한 경우 상세 내용을 입력해주세요');
+    }
+  }
+}
+
+function getOutputIndex(filePath: string): number | null {
+  const match = filePath.match(/output_(\d+)\.png$/);
+  return match ? Number.parseInt(match[1], 10) : null;
+}
+
+function sortGeneratedImagesByOutputIndex(images: GeneratedImage[]): GeneratedImage[] {
+  return [...images].sort((a, b) => {
+    const aIndex = getOutputIndex(a.filePath);
+    const bIndex = getOutputIndex(b.filePath);
+
+    if (aIndex !== null && bIndex !== null && aIndex !== bIndex) {
+      return aIndex - bIndex;
+    }
+
+    if (aIndex !== null && bIndex === null) return -1;
+    if (aIndex === null && bIndex !== null) return 1;
+
+    const filePathOrder = a.filePath.localeCompare(b.filePath);
+    if (filePathOrder !== 0) return filePathOrder;
+
+    return a.createdAt.getTime() - b.createdAt.getTime();
+  });
 }
 
 /**
@@ -188,6 +244,10 @@ export class GenerationService {
 
     const userInstructions = input.options?.userInstructions?.trim();
     const hardwareSpecInput = input.options?.hardwareSpecInput?.trim();
+    const productCategory = input.options?.productCategory?.trim();
+    const productCategoryOther = input.options?.productCategoryOther?.trim();
+    const materialPreset = input.options?.materialPreset?.trim();
+    const materialOther = input.options?.materialOther?.trim();
     const validatedPaths = await validateGenerationImagePaths(userId, input.projectId, {
       sourceImagePath: input.sourceImagePath,
       characterImagePath,
@@ -212,17 +272,25 @@ export class GenerationService {
           characterImagePath,
           textureImagePath: validatedPaths.textureImagePath,
           userPrompt: input.prompt,
+          productCategory: productCategory || undefined,
+          productCategoryOther: productCategoryOther || undefined,
+          materialPreset: materialPreset || undefined,
+          materialOther: materialOther || undefined,
           regenerationMeta: input.regenerationMeta,
         },
         options: {
           preserveStructure: input.options?.preserveStructure ?? false,
           transparentBackground: input.options?.transparentBackground ?? false,
           preserveHardware: input.options?.preserveHardware ?? false,
-          fixedBackground: input.options?.fixedBackground ?? false,
-          fixedViewpoint: input.options?.fixedViewpoint ?? false,
+          fixedBackground: input.options?.fixedBackground ?? true,
+          fixedViewpoint: input.options?.fixedViewpoint ?? true,
           removeShadows: input.options?.removeShadows ?? false,
           userInstructions: userInstructions || undefined,
           hardwareSpecInput: hardwareSpecInput || undefined,
+          productCategory: productCategory || undefined,
+          productCategoryOther: productCategoryOther || undefined,
+          materialPreset: materialPreset || undefined,
+          materialOther: materialOther || undefined,
           quality: input.options?.quality,
           hardwareSpecs: input.options?.hardwareSpecs,
           outputCount: input.options?.outputCount ?? 2,
@@ -247,11 +315,15 @@ export class GenerationService {
         preserveStructure: input.options?.preserveStructure ?? false,
         transparentBackground: input.options?.transparentBackground ?? false,
         preserveHardware: input.options?.preserveHardware ?? false,
-        fixedBackground: input.options?.fixedBackground ?? false,
-        fixedViewpoint: input.options?.fixedViewpoint ?? false,
+        fixedBackground: input.options?.fixedBackground ?? true,
+        fixedViewpoint: input.options?.fixedViewpoint ?? true,
         removeShadows: input.options?.removeShadows ?? false,
         userInstructions: userInstructions || undefined,
         hardwareSpecInput: hardwareSpecInput || undefined,
+        productCategory: productCategory || undefined,
+        productCategoryOther: productCategoryOther || undefined,
+        materialPreset: materialPreset || undefined,
+        materialOther: materialOther || undefined,
         quality: input.options?.quality,
         hardwareSpecs: input.options?.hardwareSpecs,
         outputCount: input.options?.outputCount ?? 2,
@@ -282,7 +354,7 @@ export class GenerationService {
       return null;
     }
 
-    return generation;
+    return { ...generation, images: sortGeneratedImagesByOutputIndex(generation.images) };
   }
 
   /**
@@ -412,14 +484,18 @@ export class GenerationService {
         preserveStructure: (options.preserveStructure as boolean | undefined) ?? false,
         transparentBackground: (options.transparentBackground as boolean | undefined) ?? false,
         preserveHardware: (options.preserveHardware as boolean | undefined) ?? false,
-        fixedBackground: (options.fixedBackground as boolean | undefined) ?? false,
-        fixedViewpoint: (options.fixedViewpoint as boolean | undefined) ?? false,
+        fixedBackground: (options.fixedBackground as boolean | undefined) ?? true,
+        fixedViewpoint: (options.fixedViewpoint as boolean | undefined) ?? true,
         removeShadows: (options.removeShadows as boolean | undefined) ?? false,
         userInstructions:
           (options.userInstructions as string | undefined) ??
           original.userInstructions ??
           undefined,
         hardwareSpecInput: (options.hardwareSpecInput as string | undefined) ?? undefined,
+        productCategory: (options.productCategory as string | undefined) ?? undefined,
+        productCategoryOther: (options.productCategoryOther as string | undefined) ?? undefined,
+        materialPreset: (options.materialPreset as string | undefined) ?? undefined,
+        materialOther: (options.materialOther as string | undefined) ?? undefined,
         quality: (options.quality as 'low' | 'medium' | 'high' | undefined) ?? undefined,
         hardwareSpecs: (options.hardwareSpecs as HardwareSpecOption | undefined) ?? undefined,
         outputCount: (options.outputCount as number | undefined) ?? 2,
@@ -492,11 +568,15 @@ export class GenerationService {
         preserveStructure: options.preserveStructure ?? false,
         transparentBackground: options.transparentBackground ?? false,
         preserveHardware: options.preserveHardware ?? false,
-        fixedBackground: options.fixedBackground ?? false,
-        fixedViewpoint: options.fixedViewpoint ?? false,
+        fixedBackground: options.fixedBackground ?? true,
+        fixedViewpoint: options.fixedViewpoint ?? true,
         removeShadows: options.removeShadows ?? false,
         userInstructions: options.userInstructions ?? null,
         hardwareSpecInput: options.hardwareSpecInput ?? null,
+        productCategory: options.productCategory ?? null,
+        productCategoryOther: options.productCategoryOther ?? null,
+        materialPreset: options.materialPreset ?? null,
+        materialOther: options.materialOther ?? null,
         quality: options.quality ?? null,
         hardwareSpecs: options.hardwareSpecs ?? null,
         outputCount: options.outputCount ?? 2,
@@ -544,14 +624,18 @@ export class GenerationService {
         preserveStructure: (options.preserveStructure as boolean | undefined) ?? false,
         transparentBackground: (options.transparentBackground as boolean | undefined) ?? false,
         preserveHardware: (options.preserveHardware as boolean | undefined) ?? false,
-        fixedBackground: (options.fixedBackground as boolean | undefined) ?? false,
-        fixedViewpoint: (options.fixedViewpoint as boolean | undefined) ?? false,
+        fixedBackground: (options.fixedBackground as boolean | undefined) ?? true,
+        fixedViewpoint: (options.fixedViewpoint as boolean | undefined) ?? true,
         removeShadows: (options.removeShadows as boolean | undefined) ?? false,
         userInstructions:
           (options.userInstructions as string | undefined) ??
           original.userInstructions ??
           undefined,
         hardwareSpecInput: (options.hardwareSpecInput as string | undefined) ?? undefined,
+        productCategory: (options.productCategory as string | undefined) ?? undefined,
+        productCategoryOther: (options.productCategoryOther as string | undefined) ?? undefined,
+        materialPreset: (options.materialPreset as string | undefined) ?? undefined,
+        materialOther: (options.materialOther as string | undefined) ?? undefined,
         quality: (options.quality as 'low' | 'medium' | 'high' | undefined) ?? undefined,
         hardwareSpecs: (options.hardwareSpecs as HardwareSpecOption | undefined) ?? undefined,
         outputCount: (options.outputCount as number | undefined) ?? 2,
@@ -566,7 +650,8 @@ export class GenerationService {
     generationId: string,
     filePath: string,
     thumbnailPath: string | null,
-    metadata: { width: number; height: number; size: number }
+    metadata: { width: number; height: number; size: number },
+    options?: { hasTransparency?: boolean; isSelected?: boolean }
   ): Promise<GeneratedImage> {
     return prisma.generatedImage.create({
       data: {
@@ -574,13 +659,41 @@ export class GenerationService {
         filePath,
         thumbnailPath,
         type: 'output',
-        isSelected: false,
-        hasTransparency: false,
+        isSelected: options?.isSelected ?? false,
+        hasTransparency: options?.hasTransparency ?? false,
         width: metadata.width,
         height: metadata.height,
         fileSize: metadata.size,
       },
     });
+  }
+
+  async deleteGeneratedOutputImages(generationId: string): Promise<void> {
+    const images = await prisma.generatedImage.findMany({
+      where: { generationId, type: 'output' },
+      select: { id: true, filePath: true, thumbnailPath: true },
+    });
+
+    if (images.length === 0) {
+      return;
+    }
+
+    const imageIds = images.map((image) => image.id);
+    await prisma.$transaction(async (tx) => {
+      await tx.imageHistory.deleteMany({
+        where: { imageId: { in: imageIds } },
+      });
+      await tx.generatedImage.deleteMany({
+        where: { generationId, type: 'output' },
+      });
+    });
+
+    await Promise.all(
+      images.flatMap((image) => [
+        uploadService.deleteFile(image.filePath),
+        image.thumbnailPath ? uploadService.deleteFile(image.thumbnailPath) : Promise.resolve(),
+      ])
+    );
   }
 
   /**

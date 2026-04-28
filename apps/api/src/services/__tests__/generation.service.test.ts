@@ -14,9 +14,15 @@ vi.mock('../../lib/prisma.js', () => ({
       update: vi.fn(),
     },
     generatedImage: {
+      create: vi.fn(),
+      findMany: vi.fn(),
       findFirst: vi.fn(),
       updateMany: vi.fn(),
       update: vi.fn(),
+      deleteMany: vi.fn(),
+    },
+    imageHistory: {
+      deleteMany: vi.fn(),
     },
     $transaction: vi.fn(),
   },
@@ -30,6 +36,7 @@ vi.mock('../../services/upload.service.js', () => ({
   assertStoragePathWithinPrefixes: vi.fn((relativePath: string) => relativePath),
   uploadService: {
     fileExists: vi.fn().mockResolvedValue(true),
+    deleteFile: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -123,7 +130,79 @@ describe('GenerationService - provider contract', () => {
     });
   });
 
-  it('rejects OpenAI non-IP modes before creating a doomed worker job', async () => {
+  it('accepts OpenAI sketch_to_real with product and material options', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { addGenerationJob } = await import('../../lib/queue.js');
+    const { generationService } = await import('../generation.service.js');
+
+    vi.mocked(prisma.project.findFirst).mockResolvedValue({ id: 'proj1', userId: 'u1' } as any);
+    vi.mocked(prisma.generation.create).mockResolvedValue({
+      id: 'gen1',
+      projectId: 'proj1',
+      status: 'pending',
+      mode: 'sketch_to_real',
+      provider: 'openai',
+      providerModel: 'gpt-image-2',
+    } as any);
+
+    await generationService.create('u1', {
+      projectId: 'proj1',
+      mode: 'sketch_to_real',
+      provider: 'openai',
+      providerModel: 'gpt-image-2',
+      sourceImagePath: 'uploads/u1/proj1/source.png',
+      textureImagePath: 'uploads/u1/proj1/texture.png',
+      prompt: 'make it production ready',
+      options: {
+        preserveStructure: true,
+        fixedBackground: true,
+        fixedViewpoint: true,
+        transparentBackground: true,
+        productCategory: 'mug',
+        productCategoryOther: 'wide ceramic mug',
+        materialPreset: 'ceramic',
+        materialOther: 'glossy glaze',
+        quality: 'high',
+        outputCount: 2,
+      },
+    });
+
+    expect(vi.mocked(prisma.generation.create).mock.calls[0][0].data.promptData).toMatchObject({
+      sourceImagePath: 'uploads/u1/proj1/source.png',
+      textureImagePath: 'uploads/u1/proj1/texture.png',
+      productCategory: 'mug',
+      productCategoryOther: 'wide ceramic mug',
+      materialPreset: 'ceramic',
+      materialOther: 'glossy glaze',
+    });
+    expect(vi.mocked(prisma.generation.create).mock.calls[0][0].data.options).toMatchObject({
+      preserveStructure: true,
+      fixedBackground: true,
+      fixedViewpoint: true,
+      transparentBackground: true,
+      productCategory: 'mug',
+      productCategoryOther: 'wide ceramic mug',
+      materialPreset: 'ceramic',
+      materialOther: 'glossy glaze',
+      quality: 'high',
+      outputCount: 2,
+    });
+    expect(vi.mocked(addGenerationJob).mock.calls[0][0]).toMatchObject({
+      mode: 'sketch_to_real',
+      provider: 'openai',
+      providerModel: 'gpt-image-2',
+      sourceImagePath: 'uploads/u1/proj1/source.png',
+      textureImagePath: 'uploads/u1/proj1/texture.png',
+      options: expect.objectContaining({
+        productCategory: 'mug',
+        materialPreset: 'ceramic',
+        transparentBackground: true,
+        outputCount: 2,
+      }),
+    });
+  });
+
+  it('rejects OpenAI sketch_to_real without product and material options', async () => {
     const { prisma } = await import('../../lib/prisma.js');
     const { addGenerationJob } = await import('../../lib/queue.js');
     const { generationService } = await import('../generation.service.js');
@@ -137,8 +216,95 @@ describe('GenerationService - provider contract', () => {
         provider: 'openai',
         providerModel: 'gpt-image-2',
         sourceImagePath: 'uploads/u1/proj1/source.png',
+        options: {
+          outputCount: 2,
+        },
       })
-    ).rejects.toThrow('OpenAI provider는 현재 IP 변경 v2만 지원합니다');
+    ).rejects.toThrow('OpenAI 스케치 실사화 v2에는 제품 종류가 필요합니다');
+
+    expect(vi.mocked(prisma.generation.create)).not.toHaveBeenCalled();
+    expect(vi.mocked(addGenerationJob)).not.toHaveBeenCalled();
+  });
+
+  it('rejects OpenAI sketch_to_real 기타 options without detail text', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { addGenerationJob } = await import('../../lib/queue.js');
+    const { generationService } = await import('../generation.service.js');
+
+    vi.mocked(prisma.project.findFirst).mockResolvedValue({ id: 'proj1', userId: 'u1' } as any);
+
+    await expect(
+      generationService.create('u1', {
+        projectId: 'proj1',
+        mode: 'sketch_to_real',
+        provider: 'openai',
+        providerModel: 'gpt-image-2',
+        sourceImagePath: 'uploads/u1/proj1/source.png',
+        options: {
+          productCategory: '기타',
+          materialPreset: '기타',
+          outputCount: 2,
+        },
+      })
+    ).rejects.toThrow('기타 제품 종류를 선택한 경우 상세 내용을 입력해주세요');
+
+    expect(vi.mocked(prisma.generation.create)).not.toHaveBeenCalled();
+    expect(vi.mocked(addGenerationJob)).not.toHaveBeenCalled();
+  });
+
+  it('uses shared lock defaults when fixed background and viewpoint are omitted', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { addGenerationJob } = await import('../../lib/queue.js');
+    const { generationService } = await import('../generation.service.js');
+
+    vi.mocked(prisma.project.findFirst).mockResolvedValue({ id: 'proj1', userId: 'u1' } as any);
+    vi.mocked(prisma.generation.create).mockResolvedValue({
+      id: 'gen1',
+      projectId: 'proj1',
+      status: 'pending',
+      mode: 'sketch_to_real',
+      provider: 'openai',
+      providerModel: 'gpt-image-2',
+    } as any);
+
+    await generationService.create('u1', {
+      projectId: 'proj1',
+      mode: 'sketch_to_real',
+      provider: 'openai',
+      providerModel: 'gpt-image-2',
+      sourceImagePath: 'uploads/u1/proj1/source.png',
+      options: {
+        productCategory: 'mug',
+        materialPreset: 'ceramic',
+      },
+    });
+
+    expect(vi.mocked(prisma.generation.create).mock.calls[0][0].data.options).toMatchObject({
+      fixedBackground: true,
+      fixedViewpoint: true,
+    });
+    expect(vi.mocked(addGenerationJob).mock.calls[0][0].options).toMatchObject({
+      fixedBackground: true,
+      fixedViewpoint: true,
+    });
+  });
+
+  it('rejects OpenAI sketch_to_real when providerModel is wrong', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { addGenerationJob } = await import('../../lib/queue.js');
+    const { generationService } = await import('../generation.service.js');
+
+    vi.mocked(prisma.project.findFirst).mockResolvedValue({ id: 'proj1', userId: 'u1' } as any);
+
+    await expect(
+      generationService.create('u1', {
+        projectId: 'proj1',
+        mode: 'sketch_to_real',
+        provider: 'openai',
+        providerModel: 'not-gpt-image-2',
+        sourceImagePath: 'uploads/u1/proj1/source.png',
+      })
+    ).rejects.toThrow('providerModel이 provider와 일치하지 않습니다');
 
     expect(vi.mocked(prisma.generation.create)).not.toHaveBeenCalled();
     expect(vi.mocked(addGenerationJob)).not.toHaveBeenCalled();
@@ -203,7 +369,7 @@ describe('GenerationService - provider contract', () => {
     expect(vi.mocked(addGenerationJob)).not.toHaveBeenCalled();
   });
 
-  it('rejects OpenAI outputCount values outside the v2 two-candidate contract', async () => {
+  it('rejects OpenAI sketch_to_real outputCount values outside the v2 two-candidate contract', async () => {
     const { prisma } = await import('../../lib/prisma.js');
     const { addGenerationJob } = await import('../../lib/queue.js');
     const { generationService } = await import('../generation.service.js');
@@ -213,16 +379,15 @@ describe('GenerationService - provider contract', () => {
     await expect(
       generationService.create('u1', {
         projectId: 'proj1',
-        mode: 'ip_change',
+        mode: 'sketch_to_real',
         provider: 'openai',
         providerModel: 'gpt-image-2',
         sourceImagePath: 'uploads/u1/proj1/source.png',
-        characterImagePath: 'characters/u1/character.png',
         options: {
           outputCount: 4,
         },
       })
-    ).rejects.toThrow('OpenAI IP 변경 v2는 후보 2개 생성만 지원합니다');
+    ).rejects.toThrow('OpenAI v2는 후보 2개 생성만 지원합니다');
 
     expect(vi.mocked(prisma.generation.create)).not.toHaveBeenCalled();
     expect(vi.mocked(addGenerationJob)).not.toHaveBeenCalled();
@@ -258,6 +423,198 @@ describe('GenerationService - provider contract', () => {
         },
       },
     });
+  });
+});
+
+describe('GenerationService - getById', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns generated images in stable candidate order by output file index', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { generationService } = await import('../generation.service.js');
+
+    vi.mocked(prisma.generation.findFirst).mockResolvedValue({
+      id: 'gen1',
+      project: { userId: 'u1' },
+      images: [
+        {
+          id: 'img2',
+          filePath: 'generations/u1/gen1/output_2.png',
+          createdAt: new Date('2026-04-28T00:00:00.000Z'),
+        },
+        {
+          id: 'img1',
+          filePath: 'generations/u1/gen1/output_1.png',
+          createdAt: new Date('2026-04-28T00:00:01.000Z'),
+        },
+      ],
+    } as any);
+
+    const generation = await generationService.getById('u1', 'gen1');
+
+    expect(generation?.images.map((image) => image.filePath)).toEqual([
+      'generations/u1/gen1/output_1.png',
+      'generations/u1/gen1/output_2.png',
+    ]);
+  });
+});
+
+describe('GenerationService - saveGeneratedImage', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const { prisma } = await import('../../lib/prisma.js');
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) =>
+      callback({
+        imageHistory: prisma.imageHistory,
+        generatedImage: prisma.generatedImage,
+      })
+    );
+  });
+
+  it('keeps the old signature backward-compatible with hasTransparency false', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { generationService } = await import('../generation.service.js');
+
+    vi.mocked(prisma.generatedImage.create).mockResolvedValue({
+      id: 'img1',
+      generationId: 'gen1',
+      hasTransparency: false,
+    } as any);
+
+    await generationService.saveGeneratedImage(
+      'gen1',
+      'generations/u1/proj1/gen1/output_1.png',
+      'generations/u1/proj1/gen1/thumb_output_1.jpg',
+      { width: 128, height: 128, size: 1024 }
+    );
+
+    expect(vi.mocked(prisma.generatedImage.create)).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        generationId: 'gen1',
+        hasTransparency: false,
+      }),
+    });
+  });
+
+  it('persists hasTransparency true when explicitly provided', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { generationService } = await import('../generation.service.js');
+
+    vi.mocked(prisma.generatedImage.create).mockResolvedValue({
+      id: 'img1',
+      generationId: 'gen1',
+      hasTransparency: true,
+    } as any);
+
+    await generationService.saveGeneratedImage(
+      'gen1',
+      'generations/u1/proj1/gen1/output_1.png',
+      'generations/u1/proj1/gen1/thumb_output_1.jpg',
+      { width: 128, height: 128, size: 1024 },
+      { hasTransparency: true }
+    );
+
+    expect(vi.mocked(prisma.generatedImage.create)).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        generationId: 'gen1',
+        hasTransparency: true,
+      }),
+    });
+  });
+
+  it('can persist the first generated candidate as selected', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { generationService } = await import('../generation.service.js');
+
+    vi.mocked(prisma.generatedImage.create).mockResolvedValue({
+      id: 'img1',
+      generationId: 'gen1',
+      isSelected: true,
+    } as any);
+
+    await generationService.saveGeneratedImage(
+      'gen1',
+      'generations/u1/proj1/gen1/output_1.png',
+      'generations/u1/proj1/gen1/thumb_output_1.jpg',
+      { width: 128, height: 128, size: 1024 },
+      { isSelected: true }
+    );
+
+    expect(vi.mocked(prisma.generatedImage.create)).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        generationId: 'gen1',
+        isSelected: true,
+      }),
+    });
+  });
+});
+
+describe('GenerationService - deleteGeneratedOutputImages', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const { prisma } = await import('../../lib/prisma.js');
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) =>
+      callback({
+        imageHistory: prisma.imageHistory,
+        generatedImage: prisma.generatedImage,
+      })
+    );
+  });
+
+  it('removes existing output image records and files before a retry save pass', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { uploadService } = await import('../../services/upload.service.js');
+    const { generationService } = await import('../generation.service.js');
+
+    vi.mocked(prisma.generatedImage.findMany).mockResolvedValue([
+      {
+        id: 'img1',
+        filePath: 'generations/u1/proj1/gen1/output_1.png',
+        thumbnailPath: 'generations/u1/proj1/gen1/thumb_output_1.jpg',
+      },
+      {
+        id: 'img2',
+        filePath: 'generations/u1/proj1/gen1/output_2.png',
+        thumbnailPath: null,
+      },
+    ] as any);
+
+    await generationService.deleteGeneratedOutputImages('gen1');
+
+    expect(vi.mocked(prisma.generatedImage.findMany)).toHaveBeenCalledWith({
+      where: { generationId: 'gen1', type: 'output' },
+      select: { id: true, filePath: true, thumbnailPath: true },
+    });
+    expect(vi.mocked(prisma.imageHistory.deleteMany)).toHaveBeenCalledWith({
+      where: { imageId: { in: ['img1', 'img2'] } },
+    });
+    expect(vi.mocked(prisma.generatedImage.deleteMany)).toHaveBeenCalledWith({
+      where: { generationId: 'gen1', type: 'output' },
+    });
+    expect(vi.mocked(uploadService.deleteFile)).toHaveBeenCalledWith(
+      'generations/u1/proj1/gen1/output_1.png'
+    );
+    expect(vi.mocked(uploadService.deleteFile)).toHaveBeenCalledWith(
+      'generations/u1/proj1/gen1/thumb_output_1.jpg'
+    );
+    expect(vi.mocked(uploadService.deleteFile)).toHaveBeenCalledWith(
+      'generations/u1/proj1/gen1/output_2.png'
+    );
+  });
+
+  it('does nothing when there are no existing output records', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { uploadService } = await import('../../services/upload.service.js');
+    const { generationService } = await import('../generation.service.js');
+
+    vi.mocked(prisma.generatedImage.findMany).mockResolvedValue([]);
+
+    await generationService.deleteGeneratedOutputImages('gen1');
+
+    expect(vi.mocked(prisma.$transaction)).not.toHaveBeenCalled();
+    expect(vi.mocked(uploadService.deleteFile)).not.toHaveBeenCalled();
   });
 });
 

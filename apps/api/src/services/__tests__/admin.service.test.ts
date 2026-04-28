@@ -644,6 +644,71 @@ describe('AdminService - retryGeneration', () => {
     );
   });
 
+  it('preserves OpenAI sketch_to_real options when retrying a failed generation', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { addGenerationJob } = await import('../../lib/queue.js');
+    const { adminService } = await import('../admin.service.js');
+    const openAISketchGeneration = {
+      ...mockGeneration,
+      mode: 'sketch_to_real',
+      provider: 'openai',
+      providerModel: 'gpt-image-2',
+      styleReferenceId: null,
+      promptData: {
+        sourceImagePath: 'uploads/u1/proj1/sketch.png',
+        textureImagePath: 'uploads/u1/proj1/texture.png',
+        productCategory: '머그',
+        productCategoryOther: 'wide mug',
+        materialPreset: '세라믹',
+        materialOther: 'glossy ceramic',
+      },
+      options: {
+        preserveStructure: true,
+        transparentBackground: true,
+        userInstructions: 'keep the handle angle',
+        productCategory: '머그',
+        productCategoryOther: 'wide mug',
+        materialPreset: '세라믹',
+        materialOther: 'glossy ceramic',
+        quality: 'high',
+      },
+    };
+
+    vi.mocked(prisma.generation.findUnique).mockResolvedValue(openAISketchGeneration as any);
+    vi.mocked(prisma.generation.update).mockResolvedValue({
+      ...openAISketchGeneration,
+      status: 'pending',
+    } as any);
+    vi.mocked(addGenerationJob).mockResolvedValue({} as any);
+
+    await adminService.retryGeneration('gen1');
+
+    expect(vi.mocked(addGenerationJob)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        generationId: 'gen1',
+        mode: 'sketch_to_real',
+        provider: 'openai',
+        providerModel: 'gpt-image-2',
+        sourceImagePath: 'uploads/u1/proj1/sketch.png',
+        characterImagePath: undefined,
+        textureImagePath: 'uploads/u1/proj1/texture.png',
+        options: expect.objectContaining({
+          preserveStructure: true,
+          transparentBackground: true,
+          fixedBackground: true,
+          fixedViewpoint: true,
+          userInstructions: 'keep the handle angle',
+          productCategory: '머그',
+          productCategoryOther: 'wide mug',
+          materialPreset: '세라믹',
+          materialOther: 'glossy ceramic',
+          quality: 'high',
+          outputCount: 2,
+        }),
+      })
+    );
+  });
+
   it('should throw error if generation not found', async () => {
     const { prisma } = await import('../../lib/prisma.js');
     const { adminService } = await import('../admin.service.js');

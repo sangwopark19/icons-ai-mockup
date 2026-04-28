@@ -25,6 +25,10 @@ export interface GenerationJobData {
     removeShadows?: boolean;
     userInstructions?: string;
     hardwareSpecInput?: string;
+    productCategory?: string;
+    productCategoryOther?: string;
+    materialPreset?: string;
+    materialOther?: string;
     quality?: 'low' | 'medium' | 'high';
     hardwareSpecs?: {
       items: Array<{

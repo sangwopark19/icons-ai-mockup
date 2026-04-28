@@ -34,6 +34,7 @@ Thumbs.db
 
 # 테스트
 coverage
+.playwright-mcp/
 
 # 데이터
 data/uploads

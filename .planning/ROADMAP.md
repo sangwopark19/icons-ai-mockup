@@ -111,6 +111,17 @@
   3. Layout, silhouette, and key character/product details remain preserved while realistic material treatment is applied
   4. Transparent-background requests succeed through background-removal post-processing rather than unsupported direct model output
 
+**Wave Dependencies**:
+- Wave 1: `09-01` Backend OpenAI Sketch To Real Runtime; `09-02` V2 Project Entry And Sketch Form
+- Wave 2 *(blocked on Wave 1 completion)*: `09-03` V2 Sketch Result And History Lifecycle
+- Wave 3 *(blocked on Wave 2 completion)*: `09-04` Phase 9 Smoke And Release Verification
+
+**Cross-cutting constraints**:
+- D-10: OpenAI Sketch transparent-background requests generate opaque through GPT Image 2 first, then route through post-processing.
+- D-28: OpenAI Sketch to Real returns exactly two candidates.
+- D-29: Prompt names image roles and separates Must preserve, Must add, and Hard constraints.
+- D-30: Prompt states sketch is locked design spec and texture reference is not style/scene reference.
+
 ### Phase 10: Provider-Aware Result Continuation
 **Goal**: Make result pages, history, regenerate, edit, and style-copy flows stay pinned to the originating provider
 **Depends on**: Phases 8 and 9
