@@ -15,9 +15,14 @@ vi.mock('../../lib/prisma.js', () => ({
     },
     generatedImage: {
       create: vi.fn(),
+      findMany: vi.fn(),
       findFirst: vi.fn(),
       updateMany: vi.fn(),
       update: vi.fn(),
+      deleteMany: vi.fn(),
+    },
+    imageHistory: {
+      deleteMany: vi.fn(),
     },
     $transaction: vi.fn(),
   },
@@ -31,6 +36,7 @@ vi.mock('../../services/upload.service.js', () => ({
   assertStoragePathWithinPrefixes: vi.fn((relativePath: string) => relativePath),
   uploadService: {
     fileExists: vi.fn().mockResolvedValue(true),
+    deleteFile: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -369,8 +375,15 @@ describe('GenerationService - getById', () => {
 });
 
 describe('GenerationService - saveGeneratedImage', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    const { prisma } = await import('../../lib/prisma.js');
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) =>
+      callback({
+        imageHistory: prisma.imageHistory,
+        generatedImage: prisma.generatedImage,
+      })
+    );
   });
 
   it('keeps the old signature backward-compatible with hasTransparency false', async () => {
@@ -422,6 +435,73 @@ describe('GenerationService - saveGeneratedImage', () => {
         hasTransparency: true,
       }),
     });
+  });
+});
+
+describe('GenerationService - deleteGeneratedOutputImages', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const { prisma } = await import('../../lib/prisma.js');
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) =>
+      callback({
+        imageHistory: prisma.imageHistory,
+        generatedImage: prisma.generatedImage,
+      })
+    );
+  });
+
+  it('removes existing output image records and files before a retry save pass', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { uploadService } = await import('../../services/upload.service.js');
+    const { generationService } = await import('../generation.service.js');
+
+    vi.mocked(prisma.generatedImage.findMany).mockResolvedValue([
+      {
+        id: 'img1',
+        filePath: 'generations/u1/proj1/gen1/output_1.png',
+        thumbnailPath: 'generations/u1/proj1/gen1/thumb_output_1.jpg',
+      },
+      {
+        id: 'img2',
+        filePath: 'generations/u1/proj1/gen1/output_2.png',
+        thumbnailPath: null,
+      },
+    ] as any);
+
+    await generationService.deleteGeneratedOutputImages('gen1');
+
+    expect(vi.mocked(prisma.generatedImage.findMany)).toHaveBeenCalledWith({
+      where: { generationId: 'gen1', type: 'output' },
+      select: { id: true, filePath: true, thumbnailPath: true },
+    });
+    expect(vi.mocked(prisma.imageHistory.deleteMany)).toHaveBeenCalledWith({
+      where: { imageId: { in: ['img1', 'img2'] } },
+    });
+    expect(vi.mocked(prisma.generatedImage.deleteMany)).toHaveBeenCalledWith({
+      where: { generationId: 'gen1', type: 'output' },
+    });
+    expect(vi.mocked(uploadService.deleteFile)).toHaveBeenCalledWith(
+      'generations/u1/proj1/gen1/output_1.png'
+    );
+    expect(vi.mocked(uploadService.deleteFile)).toHaveBeenCalledWith(
+      'generations/u1/proj1/gen1/thumb_output_1.jpg'
+    );
+    expect(vi.mocked(uploadService.deleteFile)).toHaveBeenCalledWith(
+      'generations/u1/proj1/gen1/output_2.png'
+    );
+  });
+
+  it('does nothing when there are no existing output records', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { uploadService } = await import('../../services/upload.service.js');
+    const { generationService } = await import('../generation.service.js');
+
+    vi.mocked(prisma.generatedImage.findMany).mockResolvedValue([]);
+
+    await generationService.deleteGeneratedOutputImages('gen1');
+
+    expect(vi.mocked(prisma.$transaction)).not.toHaveBeenCalled();
+    expect(vi.mocked(uploadService.deleteFile)).not.toHaveBeenCalled();
   });
 });
 

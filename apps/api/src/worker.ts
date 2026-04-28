@@ -10,6 +10,11 @@ import type { GenerationJobData } from './lib/queue.js';
 import type { ThoughtSignatureData } from '@mockup-ai/shared/types';
 import type { OpenAIImageGenerationResult } from './services/openai-image.service.js';
 
+type ProcessedGeneratedImage = {
+  buffer: Buffer;
+  hasTransparency: boolean;
+};
+
 const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every((item) => typeof item === 'string');
 
@@ -268,26 +273,33 @@ const generationWorker = new Worker<GenerationJobData>(
         throw new Error(`알 수 없는 생성 모드: ${mode}`);
       }
 
-      // 생성된 이미지 저장
-      for (let i = 0; i < generatedImages.length; i++) {
-        let outputBuffer = generatedImages[i];
-        let hasTransparency = false;
-
+      const processedImages: ProcessedGeneratedImage[] = [];
+      for (const image of generatedImages) {
         if (provider === 'openai' && mode === 'sketch_to_real' && options.transparentBackground) {
           try {
-            const processed = await removeUniformLightBackground(outputBuffer);
-            outputBuffer = processed.buffer;
-            hasTransparency = processed.hasTransparency;
+            const processed = await removeUniformLightBackground(image);
+            processedImages.push({
+              buffer: processed.buffer,
+              hasTransparency: processed.hasTransparency,
+            });
           } catch {
             throw new Error('배경 제거에 실패했습니다. 원본 결과를 저장하거나 다시 생성해주세요.');
           }
+        } else {
+          processedImages.push({ buffer: image, hasTransparency: false });
         }
+      }
 
+      await generationService.deleteGeneratedOutputImages(generationId);
+
+      // 생성된 이미지 저장
+      for (let i = 0; i < processedImages.length; i++) {
+        const image = processedImages[i];
         const result = await uploadService.saveGeneratedImage(
           userId,
           projectId,
           generationId,
-          outputBuffer,
+          image.buffer,
           i
         );
 
@@ -296,7 +308,7 @@ const generationWorker = new Worker<GenerationJobData>(
           result.filePath,
           result.thumbnailPath,
           result.metadata,
-          hasTransparency ? { hasTransparency: true } : undefined
+          image.hasTransparency ? { hasTransparency: true } : undefined
         );
       }
 

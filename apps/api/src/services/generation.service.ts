@@ -644,6 +644,34 @@ export class GenerationService {
     });
   }
 
+  async deleteGeneratedOutputImages(generationId: string): Promise<void> {
+    const images = await prisma.generatedImage.findMany({
+      where: { generationId, type: 'output' },
+      select: { id: true, filePath: true, thumbnailPath: true },
+    });
+
+    if (images.length === 0) {
+      return;
+    }
+
+    const imageIds = images.map((image) => image.id);
+    await prisma.$transaction(async (tx) => {
+      await tx.imageHistory.deleteMany({
+        where: { imageId: { in: imageIds } },
+      });
+      await tx.generatedImage.deleteMany({
+        where: { generationId, type: 'output' },
+      });
+    });
+
+    await Promise.all(
+      images.flatMap((image) => [
+        uploadService.deleteFile(image.filePath),
+        image.thumbnailPath ? uploadService.deleteFile(image.thumbnailPath) : Promise.resolve(),
+      ])
+    );
+  }
+
   /**
    * 생성 기록 삭제 (연관된 모든 이미지 및 폴더 포함)
    */
