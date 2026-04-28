@@ -60,6 +60,10 @@ interface CreateGenerationInput {
 
 type HardwareSpecOption = NonNullable<CreateGenerationInput['options']>['hardwareSpecs'];
 
+function hasTrimmedValue(value: string | undefined): boolean {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
 async function validateOwnedStoragePath(
   value: string | undefined,
   allowedPrefixes: string[],
@@ -141,11 +145,7 @@ function validateCreateGenerationInput(
     throw new Error('스케치 실사화에는 원본 이미지가 필요합니다');
   }
 
-  if (
-    provider === 'openai' &&
-    input.mode === 'ip_change' &&
-    input.options?.transparentBackground
-  ) {
+  if (provider === 'openai' && input.mode === 'ip_change' && input.options?.transparentBackground) {
     throw new Error('OpenAI IP 변경 v2는 투명 배경을 아직 지원하지 않습니다');
   }
 
@@ -155,6 +155,30 @@ function validateCreateGenerationInput(
     input.options.outputCount !== 2
   ) {
     throw new Error('OpenAI v2는 후보 2개 생성만 지원합니다');
+  }
+
+  if (provider === 'openai' && input.mode === 'sketch_to_real') {
+    if (!hasTrimmedValue(input.options?.productCategory)) {
+      throw new Error('OpenAI 스케치 실사화 v2에는 제품 종류가 필요합니다');
+    }
+
+    if (!hasTrimmedValue(input.options?.materialPreset)) {
+      throw new Error('OpenAI 스케치 실사화 v2에는 재질 가이드가 필요합니다');
+    }
+
+    if (
+      input.options?.productCategory?.trim() === '기타' &&
+      !hasTrimmedValue(input.options.productCategoryOther)
+    ) {
+      throw new Error('기타 제품 종류를 선택한 경우 상세 내용을 입력해주세요');
+    }
+
+    if (
+      input.options?.materialPreset?.trim() === '기타' &&
+      !hasTrimmedValue(input.options.materialOther)
+    ) {
+      throw new Error('기타 재질을 선택한 경우 상세 내용을 입력해주세요');
+    }
   }
 }
 
@@ -627,7 +651,7 @@ export class GenerationService {
     filePath: string,
     thumbnailPath: string | null,
     metadata: { width: number; height: number; size: number },
-    options?: { hasTransparency?: boolean }
+    options?: { hasTransparency?: boolean; isSelected?: boolean }
   ): Promise<GeneratedImage> {
     return prisma.generatedImage.create({
       data: {
@@ -635,7 +659,7 @@ export class GenerationService {
         filePath,
         thumbnailPath,
         type: 'output',
-        isSelected: false,
+        isSelected: options?.isSelected ?? false,
         hasTransparency: options?.hasTransparency ?? false,
         width: metadata.width,
         height: metadata.height,

@@ -2,6 +2,10 @@ import { FastifyPluginAsync, type FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { generationService } from '../services/generation.service.js';
 
+function hasTrimmedValue(value: string | undefined): boolean {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
 /**
  * 요청 스키마
  */
@@ -114,6 +118,44 @@ const CreateGenerationSchema = z
         path: ['options', 'outputCount'],
         message: 'OpenAI v2는 후보 2개 생성만 지원합니다',
       });
+    }
+
+    if (value.provider === 'openai' && value.mode === 'sketch_to_real') {
+      const { options } = value;
+      if (!hasTrimmedValue(options?.productCategory)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['options', 'productCategory'],
+          message: 'OpenAI 스케치 실사화 v2에는 제품 종류가 필요합니다',
+        });
+      }
+
+      if (!hasTrimmedValue(options?.materialPreset)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['options', 'materialPreset'],
+          message: 'OpenAI 스케치 실사화 v2에는 재질 가이드가 필요합니다',
+        });
+      }
+
+      if (
+        options?.productCategory?.trim() === '기타' &&
+        !hasTrimmedValue(options.productCategoryOther)
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['options', 'productCategoryOther'],
+          message: '기타 제품 종류를 선택한 경우 상세 내용을 입력해주세요',
+        });
+      }
+
+      if (options?.materialPreset?.trim() === '기타' && !hasTrimmedValue(options.materialOther)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['options', 'materialOther'],
+          message: '기타 재질을 선택한 경우 상세 내용을 입력해주세요',
+        });
+      }
     }
   });
 
@@ -409,9 +451,7 @@ const generationRoutes: FastifyPluginAsync = async (fastify) => {
           providerModel: g.providerModel,
           createdAt: g.createdAt,
           selectedImage: g.images[0] || null,
-          character: g.ipCharacter
-            ? { id: g.ipCharacter.id, name: g.ipCharacter.name }
-            : null,
+          character: g.ipCharacter ? { id: g.ipCharacter.id, name: g.ipCharacter.name } : null,
         })),
         pagination: {
           page,

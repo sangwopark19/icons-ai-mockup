@@ -7,6 +7,8 @@ import { encrypt, decrypt, getEncryptionKey } from '../lib/crypto.js';
 export type ApiKeyProvider = 'gemini' | 'openai';
 
 type ActiveApiKeyStats = { alias: string; callCount: number };
+type StoredGenerationOptions = Record<string, unknown>;
+type StoredGenerationPromptData = Record<string, unknown>;
 
 const API_KEY_PROVIDER_LABELS: Record<ApiKeyProvider, string> = {
   gemini: 'Gemini',
@@ -23,6 +25,53 @@ const API_KEY_PUBLIC_SELECT = {
   lastUsedAt: true,
   createdAt: true,
 } as const;
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+function booleanValue(options: StoredGenerationOptions, key: string, fallback: boolean): boolean {
+  return typeof options[key] === 'boolean' ? (options[key] as boolean) : fallback;
+}
+
+function outputCountValue(value: unknown): number {
+  return typeof value === 'number' ? value : 2;
+}
+
+function qualityValue(value: unknown): GenerationJobData['options']['quality'] {
+  return value === 'low' || value === 'medium' || value === 'high' ? value : undefined;
+}
+
+function retryStringOption(
+  options: StoredGenerationOptions,
+  promptData: StoredGenerationPromptData,
+  key: string
+): string | undefined {
+  return stringValue(options[key]) ?? stringValue(promptData[key]);
+}
+
+function buildRetryGenerationOptions(
+  options: StoredGenerationOptions,
+  promptData: StoredGenerationPromptData
+): GenerationJobData['options'] {
+  return {
+    preserveStructure: booleanValue(options, 'preserveStructure', false),
+    transparentBackground: booleanValue(options, 'transparentBackground', false),
+    preserveHardware: booleanValue(options, 'preserveHardware', false),
+    fixedBackground: booleanValue(options, 'fixedBackground', true),
+    fixedViewpoint: booleanValue(options, 'fixedViewpoint', true),
+    removeShadows: booleanValue(options, 'removeShadows', false),
+    userInstructions: retryStringOption(options, promptData, 'userInstructions'),
+    hardwareSpecInput: retryStringOption(options, promptData, 'hardwareSpecInput'),
+    productCategory: retryStringOption(options, promptData, 'productCategory'),
+    productCategoryOther: retryStringOption(options, promptData, 'productCategoryOther'),
+    materialPreset: retryStringOption(options, promptData, 'materialPreset'),
+    materialOther: retryStringOption(options, promptData, 'materialOther'),
+    quality: qualityValue(options.quality),
+    hardwareSpecs: options.hardwareSpecs as GenerationJobData['options']['hardwareSpecs'],
+    outputCount: outputCountValue(options.outputCount),
+  };
+}
 
 export interface DashboardStats {
   userCount: number;
@@ -473,8 +522,8 @@ export class AdminService {
       },
     });
 
-    const promptData = (generation.promptData as Record<string, unknown>) ?? {};
-    const options = (generation.options as Record<string, unknown>) ?? {};
+    const promptData = (generation.promptData as StoredGenerationPromptData) ?? {};
+    const options = (generation.options as StoredGenerationOptions) ?? {};
     const projectUploadPrefix = `uploads/${generation.project.userId}/${generation.projectId}`;
     const characterUploadPrefix = `characters/${generation.project.userId}`;
     const [sourceImagePath, characterImagePath, textureImagePath] = await Promise.all([
@@ -495,18 +544,7 @@ export class AdminService {
       characterImagePath,
       textureImagePath,
       prompt: promptData.userPrompt as string | undefined,
-      options: {
-        preserveStructure: (options.preserveStructure as boolean | undefined) ?? false,
-        transparentBackground: (options.transparentBackground as boolean | undefined) ?? false,
-        preserveHardware: (options.preserveHardware as boolean | undefined) ?? false,
-        fixedBackground: (options.fixedBackground as boolean | undefined) ?? false,
-        fixedViewpoint: (options.fixedViewpoint as boolean | undefined) ?? false,
-        removeShadows: (options.removeShadows as boolean | undefined) ?? false,
-        userInstructions: (options.userInstructions as string | undefined) ?? undefined,
-        hardwareSpecInput: (options.hardwareSpecInput as string | undefined) ?? undefined,
-        hardwareSpecs: options.hardwareSpecs as GenerationJobData['options']['hardwareSpecs'],
-        outputCount: (options.outputCount as number | undefined) ?? 1,
-      },
+      options: buildRetryGenerationOptions(options, promptData),
     });
 
     return updated;

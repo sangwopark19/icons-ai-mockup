@@ -140,6 +140,72 @@ describe('generation routes', () => {
     await app.close();
   });
 
+  it('rejects OpenAI sketch_to_real requests without product and material options', async () => {
+    const app = await buildTestApp();
+    const { generationService } = await import('../../services/generation.service.js');
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/',
+      payload: {
+        projectId: '00000000-0000-0000-0000-000000000001',
+        mode: 'sketch_to_real',
+        provider: 'openai',
+        providerModel: 'gpt-image-2',
+        sourceImagePath: 'uploads/user1/project/source.png',
+        options: {
+          outputCount: 2,
+        },
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(JSON.parse(response.body)).toMatchObject({
+      success: false,
+      error: {
+        code: 'GENERATION_FAILED',
+        message: 'OpenAI 스케치 실사화 v2에는 제품 종류가 필요합니다',
+      },
+    });
+    expect(vi.mocked(generationService.create)).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
+  it('rejects OpenAI sketch_to_real 기타 options without detail text', async () => {
+    const app = await buildTestApp();
+    const { generationService } = await import('../../services/generation.service.js');
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/',
+      payload: {
+        projectId: '00000000-0000-0000-0000-000000000001',
+        mode: 'sketch_to_real',
+        provider: 'openai',
+        providerModel: 'gpt-image-2',
+        sourceImagePath: 'uploads/user1/project/source.png',
+        options: {
+          outputCount: 2,
+          productCategory: '기타',
+          materialPreset: '기타',
+        },
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(JSON.parse(response.body)).toMatchObject({
+      success: false,
+      error: {
+        code: 'GENERATION_FAILED',
+        message: '기타 제품 종류를 선택한 경우 상세 내용을 입력해주세요',
+      },
+    });
+    expect(vi.mocked(generationService.create)).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
   it('returns a structured 400 for invalid select-image payloads', async () => {
     const app = await buildTestApp();
     const { generationService } = await import('../../services/generation.service.js');

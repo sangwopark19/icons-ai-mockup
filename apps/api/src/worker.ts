@@ -325,7 +325,7 @@ const generationWorker = new Worker<GenerationJobData>(
           result.filePath,
           result.thumbnailPath,
           result.metadata,
-          image.hasTransparency ? { hasTransparency: true } : undefined
+          { hasTransparency: image.hasTransparency, isSelected: i === 0 }
         );
       }
 
