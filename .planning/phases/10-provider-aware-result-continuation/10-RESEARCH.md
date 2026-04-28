@@ -434,24 +434,24 @@ The dedicated style-copy page route is locked in the UI contract as `/projects/:
 
 | # | Claim | Section | Risk if Wrong |
 |---|-------|---------|---------------|
-| A1 | The OpenAI account used for live smoke has access to the current docs-supported Responses top-level model `gpt-5.5`. [ASSUMED] | Open Questions / Style Copy | Style-copy Responses linkage may need a configured alternative text-capable model such as another supported GPT model, while preserving `providerModel = gpt-image-2`. |
+| A1 | The OpenAI account used for live smoke has access to the configured Responses top-level model, defaulting to `gpt-5.5` unless `OPENAI_RESPONSES_IMAGE_MODEL` overrides it. [ASSUMED] | Smoke-Gated Validation / Style Copy | Style-copy Responses linkage may need a configured alternative text-capable model while preserving `providerModel = gpt-image-2`. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Which Responses top-level model should the app use for OpenAI style-copy linkage?**  
-   - What we know: Official docs list `gpt-5.5` among models that support the image generation tool, and state GPT Image models are not valid Responses `model` values. [CITED: https://developers.openai.com/api/docs/guides/tools-image-generation]  
-   - What's unclear: The active OpenAI account's model access and cost preference were not verified. [ASSUMED]  
-   - Recommendation: Use a backend constant such as `OPENAI_RESPONSES_IMAGE_MODEL = "gpt-5.5"` or a code constant default, store it in `providerTrace`, and fail clearly if unavailable rather than falling back to Gemini. [VERIFIED: no-fallback decisions in `10-CONTEXT.md`]
+   - RESOLVED: Use `process.env.OPENAI_RESPONSES_IMAGE_MODEL ?? "gpt-5.5"` for Responses style-copy linkage, store that top-level model in `providerTrace.responsesModel`, and keep persisted `providerModel = "gpt-image-2"` for the image workflow. [VERIFIED: `10-02-PLAN.md`; CITED: https://developers.openai.com/api/docs/guides/tools-image-generation]
+   - Account-level access to the Responses image tool and the configured top-level model is a smoke-gated validation risk, not a blocker for mocked implementation planning. Plan 07 records live smoke evidence or `manual_needed` when active-account prerequisites are unavailable. [VERIFIED: `10-07-PLAN.md`, `10-VALIDATION.md`]
+   - If the configured Responses model is unavailable at runtime, the OpenAI path must fail clearly and must not fall back to Gemini. [VERIFIED: no-fallback decisions in `10-CONTEXT.md`]
 
 2. **Should partial edit stay synchronous like current Gemini edit or move to queue?**  
-   - What we know: Current edit route synchronously calls Gemini and creates a completed generation, and Phase 10 allows either existing edit route or shared provider-aware service if fallback is impossible. [VERIFIED: `edit.routes.ts`, `10-CONTEXT.md`]  
-   - What's unclear: OpenAI Image API latency for one-output partial edit under the active account was not smoke-tested during research. [ASSUMED]  
-   - Recommendation: Keep the existing synchronous route for parity only if timeout and UX are acceptable; otherwise create a queued pending generation and reuse result-page polling. [VERIFIED: existing result-page polling pattern]
+   - RESOLVED: Keep the current plan shape: the existing `/api/generations/:id/edit` route remains synchronous, and OpenAI partial edit uses one-shot Image API edit with the selected result image. [VERIFIED: `10-02-PLAN.md`, `10-03-PLAN.md`]
+   - This remains acceptable because D-09 reuses the existing freeform edit modal, D-11 chooses Image API edit first, D-12 requires exactly one output, and D-13 expects a completed new result record that the current route lifecycle already matches. [VERIFIED: `10-CONTEXT.md`, current `edit.routes.ts` pattern]
+   - Live latency/account behavior is handled by smoke evidence in Plan 07; mocked unit tests still validate request shape, output count, metadata capture, and no Gemini fallback. [VERIFIED: `10-02-PLAN.md`, `10-03-PLAN.md`, `10-07-PLAN.md`]
 
 3. **No AI-SPEC.md exists for Phase 10.**  
-   - What we know: The user explicitly said no phase AI-SPEC was found. [VERIFIED: user prompt]  
-   - What's unclear: There is no separate AI acceptance rubric for prompt quality beyond CONTEXT, UI-SPEC, skill references, and smoke requirements. [VERIFIED: files read]  
-   - Recommendation: Planner should make prompt review and smoke evidence explicit tasks, especially for style-copy quality and OpenAI linkage fallback. [VERIFIED: `OPENAI-SKILL-GUARDRAILS.md`]
+   - RESOLVED: The absence of `AI-SPEC.md` is handled by explicit prompt review and smoke evidence in the plans rather than by creating a separate acceptance artifact. [VERIFIED: no `10-AI-SPEC.md` in phase directory, `10-02-PLAN.md`, `10-07-PLAN.md`]
+   - Plan 02 requires exact prompt sections and preservation phrases for partial edit/style copy, plus tests for output count, forbidden parameters, metadata, and `thoughtSignature` absence. [VERIFIED: `10-02-PLAN.md`]
+   - Plan 07 records automated checks and live/manual-needed OpenAI smoke evidence for partial edit, style copy, lineage isolation, and account/model access. [VERIFIED: `10-07-PLAN.md`]
 
 ## Environment Availability
 
