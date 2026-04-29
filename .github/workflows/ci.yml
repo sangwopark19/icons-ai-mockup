@@ -45,10 +45,10 @@ jobs:
         run: cd apps/api && npx prisma generate
 
       - name: Lint
-        run: pnpm lint || true
+        run: pnpm lint
 
       - name: Type check
-        run: pnpm type-check || true
+        run: pnpm type-check
 
   deploy:
     name: Deploy to Mac Server
