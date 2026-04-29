@@ -1,7 +1,11 @@
 import { prisma } from '../lib/prisma.js';
 import { addGenerationJob } from '../lib/queue.js';
 import { Prisma, type Generation, type GeneratedImage } from '@prisma/client';
-import type { GenerationProvider, ThoughtSignatureData } from '@mockup-ai/shared/types';
+import type {
+  GenerationCopyTarget,
+  GenerationProvider,
+  ThoughtSignatureData,
+} from '@mockup-ai/shared/types';
 import fs from 'fs/promises';
 import path from 'path';
 import { config } from '../config/index.js';
@@ -22,6 +26,8 @@ interface CreateGenerationInput {
   provider?: GenerationProvider;
   providerModel?: string;
   styleReferenceId?: string;
+  copyTarget?: GenerationCopyTarget;
+  selectedImageId?: string;
   sourceImagePath?: string;
   characterId?: string;
   characterImagePath?: string; // 직접 업로드된 캐릭터 이미지 경로
@@ -31,6 +37,7 @@ interface CreateGenerationInput {
     originalGenerationId: string;
     regeneratedAt: string;
   };
+  providerTrace?: Record<string, unknown>;
   options?: {
     preserveStructure?: boolean;
     transparentBackground?: boolean;
@@ -266,11 +273,14 @@ export class GenerationService {
         provider,
         providerModel,
         styleReferenceId: input.styleReferenceId || null,
+        providerTrace: input.providerTrace ? (input.providerTrace as Prisma.JsonObject) : undefined,
         userInstructions: userInstructions || null,
         promptData: {
           sourceImagePath: validatedPaths.sourceImagePath,
           characterImagePath,
           textureImagePath: validatedPaths.textureImagePath,
+          copyTarget: input.copyTarget,
+          selectedImageId: input.selectedImageId,
           userPrompt: input.prompt,
           productCategory: productCategory || undefined,
           productCategoryOther: productCategoryOther || undefined,
@@ -307,6 +317,8 @@ export class GenerationService {
       provider,
       providerModel,
       styleReferenceId: input.styleReferenceId,
+      copyTarget: input.copyTarget,
+      selectedImageId: input.selectedImageId,
       sourceImagePath: validatedPaths.sourceImagePath,
       characterImagePath,
       textureImagePath: validatedPaths.textureImagePath,
@@ -618,23 +630,33 @@ export class GenerationService {
   async copyStyle(
     userId: string,
     generationId: string,
-    input: { characterImagePath?: string; sourceImagePath?: string }
+    input: {
+      characterImagePath?: string;
+      sourceImagePath?: string;
+      copyTarget?: GenerationCopyTarget;
+      selectedImageId?: string;
+      userInstructions?: string;
+    }
   ): Promise<Generation> {
     const original = await this.getById(userId, generationId);
     if (!original) {
       throw new Error('생성 기록을 찾을 수 없습니다');
     }
 
+    if (original.provider === 'gemini' && input.selectedImageId) {
+      throw new Error('v2 스타일 복사는 v2 기준 결과에서만 시작할 수 있습니다');
+    }
+
     if (!input.characterImagePath && !input.sourceImagePath) {
       throw new Error('새 캐릭터 또는 제품 이미지를 제공해야 합니다');
     }
 
-    if (original.provider === 'openai') {
-      throw new Error('OpenAI IP 변경 v2는 스타일 복사를 지원하지 않습니다');
-    }
-
     const promptData = (original.promptData as Record<string, unknown>) || {};
     const options = (original.options as Record<string, unknown>) || {};
+
+    if (original.provider === 'openai') {
+      return this.createOpenAIStyleCopy(userId, original, promptData, options, input);
+    }
 
     return this.create(userId, {
       projectId: original.projectId,
@@ -667,6 +689,83 @@ export class GenerationService {
         quality: (options.quality as 'low' | 'medium' | 'high' | undefined) ?? undefined,
         hardwareSpecs: (options.hardwareSpecs as HardwareSpecOption | undefined) ?? undefined,
         outputCount: (options.outputCount as number | undefined) ?? 2,
+      },
+    });
+  }
+
+  private async createOpenAIStyleCopy(
+    userId: string,
+    original: Generation & { images: GeneratedImage[] },
+    promptData: Record<string, unknown>,
+    options: Record<string, unknown>,
+    input: {
+      characterImagePath?: string;
+      sourceImagePath?: string;
+      copyTarget?: GenerationCopyTarget;
+      selectedImageId?: string;
+      userInstructions?: string;
+    }
+  ): Promise<Generation> {
+    if (!input.copyTarget) {
+      throw new Error('OpenAI 스타일 복사에는 복사 대상이 필요합니다');
+    }
+
+    if (!input.selectedImageId) {
+      throw new Error('OpenAI 스타일 복사에는 선택된 기준 이미지가 필요합니다');
+    }
+
+    const selectedImage = original.images.find((image) => image.id === input.selectedImageId);
+    if (!selectedImage) {
+      throw new Error('선택한 스타일 기준 이미지를 찾을 수 없습니다');
+    }
+
+    if (input.copyTarget === 'ip-change' && !input.characterImagePath) {
+      throw new Error('IP 변경 스타일 복사에는 새 캐릭터 이미지가 필요합니다');
+    }
+
+    if (input.copyTarget === 'new-product' && !input.sourceImagePath) {
+      throw new Error('새 제품 스타일 복사에는 새 제품 이미지가 필요합니다');
+    }
+
+    const userInstructions =
+      input.userInstructions?.trim() || (options.userInstructions as string | undefined);
+
+    return this.create(userId, {
+      projectId: original.projectId,
+      mode: original.mode,
+      provider: original.provider,
+      providerModel: original.providerModel,
+      styleReferenceId: original.id,
+      copyTarget: input.copyTarget,
+      selectedImageId: input.selectedImageId,
+      sourceImagePath: input.sourceImagePath || (promptData.sourceImagePath as string | undefined),
+      characterId: original.ipCharacterId || undefined,
+      characterImagePath:
+        input.characterImagePath || (promptData.characterImagePath as string | undefined),
+      textureImagePath: promptData.textureImagePath as string | undefined,
+      prompt: promptData.userPrompt as string | undefined,
+      providerTrace: {
+        workflow: 'style_copy',
+        copyTarget: input.copyTarget,
+        styleReferenceId: original.id,
+        styleSourceImageId: input.selectedImageId,
+      },
+      options: {
+        preserveStructure: (options.preserveStructure as boolean | undefined) ?? false,
+        transparentBackground: (options.transparentBackground as boolean | undefined) ?? false,
+        preserveHardware: (options.preserveHardware as boolean | undefined) ?? false,
+        fixedBackground: (options.fixedBackground as boolean | undefined) ?? true,
+        fixedViewpoint: (options.fixedViewpoint as boolean | undefined) ?? true,
+        removeShadows: (options.removeShadows as boolean | undefined) ?? false,
+        userInstructions: userInstructions || undefined,
+        hardwareSpecInput: (options.hardwareSpecInput as string | undefined) ?? undefined,
+        productCategory: (options.productCategory as string | undefined) ?? undefined,
+        productCategoryOther: (options.productCategoryOther as string | undefined) ?? undefined,
+        materialPreset: (options.materialPreset as string | undefined) ?? undefined,
+        materialOther: (options.materialOther as string | undefined) ?? undefined,
+        quality: (options.quality as 'low' | 'medium' | 'high' | undefined) ?? undefined,
+        hardwareSpecs: (options.hardwareSpecs as HardwareSpecOption | undefined) ?? undefined,
+        outputCount: 2,
       },
     });
   }

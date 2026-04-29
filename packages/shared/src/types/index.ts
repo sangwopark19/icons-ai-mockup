@@ -69,6 +69,9 @@ export type GenerationStatus = z.infer<typeof GenerationStatusEnum>;
 export const GenerationProviderEnum = z.enum(['gemini', 'openai']);
 export type GenerationProvider = z.infer<typeof GenerationProviderEnum>;
 
+export const GenerationCopyTargetEnum = z.enum(['ip-change', 'new-product']);
+export type GenerationCopyTarget = z.infer<typeof GenerationCopyTargetEnum>;
+
 export const GenerationOptionsSchema = z.object({
   preserveStructure: z.boolean().default(false),
   transparentBackground: z.boolean().default(false),
@@ -131,6 +134,8 @@ export const CreateGenerationSchema = z.object({
   characterId: z.string().uuid().optional(),
   characterImagePath: z.string().optional(),
   textureImagePath: z.string().optional(),
+  copyTarget: GenerationCopyTargetEnum.optional(),
+  selectedImageId: z.string().uuid().optional(),
   prompt: z.string().max(2000).optional(),
   options: GenerationOptionsSchema.optional(),
 });

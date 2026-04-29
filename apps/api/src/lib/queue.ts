@@ -12,6 +12,8 @@ export interface GenerationJobData {
   provider: 'gemini' | 'openai';
   providerModel: string;
   styleReferenceId?: string;
+  copyTarget?: 'ip-change' | 'new-product';
+  selectedImageId?: string;
   sourceImagePath?: string;
   characterImagePath?: string;
   textureImagePath?: string;

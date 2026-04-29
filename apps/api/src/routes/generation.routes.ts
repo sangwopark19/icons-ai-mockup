@@ -166,6 +166,9 @@ const SelectImageSchema = z.object({
 const CopyStyleSchema = z.object({
   characterImagePath: z.string().optional(),
   sourceImagePath: z.string().optional(),
+  copyTarget: z.enum(['ip-change', 'new-product']).default('ip-change'),
+  selectedImageId: z.string().uuid().optional(),
+  userInstructions: z.string().max(2000).optional(),
 });
 
 const HistoryQuerySchema = z.object({
