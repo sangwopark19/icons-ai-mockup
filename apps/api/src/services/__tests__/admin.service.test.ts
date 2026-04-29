@@ -567,13 +567,13 @@ describe('AdminService - listGenerations', () => {
     vi.mocked(prisma.generation.findMany).mockResolvedValue([]);
     vi.mocked(prisma.generation.count).mockResolvedValue(0);
     vi.mocked(prisma.generation.groupBy).mockResolvedValue([
-      { status: 'completed', _count: { id: 10 } },
-      { status: 'failed', _count: { id: 3 } },
+      { status: 'completed', _count: { _all: 10 } },
+      { status: 'failed', _count: { _all: 3 } },
     ] as any);
 
     const result = await adminService.listGenerations({});
 
-    expect(result.statusCounts).toBeDefined();
+    expect(result.statusCounts).toEqual({ completed: 10, failed: 3 });
     expect(vi.mocked(prisma.generation.groupBy)).toHaveBeenCalled();
   });
 
