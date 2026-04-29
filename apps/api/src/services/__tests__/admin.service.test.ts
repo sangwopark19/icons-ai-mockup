@@ -13,6 +13,7 @@ vi.mock('../../lib/prisma.js', () => ({
       findMany: vi.fn(),
       findUnique: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
       groupBy: vi.fn(),
     },
     generatedImage: {
@@ -613,8 +614,10 @@ describe('AdminService - listGenerations', () => {
 });
 
 describe('AdminService - retryGeneration', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    const { prisma } = await import('../../lib/prisma.js');
+    vi.mocked(prisma.generation.updateMany).mockResolvedValue({ count: 1 } as any);
   });
 
   it('should update status to pending, clear errorMessage, increment retryCount', async () => {
@@ -631,9 +634,9 @@ describe('AdminService - retryGeneration', () => {
 
     await adminService.retryGeneration('gen1');
 
-    expect(vi.mocked(prisma.generation.update)).toHaveBeenCalledWith(
+    expect(vi.mocked(prisma.generation.updateMany)).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'gen1' },
+        where: { id: 'gen1', status: 'failed' },
         data: expect.objectContaining({
           status: 'pending',
           errorMessage: null,
@@ -804,6 +807,21 @@ describe('AdminService - retryGeneration', () => {
       where: { id: 'gen1' },
       data: { status: 'failed', errorMessage: 'queue down' },
     });
+  });
+
+  it('should not enqueue when another retry already claimed the generation', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { addGenerationJob } = await import('../../lib/queue.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.generation.findUnique).mockResolvedValue(mockGeneration as any);
+    vi.mocked(prisma.generation.updateMany).mockResolvedValue({ count: 0 } as any);
+
+    await expect(adminService.retryGeneration('gen1')).rejects.toThrow(
+      'Only failed generations can be retried'
+    );
+
+    expect(vi.mocked(addGenerationJob)).not.toHaveBeenCalled();
   });
 
   it('should throw error if generation not found', async () => {

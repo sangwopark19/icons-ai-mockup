@@ -579,14 +579,25 @@ export class AdminService {
       options: buildRetryGenerationOptions(options, promptData),
     };
 
-    const updated = await prisma.generation.update({
-      where: { id },
+    const claim = await prisma.generation.updateMany({
+      where: { id, status: 'failed' },
       data: {
         status: 'pending',
         errorMessage: null,
         retryCount: { increment: 1 },
       },
     });
+
+    if (claim.count !== 1) {
+      throw new Error('Only failed generations can be retried');
+    }
+
+    const updated = {
+      ...generation,
+      status: 'pending',
+      errorMessage: null,
+      retryCount: generation.retryCount + 1,
+    };
 
     try {
       await addGenerationJob(jobData);
