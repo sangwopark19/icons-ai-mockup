@@ -116,6 +116,14 @@ const generationRecord = (overrides: Record<string, unknown> = {}) => ({
   provider: 'openai',
   providerModel: 'gpt-image-2',
   mode: 'ip_change',
+  styleReferenceId: 'style-ref-1',
+  promptData: {
+    sourceImagePath: 'uploads/user-1/project-1/source.png',
+    characterImagePath: 'characters/user-1/target.png',
+    copyTarget: 'ip-change',
+    selectedImageId: 'style-img-2',
+  },
+  options: baseOptions,
   images: [],
   ...overrides,
 });
@@ -384,10 +392,53 @@ describe('processGenerationJob provider continuation', () => {
     expect(geminiService.generateWithStyleCopy).not.toHaveBeenCalled();
   });
 
+  it('rejects queue styleReferenceId mismatch before vendor calls', async () => {
+    const jobData = baseOpenAIJob({ styleReferenceId: 'stale-style-ref' });
+    mockGenerationLookup(generationRecord(), openAIReference());
+
+    await expect(processGenerationJob({ data: jobData })).rejects.toThrow(
+      '저장된 생성 입력과 큐 styleReferenceId가 일치하지 않습니다.'
+    );
+
+    expect(adminService.getActiveApiKey).not.toHaveBeenCalled();
+    expect(openaiImageService.generateStyleCopyWithLinkage).not.toHaveBeenCalled();
+    expect(openaiImageService.generateStyleCopyFromImage).not.toHaveBeenCalled();
+    expect(geminiService.generateWithStyleCopy).not.toHaveBeenCalled();
+  });
+
+  it('rejects queue selectedImageId mismatch before vendor calls', async () => {
+    const jobData = baseOpenAIJob({ selectedImageId: 'stale-style-image' });
+    mockGenerationLookup(generationRecord(), openAIReference());
+
+    await expect(processGenerationJob({ data: jobData })).rejects.toThrow(
+      '저장된 생성 입력과 큐 selectedImageId가 일치하지 않습니다.'
+    );
+
+    expect(adminService.getActiveApiKey).not.toHaveBeenCalled();
+    expect(openaiImageService.generateStyleCopyWithLinkage).not.toHaveBeenCalled();
+    expect(openaiImageService.generateStyleCopyFromImage).not.toHaveBeenCalled();
+    expect(geminiService.generateWithStyleCopy).not.toHaveBeenCalled();
+  });
+
   it('preserves existing OpenAI ip_change and sketch_to_real worker dispatch after processGenerationJob export', async () => {
     mockGenerationLookup(
-      generationRecord({ id: 'gen-ip', mode: 'ip_change' }),
-      generationRecord({ id: 'gen-sketch', mode: 'sketch_to_real' })
+      generationRecord({
+        id: 'gen-ip',
+        mode: 'ip_change',
+        styleReferenceId: undefined,
+        promptData: {
+          sourceImagePath: 'uploads/user-1/project-1/source.png',
+          characterImagePath: 'characters/user-1/target.png',
+        },
+      }),
+      generationRecord({
+        id: 'gen-sketch',
+        mode: 'sketch_to_real',
+        styleReferenceId: undefined,
+        promptData: {
+          sourceImagePath: 'uploads/user-1/project-1/source.png',
+        },
+      })
     );
 
     await processGenerationJob({

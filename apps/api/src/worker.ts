@@ -28,6 +28,13 @@ type GeneratedImageReference = {
   isSelected: boolean;
 };
 
+type StoredGenerationJobSource = {
+  projectId: string;
+  mode: GenerationJobData['mode'];
+  styleReferenceId?: string | null;
+  promptData?: unknown;
+};
+
 const getOutputIndexFromFilePath = (filePath: string): number | null => {
   const match = filePath.match(/output_(\d+)\.(png|jpe?g|webp)$/i);
   return match ? Number.parseInt(match[1], 10) : null;
@@ -46,6 +53,72 @@ const isStringArray = (value: unknown): value is string[] =>
 
 const getPositiveNumber = (value: unknown, fallback: number): number =>
   typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback;
+
+const getOptionalString = (value: unknown): string | undefined =>
+  typeof value === 'string' ? value : undefined;
+
+const getRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+
+const assertQueuedFieldMatchesStored = (
+  field: string,
+  queuedValue: unknown,
+  storedValue: unknown
+): void => {
+  const queued = queuedValue ?? undefined;
+  const stored = storedValue ?? undefined;
+
+  if (queued !== stored) {
+    throw new Error(`저장된 생성 입력과 큐 ${field}가 일치하지 않습니다.`);
+  }
+};
+
+const assertQueuedJobMatchesStoredGeneration = (
+  jobData: GenerationJobData,
+  generation: StoredGenerationJobSource
+): void => {
+  const promptData = getRecord(generation.promptData);
+
+  assertQueuedFieldMatchesStored('projectId', jobData.projectId, generation.projectId);
+  assertQueuedFieldMatchesStored('mode', jobData.mode, generation.mode);
+  assertQueuedFieldMatchesStored(
+    'styleReferenceId',
+    jobData.styleReferenceId,
+    getOptionalString(generation.styleReferenceId)
+  );
+  assertQueuedFieldMatchesStored(
+    'sourceImagePath',
+    jobData.sourceImagePath,
+    getOptionalString(promptData.sourceImagePath)
+  );
+  assertQueuedFieldMatchesStored(
+    'characterImagePath',
+    jobData.characterImagePath,
+    getOptionalString(promptData.characterImagePath)
+  );
+  assertQueuedFieldMatchesStored(
+    'textureImagePath',
+    jobData.textureImagePath,
+    getOptionalString(promptData.textureImagePath)
+  );
+  assertQueuedFieldMatchesStored(
+    'prompt',
+    jobData.prompt,
+    getOptionalString(promptData.userPrompt)
+  );
+  assertQueuedFieldMatchesStored(
+    'copyTarget',
+    jobData.copyTarget,
+    getOptionalString(promptData.copyTarget)
+  );
+  assertQueuedFieldMatchesStored(
+    'selectedImageId',
+    jobData.selectedImageId,
+    getOptionalString(promptData.selectedImageId)
+  );
+};
 
 const attachOpenAIWorkerTrace = (
   metadata: OpenAIImageGenerationResult,
@@ -372,6 +445,8 @@ export async function processGenerationJob(
     if (job.data.providerModel !== generation.providerModel) {
       throw new Error('저장된 providerModel과 큐 providerModel이 일치하지 않습니다.');
     }
+
+    assertQueuedJobMatchesStoredGeneration(job.data, generation);
 
     const provider = generation.provider;
     const mode = generation.mode;

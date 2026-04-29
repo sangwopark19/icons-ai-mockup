@@ -67,6 +67,30 @@ describe('GenerationService - provider contract', () => {
     expect(vi.mocked(addGenerationJob)).not.toHaveBeenCalled();
   });
 
+  it('rejects continuation-only metadata on direct source generation create', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { addGenerationJob } = await import('../../lib/queue.js');
+    const { generationService } = await import('../generation.service.js');
+
+    vi.mocked(prisma.project.findFirst).mockResolvedValue({ id: 'proj1', userId: 'u1' } as any);
+
+    await expect(
+      generationService.create('u1', {
+        projectId: 'proj1',
+        mode: 'ip_change',
+        provider: 'openai',
+        providerModel: 'gpt-image-2',
+        sourceImagePath: 'uploads/u1/proj1/source.png',
+        characterImagePath: 'characters/u1/character.png',
+        copyTarget: 'ip-change',
+        selectedImageId: '00000000-0000-0000-0000-000000000111',
+      })
+    ).rejects.toThrow('스타일 복사 continuation metadata가 불완전합니다');
+
+    expect(vi.mocked(prisma.generation.create)).not.toHaveBeenCalled();
+    expect(vi.mocked(addGenerationJob)).not.toHaveBeenCalled();
+  });
+
   it('rejects image paths outside the authenticated user/project boundary', async () => {
     const { prisma } = await import('../../lib/prisma.js');
     const { addGenerationJob } = await import('../../lib/queue.js');

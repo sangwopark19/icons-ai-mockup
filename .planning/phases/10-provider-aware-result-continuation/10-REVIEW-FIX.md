@@ -2,12 +2,12 @@
 phase: 10-provider-aware-result-continuation
 source: 10-REVIEW.md
 status: all_fixed
-fixed_at: 2026-04-29T05:45:21Z
-fix_scope: critical_warning
-findings_in_scope: 5
-fixed: 5
+fixed_at: 2026-04-29T06:06:38Z
+fix_scope: critical_warning_followup
+findings_in_scope: 7
+fixed: 7
 skipped: 0
-iteration: 1
+iteration: 2
 commits:
   - 22da187 fix(10): make OpenAI Responses style copy deterministic
   - 54420da fix(10): harden partial edit persistence
@@ -18,7 +18,7 @@ commits:
 
 ## Summary
 
-Applied a single inline fallback fix pass for the five Critical/Warning findings in `10-REVIEW.md`.
+Applied a single inline fallback fix pass for the five Critical/Warning findings in `10-REVIEW.md`, then applied a focused follow-up pass for two provider-continuation integrity findings discovered during final review.
 The native `gsd-code-fixer` agent was started first, but its mandatory isolated-worktree setup failed because the current phase branch is already checked out in the main workspace. No agent code changes were applied before fallback.
 
 ## Fixes Applied
@@ -75,6 +75,27 @@ Status: fixed
 
 Commit: `6b3a55c fix(10): fail generations when enqueue fails`
 
+### FU-01: Worker trusted stale continuation job fields
+
+Status: fixed
+
+- Added a worker-side persisted metadata guard before API-key lookup or vendor calls.
+- The guard now compares queued `projectId`, `mode`, `styleReferenceId`, input paths, prompt, `copyTarget`, and `selectedImageId` against the persisted `Generation` row and `promptData`.
+- Added regression coverage for stale `styleReferenceId` and stale `selectedImageId` queue payloads, asserting no OpenAI or Gemini vendor dispatch occurs.
+
+Commit: this follow-up review-fix commit
+
+### FU-02: Public create contract accepted continuation-only fields
+
+Status: fixed
+
+- Removed `copyTarget` and `selectedImageId` from the shared public `CreateGenerationSchema`.
+- Added service-level validation so direct source generation rejects continuation-only metadata without `styleReferenceId`.
+- Added a Gemini guard for continuation-only metadata so v2 style-copy metadata cannot be mixed into a Gemini direct-create path.
+- Added regression coverage that direct OpenAI source generation with continuation-only metadata fails before generation row creation or queue enqueue.
+
+Commit: this follow-up review-fix commit
+
 ## Verification
 
 Passed:
@@ -108,6 +129,22 @@ pnpm --filter @mockup-ai/api test -- src/__tests__/worker.provider-continuation.
 ```
 
 Result: 5 test files passed, 77 tests passed.
+
+Passed:
+
+```bash
+pnpm --filter @mockup-ai/api test -- worker.provider-continuation.test.ts generation.service.test.ts openai-image.service.test.ts edit.routes.test.ts generation.routes.test.ts
+```
+
+Result: 5 test files passed, 80 tests passed.
+
+Passed:
+
+```bash
+pnpm --filter @mockup-ai/api test -- worker.provider-continuation.test.ts generation.service.test.ts
+```
+
+Result: 2 test files passed, 42 tests passed.
 
 Passed:
 

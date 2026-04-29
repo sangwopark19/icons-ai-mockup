@@ -134,8 +134,6 @@ export const CreateGenerationSchema = z.object({
   characterId: z.string().uuid().optional(),
   characterImagePath: z.string().optional(),
   textureImagePath: z.string().optional(),
-  copyTarget: GenerationCopyTargetEnum.optional(),
-  selectedImageId: z.string().uuid().optional(),
   prompt: z.string().max(2000).optional(),
   options: GenerationOptionsSchema.optional(),
 });

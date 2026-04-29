@@ -134,6 +134,26 @@ function validateCreateGenerationInput(
   input: CreateGenerationInput,
   provider: GenerationProvider
 ): void {
+  const hasContinuationOnlyMetadata = Boolean(input.copyTarget || input.selectedImageId);
+
+  if (hasContinuationOnlyMetadata && !input.styleReferenceId) {
+    throw new Error('스타일 복사 continuation metadata가 불완전합니다');
+  }
+
+  if (provider !== 'openai' && hasContinuationOnlyMetadata) {
+    throw new Error('v2 스타일 복사는 v2 기준 결과에서만 시작할 수 있습니다');
+  }
+
+  if (provider === 'openai' && input.styleReferenceId) {
+    if (!input.copyTarget) {
+      throw new Error('OpenAI 스타일 복사에는 복사 대상이 필요합니다');
+    }
+
+    if (!input.selectedImageId) {
+      throw new Error('OpenAI 스타일 복사에는 선택된 기준 이미지가 필요합니다');
+    }
+  }
+
   if (provider === 'openai' && !['ip_change', 'sketch_to_real'].includes(input.mode)) {
     throw new Error('OpenAI provider는 현재 IP 변경 v2와 스케치 실사화 v2만 지원합니다');
   }
