@@ -417,16 +417,18 @@ Source: worker provider-continuation tests already use this structure to prove O
 |---|-------|---------|---------------|
 | - | No `[ASSUMED]` claims are used in this research; all implementation-relevant claims were verified from code, planning artifacts, npm registry output, targeted tests, Context7, or official OpenAI documentation. [VERIFIED: research process] | All sections | No user confirmation is required before planning the code fix. [VERIFIED: source coverage] |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Should Phase 11 also add enqueue-failure compensation to admin retry?** [VERIFIED: `apps/api/src/services/admin.service.ts`, `apps/api/src/services/generation.service.ts`]
+1. **RESOLVED: Phase 11 does not add enqueue-failure compensation to admin retry unless separately planned later.** [VERIFIED: `apps/api/src/services/admin.service.ts`, `apps/api/src/services/generation.service.ts`]
    - What we know: `GenerationService.create()` compensates a failed `addGenerationJob()` by marking the new generation failed after Phase 10 review fixes. [VERIFIED: `.planning/phases/10-provider-aware-result-continuation/10-REVIEW-FIX.md`, `apps/api/src/services/generation.service.ts`]
-   - What's unclear: `AdminService.retryGeneration()` still updates a failed generation to pending before `addGenerationJob()`, and this broader retry durability issue is not part of the Phase 11 success criteria. [VERIFIED: `apps/api/src/services/admin.service.ts`, `.planning/ROADMAP.md`]
-   - Recommendation: Do not include compensation unless the planner creates a separate small hardening task after the required metadata regression is locked. [VERIFIED: scope analysis]
+   - Scope evidence: `AdminService.retryGeneration()` still updates a failed generation to pending before `addGenerationJob()`, and this broader retry durability issue is not part of the Phase 11 success criteria. [VERIFIED: `apps/api/src/services/admin.service.ts`, `.planning/ROADMAP.md`]
+   - Resolution: Enqueue-failure compensation is out of Phase 11 scope because this phase remains focused on persisted style-copy continuation metadata recovery. [VERIFIED: `.planning/ROADMAP.md`, `.planning/v1.1-INTEGRATION-CHECK.md`]
+   - Recommendation: Do not include compensation unless a separate later phase or small hardening task explicitly plans it after the required metadata regression is locked. [VERIFIED: scope analysis]
 
-2. **Should Phase 11 run live OpenAI style-copy retry smoke?** [VERIFIED: `.planning/phases/10-provider-aware-result-continuation/10-SMOKE.md`]
+2. **RESOLVED: Phase 11 does not require live OpenAI style-copy retry smoke in its automated gate.** [VERIFIED: `.planning/phases/10-provider-aware-result-continuation/10-SMOKE.md`]
    - What we know: Phase 10 live partial-edit/style-copy smoke remains `manual_needed` due to missing running stack, approved target images, and available completed OpenAI style reference. [VERIFIED: `10-SMOKE.md`]
-   - What's unclear: The user may later want end-to-end human UAT for the whole v1.1 OpenAI flow. [VERIFIED: `.planning/STATE.md`]
+   - Scope evidence: End-to-end human UAT for the whole v1.1 OpenAI flow may still be wanted later, but it remains in existing Phase 10/manual follow-up artifacts. [VERIFIED: `.planning/STATE.md`]
+   - Resolution: Live OpenAI style-copy retry smoke is out of Phase 11's automated gate; mocked dispatch regression is sufficient for this deterministic queue metadata fix, with live UAT remaining in existing Phase 10/manual follow-up artifacts. [VERIFIED: `.planning/phases/10-provider-aware-result-continuation/10-SMOKE.md`, `.planning/STATE.md`]
    - Recommendation: Phase 11 should require automated mocked dispatch regression, not live OpenAI smoke, because this phase fixes deterministic queue metadata recovery. [VERIFIED: phase scope, targeted test feasibility]
 
 ## Environment Availability
