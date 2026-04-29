@@ -11,8 +11,8 @@ Requirements for milestone v1.1 OpenAI GPT Image 2 Dual Provider.
 
 - [x] **PROV-01**: User can open an OpenAI GPT Image 2 version of the IP Change workflow from a project without losing access to the existing Gemini version.
 - [ ] **PROV-02**: User can open an OpenAI GPT Image 2 version of the Sketch to Real workflow from a project without losing access to the existing Gemini version.
-- [ ] **PROV-03**: User can see which provider and model produced each generation in the result view and project history.
-- [ ] **PROV-04**: User can regenerate a saved generation with the same provider and core options used for the original request.
+- [x] **PROV-03**: User can see which provider and model produced each generation in the result view and project history.
+- [x] **PROV-04**: User can regenerate a saved generation with the same provider and core options used for the original request.
 
 ### OpenAI IP Change
 
@@ -28,9 +28,9 @@ Requirements for milestone v1.1 OpenAI GPT Image 2 Dual Provider.
 
 ### OpenAI Editing
 
-- [ ] **OED-01**: User can request a partial edit on an OpenAI-generated result from the existing result page.
-- [ ] **OED-02**: User can create a style-copy generation from an approved OpenAI result while changing only the named target.
-- [ ] **OED-03**: User can iterate on OpenAI edits or style-copy follow-ups without mixing state with Gemini-only style memory.
+- [x] **OED-01**: User can request a partial edit on an OpenAI-generated result from the existing result page.
+- [x] **OED-02**: User can create a style-copy generation from an approved OpenAI result while changing only the named target.
+- [x] **OED-03**: User can iterate on OpenAI edits or style-copy follow-ups without mixing state with Gemini-only style memory.
 
 ### Operations And Observability
 
@@ -72,17 +72,17 @@ Requirements for milestone v1.1 OpenAI GPT Image 2 Dual Provider.
 |-------------|-------|--------|
 | PROV-01 | Phase 8 | Pending |
 | PROV-02 | Phase 9 | Pending |
-| PROV-03 | Phase 10 | Pending |
-| PROV-04 | Phase 10 | Pending |
+| PROV-03 | Phase 10 | Complete |
+| PROV-04 | Phase 10 | Complete |
 | OIP-01 | Phase 8 | Pending |
 | OIP-02 | Phase 8 | Pending |
 | OIP-03 | Phase 8 | Pending |
 | OSR-01 | Phase 9 | Pending |
 | OSR-02 | Phase 9 | Pending |
 | OSR-03 | Phase 9 | Pending |
-| OED-01 | Phase 10 | Pending |
-| OED-02 | Phase 10 | Pending |
-| OED-03 | Phase 10 | Pending |
+| OED-01 | Phase 10 | Complete |
+| OED-02 | Phase 10 | Complete |
+| OED-03 | Phase 10 | Complete |
 | OPS-01 | Phase 7 | Satisfied |
 | OPS-02 | Phase 7 | Satisfied |
 | OPS-03 | Phase 7 | Foundation Satisfied |
