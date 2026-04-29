@@ -27,15 +27,17 @@
 
 | Check | Status | Evidence |
 |---|---|---|
-| Live/app partial edit smoke | pending | Will record request ID, response ID, image call ID, selected image ID, output count, and no Gemini fallback when prerequisites are available. |
-| Forbidden parameters | pending | Must confirm `background: "transparent"` and `input_fidelity` are absent. |
+| Live/app partial edit smoke | blocked_manual_needed | No live partial edit request was attempted. `OPENAI_API_KEY` is not exported in the shell, `.env` contains an OpenAI key entry, no current-branch local stack/DB is running, and no completed OpenAI result generation with a selected image is available for this smoke. request ID: not_available because no OpenAI request was sent. response ID: not_available. image call ID: not_available. selected image ID: not_available. output image count: not_available. |
+| Forbidden parameters | passed_static | Source grep confirms `background: "transparent"` and `input_fidelity` are absent from `apps/api/src/services/openai-image.service.ts`. |
+| Gemini fallback | passed_static | No Gemini fallback is permitted or attempted for blocked OpenAI partial edit smoke; blocked state remains manual-needed. |
 
 ## OpenAI Style Copy Smoke
 
 | Check | Status | Evidence |
 |---|---|---|
-| Live/app style-copy smoke | pending | Will record generation ID, request ID, response ID, image call ID, output count, selected image ID, and no Gemini fallback when prerequisites are available. |
-| Forbidden parameters | pending | Must confirm `background: "transparent"` and `input_fidelity` are absent. |
+| Live/app style-copy smoke | blocked_manual_needed | No live style-copy request was attempted. Missing prerequisites: no current-branch local stack/DB is running, no completed OpenAI result generation with selected image is available as the style reference, and no representative Phase 10 target images have been provided/approved for OpenAI transmission. generation ID: not_available. request ID: not_available because no OpenAI request was sent. response ID: not_available. image call ID: not_available. selected image ID: not_available. output image count: not_available. |
+| Forbidden parameters | passed_static | Source grep confirms `background: "transparent"` and `input_fidelity` are absent from `apps/api/src/services/openai-image.service.ts`. |
+| Gemini fallback | passed_static | OpenAI style-copy failures or missing prerequisites do not grant Gemini fallback permission; blocked state remains manual-needed. |
 
 ## Gemini/OpenAI Lineage Isolation
 
@@ -51,7 +53,8 @@ No Phase 10 plan modifies apps/api/prisma/schema.prisma; npx prisma db push is n
 
 ## Manual Needed Approval
 
-manual_needed: pending
+manual_needed: automated suite must be green and user approval is required before Phase 10 close.
+reason: Live OpenAI continuation smoke prerequisites are unavailable: no current-branch local app/DB stack is running to verify an active DB-managed OpenAI key or completed selected OpenAI result, `OPENAI_API_KEY` is not exported in the shell despite a `.env` entry, and no representative Phase 10 target images have been provided/approved for OpenAI transmission.
 
 ## Evidence Status
 
@@ -63,7 +66,7 @@ manual_needed: pending
 | Full phase verification command | passed |
 | Product UI metadata boundary | passed with code-only identifier note |
 | Provider-pinned regeneration | passed |
-| OpenAI partial edit live smoke | pending |
-| OpenAI style-copy live smoke | pending |
+| OpenAI partial edit live smoke | blocked_manual_needed |
+| OpenAI style-copy live smoke | blocked_manual_needed |
 | Gemini/OpenAI lineage isolation | passed by tests plus static review |
 | Schema push status | passed |
