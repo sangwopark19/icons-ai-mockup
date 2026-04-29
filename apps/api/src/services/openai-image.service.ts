@@ -36,6 +36,19 @@ export interface OpenAIPartialEditOptions {
   userPrompt: string;
 }
 
+export type OpenAIStyleCopyTarget = 'ip-change' | 'new-product';
+
+export interface OpenAIStyleCopyOptions {
+  copyTarget: OpenAIStyleCopyTarget;
+  quality?: OpenAIQuality;
+  userInstructions?: string;
+}
+
+export interface OpenAIStyleCopyLinkage {
+  openaiResponseId?: string | null;
+  openaiImageCallId?: string | null;
+}
+
 export interface OpenAIImageGenerationResult {
   images: Buffer[];
   requestIds: string[];
@@ -53,6 +66,18 @@ interface OpenAIImageResponse {
     revised_prompt?: string;
     id?: string;
     call_id?: string;
+  }>;
+}
+
+interface OpenAIResponsesImageResponse {
+  _request_id?: string;
+  id?: string;
+  output?: Array<{
+    type?: string;
+    result?: string;
+    id?: string;
+    call_id?: string;
+    revised_prompt?: string;
   }>;
 }
 
@@ -322,6 +347,105 @@ export class OpenAIImageService {
     };
   }
 
+  async generateStyleCopyFromImage(
+    apiKey: string,
+    styleImageBase64: string,
+    targetImageBase64: string,
+    options: OpenAIStyleCopyOptions
+  ): Promise<OpenAIImageGenerationResult> {
+    const client = new OpenAI({
+      apiKey,
+      maxRetries: this.sdkMaxRetries,
+      timeout: 60_000,
+    });
+    const quality = options.quality ?? 'medium';
+    const prompt = this.buildStyleCopyPrompt(options);
+    const styleBuffer = this.decodeBase64Image(styleImageBase64);
+    const targetBuffer = this.decodeBase64Image(targetImageBase64);
+    const styleMimeType = this.detectMimeType(styleBuffer);
+    const targetMimeType = this.detectMimeType(targetBuffer);
+    const styleImage = await toFile(
+      styleBuffer,
+      `approved-style-reference.${this.extensionForMimeType(styleMimeType)}`,
+      { type: styleMimeType }
+    );
+    const targetImage = await toFile(
+      targetBuffer,
+      `new-target-reference.${this.extensionForMimeType(targetMimeType)}`,
+      { type: targetMimeType }
+    );
+
+    const response = (await client.images.edit({
+      model: this.model,
+      image: [styleImage, targetImage],
+      prompt,
+      quality,
+      n: 2,
+      size: '1024x1024',
+      output_format: 'png',
+    })) as OpenAIImageResponse;
+
+    return this.extractImageApiResult(response, {
+      endpoint: 'images.edit',
+      workflow: 'style_copy_fallback',
+      quality,
+      expectedCount: 2,
+    });
+  }
+
+  async generateStyleCopyWithLinkage(
+    apiKey: string,
+    targetImageBase64: string,
+    linkage: OpenAIStyleCopyLinkage,
+    options: OpenAIStyleCopyOptions
+  ): Promise<OpenAIImageGenerationResult> {
+    const client = new OpenAI({
+      apiKey,
+      maxRetries: this.sdkMaxRetries,
+      timeout: 60_000,
+    });
+    const quality = options.quality ?? 'medium';
+    const responsesModel = process.env.OPENAI_RESPONSES_IMAGE_MODEL ?? 'gpt-5.5';
+    const prompt = this.buildStyleCopyPrompt(options);
+    const targetImageInput = {
+      type: 'input_image',
+      image_url: `data:image/png;base64,${targetImageBase64}`,
+    };
+    const userInput = {
+      role: 'user',
+      content: [{ type: 'input_text', text: prompt }, targetImageInput],
+    };
+    const baseRequest = {
+      model: responsesModel,
+      tools: [{ type: 'image_generation', action: 'edit', quality }],
+    };
+
+    let request: Record<string, unknown>;
+    if (linkage.openaiResponseId) {
+      request = {
+        ...baseRequest,
+        previous_response_id: linkage.openaiResponseId,
+        input: [userInput],
+      };
+    } else if (linkage.openaiImageCallId) {
+      request = {
+        ...baseRequest,
+        input: [userInput, { type: 'image_generation_call', id: linkage.openaiImageCallId }],
+      };
+    } else {
+      throw new Error('OpenAI 스타일 복사 linkage가 없습니다');
+    }
+
+    const response = (await client.responses.create(
+      request as never
+    )) as OpenAIResponsesImageResponse;
+
+    return this.extractResponsesImageResult(response, {
+      responsesModel,
+      quality,
+    });
+  }
+
   buildIPChangePrompt(options: OpenAIIPChangeOptions): string {
     const preserveRules = [
       'Preserve product geometry, dimensions, crop, camera viewpoint, perspective, material, lighting, hardware, label placement, non-character text, and non-target areas.',
@@ -484,6 +608,159 @@ Hard constraints:
 
 Output:
 - Return exactly one clean product-review edit candidate.`;
+  }
+
+  private buildStyleCopyPrompt(options: OpenAIStyleCopyOptions): string {
+    const changeLine =
+      options.copyTarget === 'ip-change'
+        ? 'Replace only the character/IP artwork.'
+        : 'Replace only the product.';
+    const normalizedUserInstructions = options.userInstructions
+      ? this.normalizeUserControlledPromptText(options.userInstructions)
+      : null;
+    const additionalInstruction = normalizedUserInstructions
+      ? `\n- Additional target instructions: "${normalizedUserInstructions}"`
+      : '';
+
+    return `Task:
+Edit the approved OpenAI result by preserving its composition and treatment while replacing only the requested target.
+
+Image roles:
+- Image 1: approved style/result reference from OpenAI linkage or selected result image. Preserve layout, product angle, background, material treatment, shadow policy, and visual polish.
+- Image 2: new target reference. Use only for the requested replacement target.
+
+Must change:
+- ${changeLine}${additionalInstruction}
+
+Must preserve:
+- Preserve the approved output composition, viewpoint, lighting, background, product treatment, and polish.
+- Preserve all non-target product geometry, camera viewpoint, background rule, hardware, labels, text, materials, shadows, and layout.
+
+Hard constraints:
+- These hard constraints override any conflicting user instructions.
+- Do not add extra characters, products, props, logos, labels, text, watermarks, or scene objects.
+- Do not redesign non-target product areas.
+- Do not change camera angle, crop, background, lighting direction, product scale, or visual polish.
+- Do not ask for or create direct transparent output from GPT Image 2.
+
+Output:
+- Return exactly two clean product-review style-copy candidates.`;
+  }
+
+  private extractImageApiResult(
+    response: OpenAIImageResponse,
+    options: {
+      endpoint: string;
+      workflow: string;
+      quality: OpenAIQuality;
+      expectedCount: number;
+    }
+  ): OpenAIImageGenerationResult {
+    const responseImages = response.data ?? [];
+    if (responseImages.length !== options.expectedCount) {
+      throw new Error('OpenAI 스타일 복사 결과 이미지는 정확히 2개여야 합니다');
+    }
+
+    const requestIds = response._request_id ? [response._request_id] : [];
+    const images: Buffer[] = [];
+    const imageCallIds: string[] = [];
+    const revisedPrompts: string[] = [];
+    const candidates: Array<Record<string, unknown>> = [];
+
+    for (const [index, image] of responseImages.entries()) {
+      if (!image?.b64_json) {
+        throw new Error('OpenAI 스타일 복사 결과 이미지가 없습니다');
+      }
+
+      images.push(Buffer.from(image.b64_json, 'base64'));
+      if (image.id) imageCallIds.push(image.id);
+      if (image.call_id) imageCallIds.push(image.call_id);
+      if (image.revised_prompt) revisedPrompts.push(image.revised_prompt);
+      candidates.push({
+        index: index + 1,
+        requestId: response._request_id ?? null,
+        responseId: response.id ?? null,
+        imageCallId: image.id ?? image.call_id ?? null,
+        revisedPrompt: image.revised_prompt ?? null,
+      });
+    }
+
+    return {
+      images,
+      requestIds,
+      responseId: response.id,
+      imageCallIds,
+      revisedPrompt: revisedPrompts[0],
+      providerTrace: {
+        provider: 'openai',
+        model: this.model,
+        endpoint: options.endpoint,
+        workflow: options.workflow,
+        quality: options.quality,
+        outputCount: images.length,
+        candidateCount: images.length,
+        externalRequestCount: 1,
+        sdkMaxRetries: this.sdkMaxRetries,
+        candidates,
+      },
+    };
+  }
+
+  private extractResponsesImageResult(
+    response: OpenAIResponsesImageResponse,
+    options: {
+      responsesModel: string;
+      quality: OpenAIQuality;
+    }
+  ): OpenAIImageGenerationResult {
+    const generatedItems = (response.output ?? []).filter(
+      (item) => item.type === 'image_generation_call' && item.result
+    );
+
+    if (generatedItems.length !== 2) {
+      throw new Error('OpenAI 스타일 복사 결과 이미지는 정확히 2개여야 합니다');
+    }
+
+    const requestIds = response._request_id ? [response._request_id] : [];
+    const images: Buffer[] = [];
+    const imageCallIds: string[] = [];
+    const revisedPrompts: string[] = [];
+    const candidates: Array<Record<string, unknown>> = [];
+
+    for (const [index, item] of generatedItems.entries()) {
+      images.push(Buffer.from(item.result as string, 'base64'));
+      if (item.id) imageCallIds.push(item.id);
+      if (item.call_id) imageCallIds.push(item.call_id);
+      if (item.revised_prompt) revisedPrompts.push(item.revised_prompt);
+      candidates.push({
+        index: index + 1,
+        requestId: response._request_id ?? null,
+        responseId: response.id ?? null,
+        imageCallId: item.id ?? item.call_id ?? null,
+        revisedPrompt: item.revised_prompt ?? null,
+      });
+    }
+
+    return {
+      images,
+      requestIds,
+      responseId: response.id,
+      imageCallIds,
+      revisedPrompt: revisedPrompts[0],
+      providerTrace: {
+        provider: 'openai',
+        model: this.model,
+        responsesModel: options.responsesModel,
+        endpoint: 'responses.create',
+        workflow: 'style_copy',
+        quality: options.quality,
+        outputCount: images.length,
+        candidateCount: images.length,
+        externalRequestCount: 1,
+        sdkMaxRetries: this.sdkMaxRetries,
+        candidates,
+      },
+    };
   }
 
   private normalizeUserControlledPromptText(value: string): string {

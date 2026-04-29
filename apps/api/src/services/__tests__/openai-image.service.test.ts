@@ -436,6 +436,8 @@ describe('OpenAIImageService', () => {
     expect(JSON.stringify(firstCall.input)).not.toContain('image_generation_call');
     expect(JSON.stringify(firstCall.input)).toContain('data:image/png;base64,');
     expect(firstCall.tools).toEqual([{ type: 'image_generation', action: 'edit', quality: 'high' }]);
+    expect(firstCall.background).toBeUndefined();
+    expect(firstCall.input_fidelity).toBeUndefined();
   });
 
   it('uses image-call-id-only linkage for style copy without previous_response_id', async () => {
@@ -453,6 +455,8 @@ describe('OpenAIImageService', () => {
     expect(firstCall.previous_response_id).toBeUndefined();
     expect(firstCall.input).toHaveLength(2);
     expect(firstCall.input[1]).toEqual({ type: 'image_generation_call', id: 'call_previous_1' });
+    expect(firstCall.background).toBeUndefined();
+    expect(firstCall.input_fidelity).toBeUndefined();
     expect(firstCall.input[0].content).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ type: 'input_text' }),
