@@ -8,11 +8,24 @@ import { adminService } from './services/admin.service.js';
 import { removeUniformLightBackground } from './services/background-removal.service.js';
 import type { GenerationJobData } from './lib/queue.js';
 import type { ThoughtSignatureData } from '@mockup-ai/shared/types';
-import type { OpenAIImageGenerationResult } from './services/openai-image.service.js';
+import type {
+  OpenAIImageGenerationResult,
+  OpenAIStyleCopyLinkage,
+  OpenAIStyleCopyTarget,
+} from './services/openai-image.service.js';
 
 type ProcessedGeneratedImage = {
   buffer: Buffer;
   hasTransparency: boolean;
+};
+
+type GenerationJobLike = Pick<Job<GenerationJobData>, 'data'> &
+  Partial<Pick<Job<GenerationJobData>, 'id' | 'attemptsMade' | 'opts'>>;
+
+type GeneratedImageReference = {
+  id: string;
+  filePath: string;
+  isSelected: boolean;
 };
 
 const toOpenAIMetadataPayload = (metadata: OpenAIImageGenerationResult) => ({
@@ -31,14 +44,14 @@ const getPositiveNumber = (value: unknown, fallback: number): number =>
 
 const attachOpenAIWorkerTrace = (
   metadata: OpenAIImageGenerationResult,
-  job: Job<GenerationJobData>
+  job: GenerationJobLike
 ): OpenAIImageGenerationResult => ({
   ...metadata,
   providerTrace: {
     ...metadata.providerTrace,
     queueJobId: job.id ?? null,
-    queueAttempts: job.attemptsMade + 1,
-    queueConfiguredAttempts: job.opts.attempts ?? null,
+    queueAttempts: typeof job.attemptsMade === 'number' ? job.attemptsMade + 1 : 1,
+    queueConfiguredAttempts: job.opts?.attempts ?? null,
   },
 });
 
@@ -78,9 +91,9 @@ const parseThoughtSignatures = (value: unknown): ThoughtSignatureData[] => {
 /**
  * 생성 작업 처리 워커
  */
-const generationWorker = new Worker<GenerationJobData>(
-  'generation',
-  async (job: Job<GenerationJobData>) => {
+export async function processGenerationJob(
+  job: Pick<Job<GenerationJobData>, 'data'>
+): Promise<{ success: true; imageCount: number }> {
     const { generationId, userId, projectId, options } = job.data;
     let openAIMetadata: OpenAIImageGenerationResult | undefined;
     let openAIMetadataSaved = false;
@@ -379,7 +392,11 @@ const generationWorker = new Worker<GenerationJobData>(
       await generationService.updateStatus(generationId, 'failed', message);
       throw error;
     }
-  },
+}
+
+const generationWorker = new Worker<GenerationJobData>(
+  'generation',
+  processGenerationJob,
   {
     connection: redis,
     concurrency: 2, // 동시에 2개 작업 처리
