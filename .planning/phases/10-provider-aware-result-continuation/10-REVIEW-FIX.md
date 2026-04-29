@@ -1,122 +1,123 @@
 ---
 phase: 10-provider-aware-result-continuation
 source: 10-REVIEW.md
-status: fixed
-fixed_at: 2026-04-29T03:01:32Z
-findings_in_scope: 10
-fixed: 10
+status: all_fixed
+fixed_at: 2026-04-29T05:45:21Z
+fix_scope: critical_warning
+findings_in_scope: 5
+fixed: 5
 skipped: 0
-iterations: 4
+iteration: 1
 commits:
-  - b8e93f7 fix(10): preserve OpenAI style-copy regeneration lineage
-  - 9ab4163 fix(10): resolve selected OpenAI style-copy linkage
-  - 8718c4c fix(10): label OpenAI Responses target MIME correctly
-  - 48391dc fix(10): guard unsupported continuation UI states
-  - f80d1b8 fix(10): bind OpenAI style copy to selected candidate
-  - 5323a96 fix(10): pin Responses image tool to GPT Image 2
-  - 7201bd7 fix(10): close OpenAI style-copy review warnings
+  - 22da187 fix(10): make OpenAI Responses style copy deterministic
+  - 54420da fix(10): harden partial edit persistence
+  - 6b3a55c fix(10): fail generations when enqueue fails
 ---
 
 # Phase 10 Code Review Fix Report
 
 ## Summary
 
-All code review findings raised during the Phase 10 review loop were fixed. The final re-review updated `10-REVIEW.md` to `status: clean` with zero critical, warning, or info findings.
+Applied a single inline fallback fix pass for the five Critical/Warning findings in `10-REVIEW.md`.
+The native `gsd-code-fixer` agent was started first, but its mandatory isolated-worktree setup failed because the current phase branch is already checked out in the main workspace. No agent code changes were applied before fallback.
 
 ## Fixes Applied
 
-### OpenAI Style-Copy Regeneration Lineage
+### CR-01: OpenAI image-call continuation sends an invalid Responses input item
 
 Status: fixed
 
-- Preserved `styleReferenceId`, `copyTarget`, and `selectedImageId` when regenerating OpenAI style-copy results.
-- Allowed selected image replay only for validated OpenAI style-copy regeneration.
-- Added regression coverage for both `ip-change` and `new-product` style-copy regeneration paths.
+- Replaced the invalid `{ type: 'image_generation_call', id }` input item with the SDK-supported `{ type: 'item_reference', id }` shape.
+- Removed the `request as never` escape hatch and typed the Responses request with `ResponseCreateParamsNonStreaming`.
+- Added `ResponseInputImage`/`ResponseInputText` typed request content, including explicit `detail: 'auto'`.
 
-Commit: `b8e93f7 fix(10): preserve OpenAI style-copy regeneration lineage`
+Commit: `22da187 fix(10): make OpenAI Responses style copy deterministic`
 
-### Selected Candidate Linkage
-
-Status: fixed
-
-- Resolved selected candidate `image_generation_call` IDs from provider trace and persisted output index instead of sending comma-joined call IDs.
-- Bound Responses style copy to the selected candidate call ID when both response and image-call linkage are present.
-- Added worker and OpenAI service tests for selected-candidate linkage.
-
-Commits:
-
-- `9ab4163 fix(10): resolve selected OpenAI style-copy linkage`
-- `f80d1b8 fix(10): bind OpenAI style copy to selected candidate`
-
-### Responses Image Payload Correctness
+### CR-02: Responses style-copy requires two outputs but makes only one tool request
 
 Status: fixed
 
-- Detected target image MIME type before constructing Responses `input_image` data URLs.
-- Pinned the Responses hosted `image_generation` tool to `gpt-image-2` through the configured model.
-- Added JPEG/WEBP MIME tests and model pinning assertions.
+- Changed linked OpenAI style-copy to issue two explicit one-candidate `responses.create()` calls.
+- Added per-candidate prompt text and forced the hosted `image_generation` tool via `tool_choice`.
+- Combined the two Responses outputs into one result with `externalRequestCount: 2`, per-candidate response IDs, and stable candidate metadata.
+- Updated OpenAI image service tests to assert two requests, one candidate per request, and `item_reference` linkage.
 
-Commits:
+Commit: `22da187 fix(10): make OpenAI Responses style copy deterministic`
 
-- `8718c4c fix(10): label OpenAI Responses target MIME correctly`
-- `5323a96 fix(10): pin Responses image tool to GPT Image 2`
-
-### Unsupported Continuation UI States
+### CR-03: Partial edit persists `completed` generations before outputs are safely saved
 
 Status: fixed
 
-- Disabled same-condition regeneration for one-output OpenAI partial-edit results.
-- Converted malformed OpenAI style-copy start URLs with missing `imageId` into an actionable error instead of a permanent loading state.
+- Changed Gemini and OpenAI partial-edit child generations to start as `processing`.
+- Marked child generations `completed` only after image persistence, metadata persistence, and history writes finish.
+- Added failure compensation so any child generation created before a persistence failure is marked `failed` with the original error message.
+- Added route coverage for successful status transitions and failed OpenAI output persistence.
 
-Commit: `48391dc fix(10): guard unsupported continuation UI states`
+Commit: `54420da fix(10): harden partial edit persistence`
 
-### Linkage Fallback Accounting
-
-Status: fixed
-
-- Counted the failed Responses linkage attempt when the worker falls back to selected-image style copy.
-- Persisted fallback trace metadata including `linkageFallbackUsed` and fallback reason.
-
-Commit: `9ab4163 fix(10): resolve selected OpenAI style-copy linkage`
-
-### Stale Style Source And Character Lineage
+### WR-01: Invalid edit payloads throw outside the route error handling
 
 Status: fixed
 
-- Failed stale queued `selectedImageId` values instead of silently falling back to a different style candidate.
-- Cleared the previous `ipCharacterId` when an `ip-change` style-copy continuation uploads a replacement character image.
-- Preserved the previous character ID for `new-product` continuation where the original character remains the intended subject.
+- Replaced `EditRequestSchema.parse()` with `safeParse()`.
+- Malformed edit bodies now return the route's structured `400 INVALID_REQUEST` response before generation lookup or vendor calls.
+- Added route coverage for invalid edit payloads.
 
-Commit: `7201bd7 fix(10): close OpenAI style-copy review warnings`
+Commit: `54420da fix(10): harden partial edit persistence`
+
+### WR-02: Generation records can be left permanently pending when queue enqueue fails
+
+Status: fixed
+
+- Wrapped `addGenerationJob()` in compensation logic after generation row creation.
+- If enqueue fails, the just-created generation is marked `failed` with the enqueue error and the original error is rethrown.
+- Added generation service coverage for Redis/BullMQ enqueue failure.
+
+Commit: `6b3a55c fix(10): fail generations when enqueue fails`
 
 ## Verification
 
 Passed:
 
 ```bash
-pnpm --filter @mockup-ai/api test -- src/__tests__/worker.provider-continuation.test.ts src/services/__tests__/generation.service.test.ts
+pnpm --filter @mockup-ai/api test -- src/services/__tests__/openai-image.service.test.ts
 ```
 
-Result: 2 test files passed, 38 tests passed.
+Result: 1 test file passed, 20 tests passed.
 
 Passed:
 
 ```bash
-pnpm --filter @mockup-ai/api test && pnpm --filter @mockup-ai/api type-check && pnpm --filter @mockup-ai/web type-check
+pnpm --filter @mockup-ai/api test -- src/routes/__tests__/edit.routes.test.ts
 ```
 
-Result: API Vitest passed 12 test files / 152 tests, API `tsc --noEmit` passed, and web `tsc --noEmit` passed.
+Result: 1 test file passed, 9 tests passed.
 
-Final re-review passed:
+Passed:
 
 ```bash
-pnpm --filter @mockup-ai/api test -- src/services/__tests__/openai-image.service.test.ts src/__tests__/worker.provider-continuation.test.ts src/routes/__tests__/generation.routes.test.ts src/routes/__tests__/edit.routes.test.ts src/services/__tests__/generation.service.test.ts
+pnpm --filter @mockup-ai/api test -- src/services/__tests__/generation.service.test.ts
+```
+
+Result: 1 test file passed, 30 tests passed.
+
+Passed:
+
+```bash
+pnpm --filter @mockup-ai/api test -- src/__tests__/worker.provider-continuation.test.ts src/routes/__tests__/edit.routes.test.ts src/routes/__tests__/generation.routes.test.ts src/services/__tests__/generation.service.test.ts src/services/__tests__/openai-image.service.test.ts
+```
+
+Result: 5 test files passed, 77 tests passed.
+
+Passed:
+
+```bash
 pnpm --filter @mockup-ai/api type-check
 pnpm --filter @mockup-ai/web type-check
 ```
 
-Result: targeted API Vitest passed 5 test files / 74 tests, API type-check passed, and web type-check passed.
+Result: API `tsc --noEmit` passed and web `tsc --noEmit` passed.
 
 ## Remaining Manual Gate
 
-Automated review and regression coverage are clean. Live OpenAI partial edit and style-copy smoke remain `blocked_manual_needed` in `10-SMOKE.md` because the current session does not have a running local app/DB stack, exported shell `OPENAI_API_KEY`, completed selected OpenAI result, or approved target images for live OpenAI transmission.
+No code-review fix findings remain in this pass. Live OpenAI partial edit and style-copy smoke remains a separate manual gate already tracked in `10-SMOKE.md`.
