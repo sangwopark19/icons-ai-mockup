@@ -61,7 +61,7 @@
     3. Layout, silhouette, and key character/product details remain preserved while realistic material treatment is applied
     4. Transparent-background requests succeed through background-removal post-processing rather than unsupported direct model output
 
-- [ ] **Phase 10: Provider-Aware Result Continuation**
+- [x] **Phase 10: Provider-Aware Result Continuation** — completed 2026-04-29; human UAT pending
   - Goal: make result pages, history, regenerate, edit, and style-copy flows stay pinned to the originating provider
   - Requirements: `PROV-03`, `PROV-04`, `OED-01`, `OED-02`, `OED-03`
   - Required skills: `mockup-openai-dual-provider`, `mockup-openai-workflows`, `mockup-openai-image-runtime`, `mockup-precision-edit`, `mockup-openai-cli-smoke`
@@ -140,7 +140,7 @@
 | Milestone | Phases | Plans | Status | Shipped |
 |-----------|--------|-------|--------|---------|
 | v1.0 AI Mockup Admin Panel | 1-6 | 18/18 | Shipped | 2026-04-23 |
-| v1.1 OpenAI GPT Image 2 Dual Provider | 7-10 | 4/8 | In Progress | — |
+| v1.1 OpenAI GPT Image 2 Dual Provider | 7-10 | 11/19 | In Progress | — |
 
 ## Next
 
