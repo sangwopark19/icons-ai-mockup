@@ -1222,6 +1222,19 @@ describe('AdminService - createApiKey', () => {
 
     expect(vi.mocked(encrypt)).toHaveBeenCalled();
   });
+
+  it('should reject short API keys before encryption or storage', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { encrypt } = await import('../../lib/crypto.js');
+    const { adminService } = await import('../admin.service.js');
+
+    await expect(adminService.createApiKey('openai', 'Short', 'abcd')).rejects.toThrow(
+      'API 키가 너무 짧습니다'
+    );
+
+    expect(vi.mocked(encrypt)).not.toHaveBeenCalled();
+    expect(vi.mocked(prisma.apiKey.create)).not.toHaveBeenCalled();
+  });
 });
 
 describe('AdminService - deleteApiKey', () => {

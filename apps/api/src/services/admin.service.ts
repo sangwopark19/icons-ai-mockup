@@ -793,8 +793,12 @@ export class AdminService {
     const provider: ApiKeyProvider = rawKey ? (providerOrAlias as ApiKeyProvider) : 'gemini';
     const alias = rawKey ? aliasOrRawKey : providerOrAlias;
     const keyToStore = rawKey ?? aliasOrRawKey;
-    const maskedKey = keyToStore.slice(-4);
-    const encryptedKey = encrypt(keyToStore, getEncryptionKey());
+    const trimmedKey = keyToStore.trim();
+    if (trimmedKey.length < 8) {
+      throw new Error('API 키가 너무 짧습니다');
+    }
+    const maskedKey = trimmedKey.slice(-4);
+    const encryptedKey = encrypt(trimmedKey, getEncryptionKey());
 
     const created = await prisma.apiKey.create({
       data: { provider, alias, encryptedKey, maskedKey, isActive: false },
