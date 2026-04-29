@@ -1,5 +1,12 @@
 import OpenAI, { toFile } from 'openai';
 import type { HardwareSpec } from '@mockup-ai/shared/types';
+import type {
+  EasyInputMessage,
+  ResponseCreateParamsNonStreaming,
+  ResponseInputImage,
+  ResponseInputItem,
+  ResponseInputText,
+} from 'openai/resources/responses/responses';
 
 export type OpenAIQuality = 'low' | 'medium' | 'high';
 
@@ -406,43 +413,50 @@ export class OpenAIImageService {
     });
     const quality = options.quality ?? 'medium';
     const responsesModel = process.env.OPENAI_RESPONSES_IMAGE_MODEL ?? 'gpt-5.5';
-    const prompt = this.buildStyleCopyPrompt(options);
+    const prompt = this.buildStyleCopyPrompt(options, 1);
     const targetBuffer = this.decodeBase64Image(targetImageBase64);
     const targetMimeType = this.detectMimeType(targetBuffer);
     const targetImageInput = {
       type: 'input_image',
+      detail: 'auto',
       image_url: `data:${targetMimeType};base64,${targetBuffer.toString('base64')}`,
-    };
-    const userInput = {
-      role: 'user',
-      content: [{ type: 'input_text', text: prompt }, targetImageInput],
-    };
+    } satisfies ResponseInputImage;
     const baseRequest = {
       model: responsesModel,
       tools: [{ type: 'image_generation', model: this.model, action: 'edit', quality }],
-    };
+      tool_choice: { type: 'image_generation' },
+    } satisfies Pick<ResponseCreateParamsNonStreaming, 'model' | 'tools' | 'tool_choice'>;
+    const responses: OpenAIResponsesImageResponse[] = [];
 
-    let request: Record<string, unknown>;
-    if (linkage.openaiImageCallId) {
-      request = {
+    for (let index = 0; index < 2; index++) {
+      const candidatePrompt = `${prompt}\n\nCandidate request:\n- Generate candidate ${index + 1} of 2.`;
+      const userInput = {
+        role: 'user',
+        content: [
+          { type: 'input_text', text: candidatePrompt } satisfies ResponseInputText,
+          targetImageInput,
+        ],
+      } satisfies EasyInputMessage;
+      let input: ResponseInputItem[];
+
+      if (linkage.openaiImageCallId) {
+        input = [userInput, { type: 'item_reference', id: linkage.openaiImageCallId }];
+      } else if (linkage.openaiResponseId) {
+        input = [userInput];
+      } else {
+        throw new Error('OpenAI 스타일 복사 linkage가 없습니다');
+      }
+
+      const request = {
         ...baseRequest,
-        input: [userInput, { type: 'image_generation_call', id: linkage.openaiImageCallId }],
-      };
-    } else if (linkage.openaiResponseId) {
-      request = {
-        ...baseRequest,
-        previous_response_id: linkage.openaiResponseId,
-        input: [userInput],
-      };
-    } else {
-      throw new Error('OpenAI 스타일 복사 linkage가 없습니다');
+        ...(linkage.openaiImageCallId ? {} : { previous_response_id: linkage.openaiResponseId }),
+        input,
+      } satisfies ResponseCreateParamsNonStreaming;
+
+      responses.push((await client.responses.create(request)) as OpenAIResponsesImageResponse);
     }
 
-    const response = (await client.responses.create(
-      request as never
-    )) as OpenAIResponsesImageResponse;
-
-    return this.extractResponsesImageResult(response, {
+    return this.extractResponsesImageResult(responses, {
       responsesModel,
       quality,
     });
@@ -612,7 +626,7 @@ Output:
 - Return exactly one clean product-review edit candidate.`;
   }
 
-  private buildStyleCopyPrompt(options: OpenAIStyleCopyOptions): string {
+  private buildStyleCopyPrompt(options: OpenAIStyleCopyOptions, outputCount = 2): string {
     const changeLine =
       options.copyTarget === 'ip-change'
         ? 'Replace only the character/IP artwork.'
@@ -623,6 +637,11 @@ Output:
     const additionalInstruction = normalizedUserInstructions
       ? `\n- Additional target instructions: "${normalizedUserInstructions}"`
       : '';
+
+    const outputText =
+      outputCount === 1
+        ? 'Return exactly one clean product-review style-copy candidate.'
+        : 'Return exactly two clean product-review style-copy candidates.';
 
     return `Task:
 Edit the approved OpenAI result by preserving its composition and treatment while replacing only the requested target.
@@ -646,7 +665,7 @@ Hard constraints:
 - Do not ask for or create direct transparent output from GPT Image 2.
 
 Output:
-- Return exactly two clean product-review style-copy candidates.`;
+- ${outputText}`;
   }
 
   private extractImageApiResult(
@@ -709,27 +728,32 @@ Output:
   }
 
   private extractResponsesImageResult(
-    response: OpenAIResponsesImageResponse,
+    responses: OpenAIResponsesImageResponse[],
     options: {
       responsesModel: string;
       quality: OpenAIQuality;
     }
   ): OpenAIImageGenerationResult {
-    const generatedItems = (response.output ?? []).filter(
-      (item) => item.type === 'image_generation_call' && item.result
+    const generatedItems = responses.flatMap((response) =>
+      (response.output ?? [])
+        .filter((item) => item.type === 'image_generation_call' && item.result)
+        .map((item) => ({ response, item }))
     );
 
     if (generatedItems.length !== 2) {
       throw new Error('OpenAI 스타일 복사 결과 이미지는 정확히 2개여야 합니다');
     }
 
-    const requestIds = response._request_id ? [response._request_id] : [];
+    const requestIds = responses
+      .map((response) => response._request_id)
+      .filter(Boolean) as string[];
+    const responseIds = responses.map((response) => response.id).filter(Boolean) as string[];
     const images: Buffer[] = [];
     const imageCallIds: string[] = [];
     const revisedPrompts: string[] = [];
     const candidates: Array<Record<string, unknown>> = [];
 
-    for (const [index, item] of generatedItems.entries()) {
+    for (const [index, { response, item }] of generatedItems.entries()) {
       images.push(Buffer.from(item.result as string, 'base64'));
       if (item.id) imageCallIds.push(item.id);
       if (item.call_id) imageCallIds.push(item.call_id);
@@ -746,7 +770,7 @@ Output:
     return {
       images,
       requestIds,
-      responseId: response.id,
+      responseId: responseIds.at(-1),
       imageCallIds,
       revisedPrompt: revisedPrompts[0],
       providerTrace: {
@@ -758,8 +782,9 @@ Output:
         quality: options.quality,
         outputCount: images.length,
         candidateCount: images.length,
-        externalRequestCount: 1,
+        externalRequestCount: responses.length,
         sdkMaxRetries: this.sdkMaxRetries,
+        responseIds,
         candidates,
       },
     };
