@@ -308,39 +308,54 @@ export class GenerationService {
       },
     });
 
-    // 작업 큐에 추가
-    await addGenerationJob({
-      generationId: generation.id,
-      userId,
-      projectId: input.projectId,
-      mode: input.mode,
-      provider,
-      providerModel,
-      styleReferenceId: input.styleReferenceId,
-      copyTarget: input.copyTarget,
-      selectedImageId: input.selectedImageId,
-      sourceImagePath: validatedPaths.sourceImagePath,
-      characterImagePath,
-      textureImagePath: validatedPaths.textureImagePath,
-      prompt: input.prompt,
-      options: {
-        preserveStructure: input.options?.preserveStructure ?? false,
-        transparentBackground: input.options?.transparentBackground ?? false,
-        preserveHardware: input.options?.preserveHardware ?? false,
-        fixedBackground: input.options?.fixedBackground ?? true,
-        fixedViewpoint: input.options?.fixedViewpoint ?? true,
-        removeShadows: input.options?.removeShadows ?? false,
-        userInstructions: userInstructions || undefined,
-        hardwareSpecInput: hardwareSpecInput || undefined,
-        productCategory: productCategory || undefined,
-        productCategoryOther: productCategoryOther || undefined,
-        materialPreset: materialPreset || undefined,
-        materialOther: materialOther || undefined,
-        quality: input.options?.quality,
-        hardwareSpecs: input.options?.hardwareSpecs,
-        outputCount: input.options?.outputCount ?? 2,
-      },
-    });
+    try {
+      // 작업 큐에 추가
+      await addGenerationJob({
+        generationId: generation.id,
+        userId,
+        projectId: input.projectId,
+        mode: input.mode,
+        provider,
+        providerModel,
+        styleReferenceId: input.styleReferenceId,
+        copyTarget: input.copyTarget,
+        selectedImageId: input.selectedImageId,
+        sourceImagePath: validatedPaths.sourceImagePath,
+        characterImagePath,
+        textureImagePath: validatedPaths.textureImagePath,
+        prompt: input.prompt,
+        options: {
+          preserveStructure: input.options?.preserveStructure ?? false,
+          transparentBackground: input.options?.transparentBackground ?? false,
+          preserveHardware: input.options?.preserveHardware ?? false,
+          fixedBackground: input.options?.fixedBackground ?? true,
+          fixedViewpoint: input.options?.fixedViewpoint ?? true,
+          removeShadows: input.options?.removeShadows ?? false,
+          userInstructions: userInstructions || undefined,
+          hardwareSpecInput: hardwareSpecInput || undefined,
+          productCategory: productCategory || undefined,
+          productCategoryOther: productCategoryOther || undefined,
+          materialPreset: materialPreset || undefined,
+          materialOther: materialOther || undefined,
+          quality: input.options?.quality,
+          hardwareSpecs: input.options?.hardwareSpecs,
+          outputCount: input.options?.outputCount ?? 2,
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '작업 큐 등록에 실패했습니다';
+      await Promise.resolve(
+        prisma.generation.update({
+          where: { id: generation.id },
+          data: {
+            status: 'failed',
+            errorMessage: message,
+            completedAt: new Date(),
+          },
+        })
+      ).catch(() => undefined);
+      throw error;
+    }
 
     return generation;
   }
@@ -581,8 +596,8 @@ export class GenerationService {
 
     const isStyleCopyRegeneration = Boolean(
       regenerationInput.styleReferenceId &&
-        regenerationInput.copyTarget &&
-        regenerationInput.selectedImageId
+      regenerationInput.copyTarget &&
+      regenerationInput.selectedImageId
     );
 
     if ((replayInput.selectedImageId || replayInput.sourceImageId) && !isStyleCopyRegeneration) {
@@ -738,8 +753,7 @@ export class GenerationService {
 
     const userInstructions =
       input.userInstructions?.trim() || (options.userInstructions as string | undefined);
-    const replacesCharacter =
-      input.copyTarget === 'ip-change' && Boolean(input.characterImagePath);
+    const replacesCharacter = input.copyTarget === 'ip-change' && Boolean(input.characterImagePath);
 
     return this.create(userId, {
       projectId: original.projectId,

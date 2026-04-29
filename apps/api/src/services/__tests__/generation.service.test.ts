@@ -130,6 +130,41 @@ describe('GenerationService - provider contract', () => {
     });
   });
 
+  it('marks a created generation failed when queue enqueue fails', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { addGenerationJob } = await import('../../lib/queue.js');
+    const { generationService } = await import('../generation.service.js');
+
+    vi.mocked(prisma.project.findFirst).mockResolvedValue({ id: 'proj1', userId: 'u1' } as any);
+    vi.mocked(prisma.generation.create).mockResolvedValue({
+      id: 'gen-enqueue-failed',
+      projectId: 'proj1',
+      status: 'pending',
+      mode: 'ip_change',
+      provider: 'gemini',
+      providerModel: 'gemini-3-pro-image-preview',
+    } as any);
+    vi.mocked(addGenerationJob).mockRejectedValueOnce(new Error('redis unavailable'));
+
+    await expect(
+      generationService.create('u1', {
+        projectId: 'proj1',
+        mode: 'ip_change',
+        sourceImagePath: 'uploads/u1/proj1/source.png',
+        characterImagePath: 'characters/u1/character.png',
+      })
+    ).rejects.toThrow('redis unavailable');
+
+    expect(vi.mocked(prisma.generation.update)).toHaveBeenCalledWith({
+      where: { id: 'gen-enqueue-failed' },
+      data: {
+        status: 'failed',
+        errorMessage: 'redis unavailable',
+        completedAt: expect.any(Date),
+      },
+    });
+  });
+
   it('accepts OpenAI sketch_to_real with product and material options', async () => {
     const { prisma } = await import('../../lib/prisma.js');
     const { addGenerationJob } = await import('../../lib/queue.js');
