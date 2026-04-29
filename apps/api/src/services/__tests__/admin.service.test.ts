@@ -686,6 +686,42 @@ describe('AdminService - retryGeneration', () => {
     );
   });
 
+  it('requeues failed OpenAI style-copy retry with persisted continuation metadata', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { addGenerationJob } = await import('../../lib/queue.js');
+    const { adminService } = await import('../admin.service.js');
+    const openAIStyleCopyGeneration = {
+      ...mockGeneration,
+      provider: 'openai',
+      providerModel: 'gpt-image-2',
+      styleReferenceId: 'source-style-generation',
+      promptData: {
+        ...mockGeneration.promptData,
+        copyTarget: 'ip-change',
+        selectedImageId: 'style-source-image-2',
+      },
+    };
+
+    vi.mocked(prisma.generation.findUnique).mockResolvedValue(openAIStyleCopyGeneration as any);
+    vi.mocked(prisma.generation.update).mockResolvedValue({
+      ...openAIStyleCopyGeneration,
+      status: 'pending',
+    } as any);
+    vi.mocked(addGenerationJob).mockResolvedValue({} as any);
+
+    await adminService.retryGeneration('gen1');
+
+    expect(vi.mocked(addGenerationJob)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: 'openai',
+        providerModel: 'gpt-image-2',
+        styleReferenceId: 'source-style-generation',
+        copyTarget: 'ip-change',
+        selectedImageId: 'style-source-image-2',
+      })
+    );
+  });
+
   it('preserves OpenAI sketch_to_real options when retrying a failed generation', async () => {
     const { prisma } = await import('../../lib/prisma.js');
     const { addGenerationJob } = await import('../../lib/queue.js');
