@@ -4,10 +4,10 @@
 
 | Check | Status | Evidence |
 |---|---|---|
-| `pnpm --filter @mockup-ai/api test` | passed | Exit 0. Vitest passed 12 test files / 145 tests. |
+| `pnpm --filter @mockup-ai/api test` | passed | Exit 0. Vitest passed 12 test files / 152 tests. |
 | `pnpm --filter @mockup-ai/api type-check` | passed | Exit 0. `tsc --noEmit` completed. |
 | `pnpm --filter @mockup-ai/web type-check` | passed | Exit 0. `tsc --noEmit` completed. |
-| `pnpm --filter @mockup-ai/api test && pnpm --filter @mockup-ai/api type-check && pnpm --filter @mockup-ai/web type-check` | passed | Exit 0. Full phase verification command completed after the individual runs. |
+| `pnpm --filter @mockup-ai/api test && pnpm --filter @mockup-ai/api type-check && pnpm --filter @mockup-ai/web type-check` | passed | Exit 0. Full phase verification command completed after the review-fix pass. API Vitest passed 12 test files / 152 tests. |
 
 ## Product UI Metadata Boundary
 
