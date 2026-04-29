@@ -73,7 +73,7 @@
     4. OpenAI style-copy and iterative follow-ups use OpenAI lineage rather than Gemini-only `thoughtSignature`
     5. Follow-up actions on Gemini and OpenAI results no longer drift into the wrong provider runtime
 
-- [ ] **Phase 11: OpenAI Style-Copy Retry Recovery**
+- [x] **Phase 11: OpenAI Style-Copy Retry Recovery** — completed 2026-04-29
   - Goal: reconnect admin retry recovery with OpenAI style-copy continuation metadata
   - Requirements: `OPS-03`, `OED-02`, `OED-03`
   - Gap Closure: closes v1.1 audit blocker where `AdminService.retryGeneration()` omits `copyTarget` and `selectedImageId`
@@ -205,6 +205,6 @@
 
 ## Next
 
-**Phase 11: OpenAI Style-Copy Retry Recovery** — first gap-closure phase from the v1.1 milestone audit.
+**Phase 12: OpenAI Sketch Verification Closure** — close Phase 9 verification and transparent-background evidence gaps.
 
-Run `$gsd-plan-phase 11` to plan the admin retry metadata fix.
+Run `$gsd-plan-phase 12` to plan the Sketch verification closure.
