@@ -16,10 +16,33 @@ interface GenerationDetailResponse {
   data?: GenerationDetail;
 }
 
+interface UploadResponse {
+  success: boolean;
+  data?: {
+    filePath: string;
+  };
+  error?: {
+    message?: string;
+  };
+}
+
+interface CopyStyleResponse {
+  success: boolean;
+  data?: {
+    id: string;
+  };
+  error?: {
+    message?: string;
+  };
+}
+
 const GENERIC_START_ERROR =
   '후속 작업을 시작하지 못했습니다. 저장된 입력과 선택 이미지를 확인한 뒤 다시 시도해주세요.';
 const MISSING_STYLE_REFERENCE_ERROR =
   '스타일 기준 이미지를 확인할 수 없습니다. 히스토리에서 결과를 다시 열어주세요.';
+const REQUIRED_TARGET_ERROR = '새 대상 이미지를 업로드해주세요.';
+const SUBMIT_ERROR =
+  '스타일 복사 생성에 실패했습니다. 기준 결과와 새 대상 이미지를 확인한 뒤 다시 시도해주세요.';
 
 const COPY_TARGET_CONFIG: Record<
   CopyTarget,
@@ -73,6 +96,8 @@ export default function OpenAIStyleCopyPage() {
   const [targetImage, setTargetImage] = useState<File | null>(null);
   const [targetPreview, setTargetPreview] = useState<string | null>(null);
   const [userInstructions, setUserInstructions] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const hasBlockingError = Boolean(styleFetchError) || !styleGeneration || !styleImage || !copyTarget;
   const isTargetDisabled = hasBlockingError || isFetchingStyle;
@@ -153,6 +178,7 @@ export default function OpenAIStyleCopyPage() {
 
   const handleTargetUpload = (file: File) => {
     setTargetImage(file);
+    setSubmitError(null);
 
     const reader = new FileReader();
     reader.onload = (event) => setTargetPreview(event.target?.result as string);
@@ -162,6 +188,91 @@ export default function OpenAIStyleCopyPage() {
   const handleTargetRemove = () => {
     setTargetImage(null);
     setTargetPreview(null);
+  };
+
+  const uploadTargetImage = async (file: File): Promise<string> => {
+    if (!accessToken || !targetConfig) {
+      throw new Error(SUBMIT_ERROR);
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await apiFetch(targetConfig.uploadEndpoint(projectId), {
+      method: 'POST',
+      token: accessToken,
+      body: formData,
+    });
+
+    const data = (await response.json()) as UploadResponse;
+    if (!response.ok || !data.success || !data.data?.filePath) {
+      throw new Error(data.error?.message || SUBMIT_ERROR);
+    }
+
+    return data.data.filePath;
+  };
+
+  const handleGenerate = async () => {
+    if (
+      !accessToken ||
+      !styleRef ||
+      !imageId ||
+      !copyTarget ||
+      !styleGeneration ||
+      !styleImage ||
+      hasBlockingError ||
+      isGenerating
+    ) {
+      return;
+    }
+
+    setSubmitError(null);
+
+    if (!targetImage) {
+      setSubmitError(REQUIRED_TARGET_ERROR);
+      return;
+    }
+
+    setIsGenerating(true);
+
+    try {
+      const uploadedTargetPath = await uploadTargetImage(targetImage);
+      const trimmedInstructions = userInstructions.trim();
+      const body =
+        copyTarget === 'ip-change'
+          ? {
+              copyTarget: 'ip-change',
+              selectedImageId: imageId,
+              characterImagePath: uploadedTargetPath,
+              userInstructions: trimmedInstructions || undefined,
+            }
+          : {
+              copyTarget: 'new-product',
+              selectedImageId: imageId,
+              sourceImagePath: uploadedTargetPath,
+              userInstructions: trimmedInstructions || undefined,
+            };
+
+      const response = await apiFetch(`/api/generations/${styleRef}/copy-style`, {
+        method: 'POST',
+        token: accessToken,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+
+      const data = (await response.json()) as CopyStyleResponse;
+      if (!response.ok || !data.success || !data.data?.id) {
+        throw new Error(data.error?.message || SUBMIT_ERROR);
+      }
+
+      router.push(`/projects/${projectId}/generations/${data.data.id}`);
+    } catch {
+      setSubmitError(SUBMIT_ERROR);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   if (authLoading) {
@@ -197,6 +308,11 @@ export default function OpenAIStyleCopyPage() {
         {styleFetchError && (
           <div className="mb-6 rounded-lg bg-red-500/10 p-4 text-sm text-red-500">
             {styleFetchError}
+          </div>
+        )}
+        {submitError && (
+          <div className="mb-6 rounded-lg bg-red-500/10 p-4 text-sm text-red-500">
+            {submitError}
           </div>
         )}
 
@@ -247,7 +363,7 @@ export default function OpenAIStyleCopyPage() {
               removeAriaLabel={targetConfig?.removeAriaLabel ?? '새 대상 이미지 제거'}
               onUpload={handleTargetUpload}
               onRemove={handleTargetRemove}
-              onError={setStyleFetchError}
+              onError={setSubmitError}
               preview={targetPreview}
               className={isTargetDisabled ? 'pointer-events-none opacity-50' : undefined}
             />
@@ -257,15 +373,20 @@ export default function OpenAIStyleCopyPage() {
                 label="추가 지시사항"
                 value={userInstructions}
                 onChange={(event) => setUserInstructions(event.target.value)}
-                disabled={isTargetDisabled}
+                disabled={isTargetDisabled || isGenerating}
               />
               <p className="mt-2 text-sm text-[var(--text-tertiary)]">
                 교체 대상에 대한 요청만 입력하세요. 구도와 배경 변경 요청은 반영하지 않습니다.
               </p>
             </div>
 
-            <Button className="w-full" disabled={isTargetDisabled || !targetImage}>
-              v2 스타일 복사 생성하기
+            <Button
+              className="w-full"
+              onClick={handleGenerate}
+              isLoading={isGenerating}
+              disabled={isTargetDisabled}
+            >
+              {isGenerating ? '스타일을 복사한 두 후보를 생성 중...' : 'v2 스타일 복사 생성하기'}
             </Button>
           </section>
         </div>
