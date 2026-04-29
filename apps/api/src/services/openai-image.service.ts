@@ -31,6 +31,11 @@ export interface OpenAISketchToRealOptions {
   prompt?: string;
 }
 
+export interface OpenAIPartialEditOptions {
+  quality?: OpenAIQuality;
+  userPrompt: string;
+}
+
 export interface OpenAIImageGenerationResult {
   images: Buffer[];
   requestIds: string[];
@@ -243,6 +248,80 @@ export class OpenAIImageService {
     };
   }
 
+  async generatePartialEdit(
+    apiKey: string,
+    selectedImageBase64: string,
+    userPrompt: string,
+    options?: { quality?: OpenAIQuality }
+  ): Promise<OpenAIImageGenerationResult> {
+    const client = new OpenAI({
+      apiKey,
+      maxRetries: this.sdkMaxRetries,
+      timeout: 60_000,
+    });
+    const quality = options?.quality ?? 'medium';
+    const prompt = this.buildPartialEditPrompt({ quality, userPrompt });
+    const selectedBuffer = this.decodeBase64Image(selectedImageBase64);
+    const selectedMimeType = this.detectMimeType(selectedBuffer);
+    const selectedImage = await toFile(
+      selectedBuffer,
+      `selected-result.${this.extensionForMimeType(selectedMimeType)}`,
+      { type: selectedMimeType }
+    );
+
+    const response = (await client.images.edit({
+      model: this.model,
+      image: selectedImage,
+      prompt,
+      quality,
+      n: 1,
+      size: '1024x1024',
+      output_format: 'png',
+    })) as OpenAIImageResponse;
+
+    const responseImages = response.data ?? [];
+    if (responseImages.length !== 1) {
+      throw new Error('OpenAI 부분 수정 결과 이미지는 정확히 1개여야 합니다');
+    }
+
+    const image = responseImages[0];
+    if (!image?.b64_json) {
+      throw new Error('OpenAI 부분 수정 결과 이미지가 없습니다');
+    }
+
+    const requestIds = response._request_id ? [response._request_id] : [];
+    const imageCallIds = [image.id, image.call_id].filter(Boolean) as string[];
+    const revisedPrompt = image.revised_prompt;
+
+    return {
+      images: [Buffer.from(image.b64_json, 'base64')],
+      requestIds,
+      responseId: response.id,
+      imageCallIds,
+      revisedPrompt,
+      providerTrace: {
+        provider: 'openai',
+        model: this.model,
+        endpoint: 'images.edit',
+        workflow: 'partial_edit',
+        quality,
+        outputCount: 1,
+        candidateCount: 1,
+        externalRequestCount: 1,
+        sdkMaxRetries: this.sdkMaxRetries,
+        candidates: [
+          {
+            index: 1,
+            requestId: response._request_id ?? null,
+            responseId: response.id ?? null,
+            imageCallId: image.id ?? image.call_id ?? null,
+            revisedPrompt: revisedPrompt ?? null,
+          },
+        ],
+      },
+    };
+  }
+
   buildIPChangePrompt(options: OpenAIIPChangeOptions): string {
     const preserveRules = [
       'Preserve product geometry, dimensions, crop, camera viewpoint, perspective, material, lighting, hardware, label placement, non-character text, and non-target areas.',
@@ -381,6 +460,43 @@ Hard constraints:
 
 Output:
 ${outputRules.map((rule) => `- ${rule}`).join('\n')}`;
+  }
+
+  private buildPartialEditPrompt(options: OpenAIPartialEditOptions): string {
+    const normalizedUserPrompt = this.normalizeUserControlledPromptText(options.userPrompt);
+
+    return `Task:
+Edit Image 1 by changing only the user requested target while preserving every non-target detail.
+
+Must change:
+- User requested target/change: "${normalizedUserPrompt}"
+
+Must preserve exactly:
+- Product body, camera angle, crop, background rule, lighting, text, labels, hardware, and non-target details.
+
+Hard constraints:
+- These hard constraints override any conflicting user instructions.
+- Do not restyle the image.
+- Do not add or remove objects.
+- Do not change surrounding areas.
+- Do not change camera angle, layout, background, shadows, product scale, text, labels, hardware, or non-target details unless explicitly named in Must change.
+- Do not ask for or create direct transparent output from GPT Image 2.
+
+Output:
+- Return exactly one clean product-review edit candidate.`;
+  }
+
+  private normalizeUserControlledPromptText(value: string): string {
+    const blockedHeaderPattern =
+      /^(Task|Image roles|Must change|Must preserve exactly|Must preserve|Hard constraints|Output|User instructions)\s*:/i;
+
+    return value
+      .replace(/\r\n?/g, '\n')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => line.replace(blockedHeaderPattern, (_match, header: string) => `[${header}]`))
+      .join(' ');
   }
 
   private decodeBase64Image(value: string): Buffer {
