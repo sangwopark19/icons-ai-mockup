@@ -202,7 +202,7 @@ describe('processGenerationJob provider continuation', () => {
       Buffer.from(`file:${jobData.characterImagePath}`).toString('base64'),
       expect.objectContaining({
         openaiResponseId: 'resp-style',
-        openaiImageCallId: null,
+        openaiImageCallId: undefined,
         providerTrace: expect.objectContaining({ workflow: 'ip_change' }),
       }),
       expect.objectContaining({
@@ -216,6 +216,33 @@ describe('processGenerationJob provider continuation', () => {
       'generations/user-1/project-1/style-ref-1/output_2.png'
     );
     expect(geminiService.generateWithStyleCopy).not.toHaveBeenCalled();
+  });
+
+  it('uses the selected candidate image call id when only persisted image-call linkage exists', async () => {
+    const jobData = baseOpenAIJob();
+    mockGenerationLookup(
+      generationRecord(),
+      openAIReference({
+        openaiResponseId: null,
+        openaiImageCallId: 'call-style-1,call-style-2',
+        providerTrace: { workflow: 'ip_change', candidateCount: 2 },
+      })
+    );
+
+    await processGenerationJob({ data: jobData });
+
+    expect(openaiImageService.generateStyleCopyWithLinkage).toHaveBeenCalledWith(
+      'openai-key',
+      Buffer.from(`file:${jobData.characterImagePath}`).toString('base64'),
+      expect.objectContaining({
+        openaiResponseId: null,
+        openaiImageCallId: 'call-style-2',
+      }),
+      expect.objectContaining({ copyTarget: 'ip-change' })
+    );
+    expect(
+      JSON.stringify(vi.mocked(openaiImageService.generateStyleCopyWithLinkage).mock.calls[0][2])
+    ).not.toContain('call-style-1,call-style-2');
   });
 
   it('falls back to selected style image when OpenAI linkage is missing', async () => {
@@ -262,6 +289,7 @@ describe('processGenerationJob provider continuation', () => {
         }),
       })
     );
+    expect(adminService.incrementCallCount).toHaveBeenCalledWith('openai', 'api-key-1', 2);
   });
 
   it('does not fallback for OpenAI auth or permission linkage errors', async () => {

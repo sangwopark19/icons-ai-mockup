@@ -28,6 +28,11 @@ type GeneratedImageReference = {
   isSelected: boolean;
 };
 
+const getOutputIndexFromFilePath = (filePath: string): number | null => {
+  const match = filePath.match(/output_(\d+)\.(png|jpe?g|webp)$/i);
+  return match ? Number.parseInt(match[1], 10) : null;
+};
+
 const toOpenAIMetadataPayload = (metadata: OpenAIImageGenerationResult) => ({
   requestIds: metadata.requestIds,
   responseId: metadata.responseId,
@@ -199,6 +204,44 @@ const readStyleReferenceImageBase64 = async (
   return referenceBuffer.toString('base64');
 };
 
+const getOpenAIStyleCandidateCallId = (
+  providerTrace: unknown,
+  referenceImage: GeneratedImageReference
+): string | undefined => {
+  if (!providerTrace || typeof providerTrace !== 'object') return undefined;
+
+  const outputIndex = getOutputIndexFromFilePath(referenceImage.filePath);
+  const candidates = (providerTrace as Record<string, unknown>).candidates;
+  if (!Array.isArray(candidates)) return undefined;
+
+  const candidate = candidates.find((item) => {
+    if (!item || typeof item !== 'object') return false;
+    return (item as Record<string, unknown>).index === outputIndex;
+  });
+  if (!candidate || typeof candidate !== 'object') return undefined;
+
+  const imageCallId = (candidate as Record<string, unknown>).imageCallId;
+  return typeof imageCallId === 'string' && imageCallId.trim().length > 0
+    ? imageCallId.trim()
+    : undefined;
+};
+
+const getSelectedOpenAIImageCallId = (
+  openaiImageCallId: string | null | undefined,
+  referenceImage: GeneratedImageReference
+): string | undefined => {
+  if (!openaiImageCallId) return undefined;
+
+  const ids = openaiImageCallId
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (ids.length <= 1) return ids[0];
+
+  const outputIndex = getOutputIndexFromFilePath(referenceImage.filePath);
+  return outputIndex ? ids[outputIndex - 1] : undefined;
+};
+
 const generateOpenAIStyleCopy = async (params: {
   activeApiKey: string;
   userId: string;
@@ -240,9 +283,12 @@ const generateOpenAIStyleCopy = async (params: {
     quality: options.quality,
     userInstructions: options.userInstructions,
   };
+  const selectedImageCallId =
+    getOpenAIStyleCandidateCallId(reference.providerTrace, referenceImage) ??
+    getSelectedOpenAIImageCallId(reference.openaiImageCallId, referenceImage);
   const linkage: OpenAIStyleCopyLinkage & { providerTrace?: unknown } = {
     openaiResponseId: reference.openaiResponseId,
-    openaiImageCallId: reference.openaiImageCallId,
+    openaiImageCallId: selectedImageCallId,
     providerTrace: reference.providerTrace,
   };
   let result: OpenAIImageGenerationResult;
@@ -290,6 +336,9 @@ const generateOpenAIStyleCopy = async (params: {
       styleReferenceId,
       styleSourceImageId: referenceImage.id,
       linkageFallbackUsed,
+      externalRequestCount:
+        getPositiveNumber(result.providerTrace.externalRequestCount, 1) +
+        (linkageFallbackUsed ? 1 : 0),
       ...(linkageFallbackReason ? { linkageFallbackReason } : {}),
     },
   };
