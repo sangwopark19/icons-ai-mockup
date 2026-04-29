@@ -29,14 +29,14 @@ Requirements for milestone v1.1 OpenAI GPT Image 2 Dual Provider.
 ### OpenAI Editing
 
 - [x] **OED-01**: User can request a partial edit on an OpenAI-generated result from the existing result page.
-- [x] **OED-02**: User can create a style-copy generation from an approved OpenAI result while changing only the named target.
-- [x] **OED-03**: User can iterate on OpenAI edits or style-copy follow-ups without mixing state with Gemini-only style memory.
+- [ ] **OED-02**: User can create a style-copy generation from an approved OpenAI result while changing only the named target.
+- [ ] **OED-03**: User can iterate on OpenAI edits or style-copy follow-ups without mixing state with Gemini-only style memory.
 
 ### Operations And Observability
 
 - [x] **OPS-01**: Admin can store and activate OpenAI API keys separately from Gemini API keys. Validated in Phase 7.
 - [x] **OPS-02**: Admin can view provider-aware generation metadata for OpenAI runs, including provider, model, and request identifiers needed for support. Validated in Phase 7.
-- [x] **OPS-03**: System routes each queued generation job to the correct provider runtime based on the saved generation request. Validated in Phase 7 foundation: worker validates saved provider/model and rejects unsupported OpenAI runtime without Gemini fallback.
+- [ ] **OPS-03**: System routes each queued generation job to the correct provider runtime based on the saved generation request. Validated in Phase 7 foundation: worker validates saved provider/model and rejects unsupported OpenAI runtime without Gemini fallback.
 - [x] **OPS-04**: System stores the OpenAI response linkage needed for OpenAI regenerate, style-copy, and multi-turn edit flows. Validated in Phase 7 foundation: schema and admin payload support OpenAI linkage fields; runtime population follows in OpenAI workflow phases.
 
 ## v2 Requirements
@@ -71,28 +71,30 @@ Requirements for milestone v1.1 OpenAI GPT Image 2 Dual Provider.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | PROV-01 | Phase 8 | Pending |
-| PROV-02 | Phase 9 | Pending |
+| PROV-02 | Phase 12 | Pending |
 | PROV-03 | Phase 10 | Complete |
 | PROV-04 | Phase 10 | Complete |
 | OIP-01 | Phase 8 | Pending |
-| OIP-02 | Phase 8 | Pending |
+| OIP-02 | Phase 13 | Pending |
 | OIP-03 | Phase 8 | Pending |
-| OSR-01 | Phase 9 | Pending |
-| OSR-02 | Phase 9 | Pending |
-| OSR-03 | Phase 9 | Pending |
+| OSR-01 | Phase 12 | Pending |
+| OSR-02 | Phase 12 | Pending |
+| OSR-03 | Phase 12 | Pending |
 | OED-01 | Phase 10 | Complete |
-| OED-02 | Phase 10 | Complete |
-| OED-03 | Phase 10 | Complete |
+| OED-02 | Phase 11 | Pending |
+| OED-03 | Phase 11 | Pending |
 | OPS-01 | Phase 7 | Satisfied |
 | OPS-02 | Phase 7 | Satisfied |
-| OPS-03 | Phase 7 | Foundation Satisfied |
+| OPS-03 | Phase 11 | Pending |
 | OPS-04 | Phase 7 | Foundation Satisfied |
 
 **Coverage:**
 - v1 requirements: 17 total
+- Checked complete after audit gap reset: 10
+- Pending gap closure: 7
 - Mapped to phases: 17
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-04-23*
-*Last updated: 2026-04-23 after roadmap creation*
+*Last updated: 2026-04-29 after v1.1 milestone audit gap planning*
