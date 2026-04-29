@@ -161,16 +161,20 @@ const selectStyleReferenceImage = (
   images: GeneratedImageReference[],
   selectedImageId?: string
 ): GeneratedImageReference => {
-  const image =
-    (selectedImageId ? images.find((item) => item.id === selectedImageId) : undefined) ??
-    images.find((item) => item.isSelected) ??
-    images[0];
+  if (selectedImageId) {
+    const selected = images.find((item) => item.id === selectedImageId);
+    if (!selected) {
+      throw new Error('선택한 스타일 기준 이미지를 찾을 수 없습니다');
+    }
+    return selected;
+  }
 
-  if (!image) {
+  const selected = images.find((item) => item.isSelected) ?? images[0];
+  if (!selected) {
     throw new Error('스타일 기준 이미지가 없습니다');
   }
 
-  return image;
+  return selected;
 };
 
 const resolveOpenAIStyleCopyTargetBase64 = (

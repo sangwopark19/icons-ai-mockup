@@ -275,6 +275,34 @@ describe('processGenerationJob provider continuation', () => {
     expect(geminiService.generateWithStyleCopy).not.toHaveBeenCalled();
   });
 
+  it('fails instead of falling back when the queued selected style image is stale', async () => {
+    const jobData = baseOpenAIJob();
+    mockGenerationLookup(
+      generationRecord(),
+      openAIReference({
+        images: [
+          {
+            id: 'style-img-1',
+            filePath: 'generations/user-1/project-1/style-ref-1/output_1.png',
+            isSelected: true,
+          },
+        ],
+      })
+    );
+
+    await expect(processGenerationJob({ data: jobData })).rejects.toThrow(
+      '선택한 스타일 기준 이미지를 찾을 수 없습니다'
+    );
+
+    expect(openaiImageService.generateStyleCopyWithLinkage).not.toHaveBeenCalled();
+    expect(openaiImageService.generateStyleCopyFromImage).not.toHaveBeenCalled();
+    expect(generationService.updateStatus).toHaveBeenLastCalledWith(
+      'gen-openai-copy',
+      'failed',
+      '선택한 스타일 기준 이미지를 찾을 수 없습니다'
+    );
+  });
+
   it('falls back once to selected style image when OpenAI linkage is invalid_response', async () => {
     const jobData = baseOpenAIJob();
     mockGenerationLookup(generationRecord(), openAIReference());

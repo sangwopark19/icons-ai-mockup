@@ -738,6 +738,8 @@ export class GenerationService {
 
     const userInstructions =
       input.userInstructions?.trim() || (options.userInstructions as string | undefined);
+    const replacesCharacter =
+      input.copyTarget === 'ip-change' && Boolean(input.characterImagePath);
 
     return this.create(userId, {
       projectId: original.projectId,
@@ -748,7 +750,7 @@ export class GenerationService {
       copyTarget: input.copyTarget,
       selectedImageId: input.selectedImageId,
       sourceImagePath: input.sourceImagePath || (promptData.sourceImagePath as string | undefined),
-      characterId: original.ipCharacterId || undefined,
+      characterId: replacesCharacter ? undefined : original.ipCharacterId || undefined,
       characterImagePath:
         input.characterImagePath || (promptData.characterImagePath as string | undefined),
       textureImagePath: promptData.textureImagePath as string | undefined,

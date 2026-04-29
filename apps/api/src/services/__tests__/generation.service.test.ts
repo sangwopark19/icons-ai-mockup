@@ -714,7 +714,7 @@ describe('GenerationService - copyStyle', () => {
       provider: 'openai',
       providerModel: 'gpt-image-2',
       mode: 'ip_change',
-      ipCharacterId: null,
+      ipCharacterId: 'character-old',
       userInstructions: null,
       promptData: {
         sourceImagePath: 'uploads/u1/proj1/source.png',
@@ -747,6 +747,7 @@ describe('GenerationService - copyStyle', () => {
       provider: 'openai',
       providerModel: 'gpt-image-2',
       styleReferenceId: 'gen1',
+      ipCharacterId: null,
       promptData: expect.objectContaining({
         sourceImagePath: 'uploads/u1/proj1/source.png',
         characterImagePath: 'characters/u1/new-character.png',
@@ -794,7 +795,7 @@ describe('GenerationService - copyStyle', () => {
       provider: 'openai',
       providerModel: 'gpt-image-2',
       mode: 'ip_change',
-      ipCharacterId: null,
+      ipCharacterId: 'character-old',
       userInstructions: 'original instruction',
       promptData: {
         sourceImagePath: 'uploads/u1/proj1/original-product.png',
@@ -827,6 +828,7 @@ describe('GenerationService - copyStyle', () => {
       provider: 'openai',
       providerModel: 'gpt-image-2',
       styleReferenceId: 'gen1',
+      ipCharacterId: 'character-old',
       promptData: expect.objectContaining({
         sourceImagePath: 'uploads/u1/proj1/new-product.png',
         characterImagePath: 'characters/u1/original-character.png',
