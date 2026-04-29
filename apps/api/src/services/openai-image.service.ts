@@ -423,16 +423,16 @@ export class OpenAIImageService {
     };
 
     let request: Record<string, unknown>;
-    if (linkage.openaiResponseId) {
+    if (linkage.openaiImageCallId) {
+      request = {
+        ...baseRequest,
+        input: [userInput, { type: 'image_generation_call', id: linkage.openaiImageCallId }],
+      };
+    } else if (linkage.openaiResponseId) {
       request = {
         ...baseRequest,
         previous_response_id: linkage.openaiResponseId,
         input: [userInput],
-      };
-    } else if (linkage.openaiImageCallId) {
-      request = {
-        ...baseRequest,
-        input: [userInput, { type: 'image_generation_call', id: linkage.openaiImageCallId }],
       };
     } else {
       throw new Error('OpenAI 스타일 복사 linkage가 없습니다');

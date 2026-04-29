@@ -128,7 +128,14 @@ const openAIReference = (overrides: Record<string, unknown> = {}) => ({
   mode: 'ip_change',
   openaiResponseId: 'resp-style',
   openaiImageCallId: null,
-  providerTrace: { workflow: 'ip_change', candidateCount: 2 },
+  providerTrace: {
+    workflow: 'ip_change',
+    candidateCount: 2,
+    candidates: [
+      { index: 1, imageCallId: 'call-style-1' },
+      { index: 2, imageCallId: 'call-style-2' },
+    ],
+  },
   promptData: { userPrompt: 'original prompt' },
   thoughtSignatures: null,
   images: [
@@ -202,7 +209,7 @@ describe('processGenerationJob provider continuation', () => {
       Buffer.from(`file:${jobData.characterImagePath}`).toString('base64'),
       expect.objectContaining({
         openaiResponseId: 'resp-style',
-        openaiImageCallId: undefined,
+        openaiImageCallId: 'call-style-2',
         providerTrace: expect.objectContaining({ workflow: 'ip_change' }),
       }),
       expect.objectContaining({
@@ -249,7 +256,11 @@ describe('processGenerationJob provider continuation', () => {
     const jobData = baseOpenAIJob();
     mockGenerationLookup(
       generationRecord(),
-      openAIReference({ openaiResponseId: null, openaiImageCallId: null })
+      openAIReference({
+        openaiResponseId: null,
+        openaiImageCallId: null,
+        providerTrace: { workflow: 'ip_change', candidateCount: 2 },
+      })
     );
 
     await processGenerationJob({ data: jobData });

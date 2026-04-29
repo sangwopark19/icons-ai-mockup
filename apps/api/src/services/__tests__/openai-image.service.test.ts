@@ -412,7 +412,7 @@ describe('OpenAIImageService', () => {
     const result = await openaiImageService.generateStyleCopyWithLinkage(
       'sk-test',
       pngBase64,
-      { openaiResponseId: 'resp_previous_1', openaiImageCallId: 'call_should_not_be_used' },
+      { openaiResponseId: 'resp_previous_1' },
       { copyTarget: 'ip-change', quality: 'high' }
     );
 
@@ -442,6 +442,22 @@ describe('OpenAIImageService', () => {
     expect(firstCall.tools).toEqual([{ type: 'image_generation', action: 'edit', quality: 'high' }]);
     expect(firstCall.background).toBeUndefined();
     expect(firstCall.input_fidelity).toBeUndefined();
+  });
+
+  it('prefers selected image-call linkage over response-id linkage for style copy', async () => {
+    const { openaiImageService } = await import('../openai-image.service.js');
+
+    await openaiImageService.generateStyleCopyWithLinkage(
+      'sk-test',
+      pngBase64,
+      { openaiResponseId: 'resp_previous_1', openaiImageCallId: 'call_selected_2' },
+      { copyTarget: 'ip-change', quality: 'medium' }
+    );
+
+    const firstCall = mocks.responsesCreate.mock.calls[0][0];
+    expect(firstCall.previous_response_id).toBeUndefined();
+    expect(firstCall.input).toHaveLength(2);
+    expect(firstCall.input[1]).toEqual({ type: 'image_generation_call', id: 'call_selected_2' });
   });
 
   it('uses image-call-id-only linkage for style copy without previous_response_id', async () => {
