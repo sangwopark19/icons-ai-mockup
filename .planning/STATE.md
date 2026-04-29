@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: OpenAI GPT Image 2 Dual Provider
-status: shipping
-stopped_at: Phase 09 PR #4 approved for merge with deferred transparent evidence
-last_updated: "2026-04-28T06:23:30Z"
-last_activity: 2026-04-28 -- PR #4 approved for merge; transparent evidence deferred
+status: "Phase 10 shipped — PR #5"
+stopped_at: Phase 10 completed; human UAT pending
+last_updated: "2026-04-29T06:11:51.733Z"
+last_activity: "2026-04-29 -- Phase 10 shipped as PR #5"
 progress:
   total_phases: 4
-  completed_phases: 3
-  total_plans: 12
-  completed_plans: 12
+  completed_phases: 4
+  total_plans: 19
+  completed_plans: 19
   percent: 100
 ---
 
@@ -18,17 +18,17 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-24)
+See: .planning/PROJECT.md (updated 2026-04-29)
 
 **Core value:** 사용자가 원하는 제품 목업을 구조와 디테일을 잃지 않고 빠르게 생성하고 비교할 수 있어야 한다.
-**Current focus:** Phase 09 — openai-sketch-to-real-parity
+**Current focus:** Phase 10 complete — provider-aware-result-continuation human UAT pending
 
 ## Current Position
 
-Phase: 09 (openai-sketch-to-real-parity) — SHIPPING
-Plan: 4 of 4
-Status: Phase 09 PR #4 approved for merge - transparent evidence deferred
-Last activity: 2026-04-28 -- PR #4 approved for merge; transparent evidence deferred
+Phase: 10
+Plan: 7 of 7
+Status: Phase 10 shipped — PR #5
+Last activity: 2026-04-29 -- Phase 10 shipped as PR #5
 
 Progress: [██████████] 100%
 
@@ -36,7 +36,7 @@ Progress: [██████████] 100%
 
 **Velocity:**
 
-- Total plans completed: 4
+- Total plans completed: 11
 - Average duration: —
 - Total execution time: 0 hours
 
@@ -45,6 +45,7 @@ Progress: [██████████] 100%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 07 | 4 | - | - |
+| 10 | 7 | - | - |
 
 **Recent Trend:**
 
@@ -56,6 +57,7 @@ Progress: [██████████] 100%
 | Phase 07-provider-foundation-and-key-separation P02 | 11 min | 2 tasks | 3 files |
 | Phase 07-provider-foundation-and-key-separation P03 | 6 min | 3 tasks | 5 files |
 | Phase 07-provider-foundation-and-key-separation P04 | 7 min | 3 tasks | 5 files |
+| Quick 260428-p4c-gpt-image-2-0-2-requests-27-101-176-cli | 19 min | 3 tasks | 13 files |
 
 ## Accumulated Context
 
@@ -119,10 +121,13 @@ Progress: [██████████] 100%
 - GPT Image 2 prompt work must also read workflow-specific prompt references: prompt-playbook/workflow-matrix plus the relevant `gpt-image-2-notes.md` for IP Change, Sketch Realization, or Precision Edit.
 - [Phase 09 ship]: User accepted merging PR #4 with transparent-background live evidence deferred to follow-up work.
 - [Phase 09 ship]: Merging to `main` triggers CI/CD deployment to the remote Mac server; stale pre-merge Tailscale/runtime evidence is not a merge blocker.
+- [Quick 260428-p4c]: OpenAI image jobs use SDK `maxRetries: 0` and BullMQ `attempts: 1`; Gemini keeps the existing default queue retry behavior.
+- [Quick 260428-p4c]: OpenAI active-key `callCount` is app-recorded Image API external request count after vendor response, not browser polling or OpenAI token usage.
 
 ### Pending Todos
 
 - [Phase 09 follow-up]: Retry transparent-background Sketch v2 live smoke after merge/deployment and record final PNG alpha, transparent pixel ratio, border ratio, dark-composite luma, and composite output evidence.
+- [Phase 10 human UAT]: Run live OpenAI partial edit smoke, live OpenAI style-copy smoke, and authenticated browser walkthrough from `10-HUMAN-UAT.md`.
 
 ### Blockers/Concerns
 
@@ -137,6 +142,7 @@ Progress: [██████████] 100%
 | 1 | admin 대시보드 흰배경 흰글자 색상 수정 | 2026-03-12 | 7238c61 | [1-admin](./quick/1-admin/) |
 | 2 | Mac 서버 ENCRYPTION_KEY 배포 누락 및 admin 대시보드 빈 상태 수정 | 2026-04-23 | 6de9087 | [260423-l20-mac-encryption-key-api-admin-dashboard](./quick/260423-l20-mac-encryption-key-api-admin-dashboard/) |
 | 3 | Mac 서버 로그인 만료 시간 1일 및 자동 refresh 처리 | 2026-04-24 | e41c6ba | [260424-eex-auth-session-refresh](./quick/260424-eex-auth-session-refresh/) |
+| 4 | GPT Image 2 요청 수/토큰 사용량 급증 원인 조사 및 request budget 수정 | 2026-04-28 | d3e3739 | [260428-p4c-gpt-image-2-0-2-requests-27-101-176-cli](./quick/260428-p4c-gpt-image-2-0-2-requests-27-101-176-cli/) |
 
 ## Deferred Items
 
@@ -151,8 +157,9 @@ Items acknowledged and deferred at milestone close on 2026-04-23:
 
 ## Session Continuity
 
-Last session: 2026-04-27T06:06:54.289Z
-Stopped at: Phase 09 UI-SPEC approved
-Resume file: .planning/phases/09-openai-sketch-to-real-parity/09-UI-SPEC.md
+Last session: 2026-04-29T05:02:00Z
+Stopped at: Phase 10 completed; human UAT pending
+Resume file: .planning/phases/10-provider-aware-result-continuation/10-HUMAN-UAT.md
 
 **Planned Phase:** 8 (OpenAI IP Change Parity) — 4 plans — 2026-04-24T07:32:48.475Z
+**Planned Phase:** 10 (Provider-Aware Result Continuation) — 7 plans — 2026-04-28T08:38:25.777Z

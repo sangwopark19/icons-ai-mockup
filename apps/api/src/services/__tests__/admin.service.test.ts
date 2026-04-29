@@ -434,6 +434,11 @@ const mockGeneration = {
   retryCount: 1,
   provider: 'gemini',
   providerModel: 'gemini-3-pro-image-preview',
+  providerTrace: null,
+  openaiRequestId: null,
+  openaiResponseId: null,
+  openaiImageCallId: null,
+  openaiRevisedPrompt: null,
   styleReferenceId: 'style-gen1',
   promptData: {
     sourceImagePath: 'uploads/u1/proj1/img.png',
@@ -567,6 +572,43 @@ describe('AdminService - listGenerations', () => {
 
     expect(result.pagination.page).toBe(1);
     expect(result.pagination.limit).toBe(20);
+  });
+
+  it('maps safe OpenAI request-accounting fields from providerTrace', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { adminService } = await import('../admin.service.js');
+    const openAIGeneration = {
+      ...mockGeneration,
+      provider: 'openai',
+      providerModel: 'gpt-image-2',
+      openaiRequestId: 'req_1',
+      openaiResponseId: 'resp_1',
+      openaiImageCallId: 'img_1,img_2',
+      openaiRevisedPrompt: 'safe revised prompt',
+      providerTrace: {
+        provider: 'openai',
+        endpoint: 'images.edit',
+        externalRequestCount: 1,
+        outputCount: 2,
+        sdkMaxRetries: 0,
+        queueAttempts: 1,
+        rawVendorResponse: { shouldNotLeak: true },
+      },
+    };
+
+    vi.mocked(prisma.generation.findMany).mockResolvedValue([openAIGeneration] as any);
+    vi.mocked(prisma.generation.count).mockResolvedValue(1);
+    vi.mocked(prisma.generation.groupBy).mockResolvedValue([] as any);
+
+    const result = await adminService.listGenerations({});
+
+    expect(result.generations[0]).toMatchObject({
+      openaiExternalRequestCount: 1,
+      openaiOutputCount: 2,
+      openaiSdkMaxRetries: 0,
+      openaiQueueAttempts: 1,
+    });
+    expect(JSON.stringify(result.generations[0])).not.toContain('rawVendorResponse');
   });
 });
 
@@ -1267,6 +1309,25 @@ describe('AdminService - incrementCallCount', () => {
         where: { id: 'k1', provider: 'openai' },
         data: expect.objectContaining({
           callCount: { increment: 1 },
+          lastUsedAt: expect.any(Date),
+        }),
+      })
+    );
+  });
+
+  it('should increment callCount by an explicit amount', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.apiKey.updateMany).mockResolvedValue({ count: 1 });
+
+    await adminService.incrementCallCount('openai', 'k1', 3);
+
+    expect(vi.mocked(prisma.apiKey.updateMany)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'k1', provider: 'openai' },
+        data: expect.objectContaining({
+          callCount: { increment: 3 },
           lastUsedAt: expect.any(Date),
         }),
       })

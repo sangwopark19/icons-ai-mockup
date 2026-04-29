@@ -407,6 +407,10 @@ export interface AdminGeneration {
   openaiResponseId: string | null;
   openaiImageCallId: string | null;
   openaiRevisedPrompt: string | null;
+  openaiExternalRequestCount: number | null;
+  openaiOutputCount: number | null;
+  openaiSdkMaxRetries: number | null;
+  openaiQueueAttempts: number | null;
   promptData: unknown;
   options: unknown;
   createdAt: string;

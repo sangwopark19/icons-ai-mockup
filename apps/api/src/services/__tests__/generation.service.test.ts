@@ -67,6 +67,30 @@ describe('GenerationService - provider contract', () => {
     expect(vi.mocked(addGenerationJob)).not.toHaveBeenCalled();
   });
 
+  it('rejects continuation-only metadata on direct source generation create', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { addGenerationJob } = await import('../../lib/queue.js');
+    const { generationService } = await import('../generation.service.js');
+
+    vi.mocked(prisma.project.findFirst).mockResolvedValue({ id: 'proj1', userId: 'u1' } as any);
+
+    await expect(
+      generationService.create('u1', {
+        projectId: 'proj1',
+        mode: 'ip_change',
+        provider: 'openai',
+        providerModel: 'gpt-image-2',
+        sourceImagePath: 'uploads/u1/proj1/source.png',
+        characterImagePath: 'characters/u1/character.png',
+        copyTarget: 'ip-change',
+        selectedImageId: '00000000-0000-0000-0000-000000000111',
+      })
+    ).rejects.toThrow('스타일 복사 continuation metadata가 불완전합니다');
+
+    expect(vi.mocked(prisma.generation.create)).not.toHaveBeenCalled();
+    expect(vi.mocked(addGenerationJob)).not.toHaveBeenCalled();
+  });
+
   it('rejects image paths outside the authenticated user/project boundary', async () => {
     const { prisma } = await import('../../lib/prisma.js');
     const { addGenerationJob } = await import('../../lib/queue.js');
@@ -127,6 +151,41 @@ describe('GenerationService - provider contract', () => {
     expect(vi.mocked(addGenerationJob).mock.calls[0][0].options).toMatchObject({
       quality: 'high',
       outputCount: 2,
+    });
+  });
+
+  it('marks a created generation failed when queue enqueue fails', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { addGenerationJob } = await import('../../lib/queue.js');
+    const { generationService } = await import('../generation.service.js');
+
+    vi.mocked(prisma.project.findFirst).mockResolvedValue({ id: 'proj1', userId: 'u1' } as any);
+    vi.mocked(prisma.generation.create).mockResolvedValue({
+      id: 'gen-enqueue-failed',
+      projectId: 'proj1',
+      status: 'pending',
+      mode: 'ip_change',
+      provider: 'gemini',
+      providerModel: 'gemini-3-pro-image-preview',
+    } as any);
+    vi.mocked(addGenerationJob).mockRejectedValueOnce(new Error('redis unavailable'));
+
+    await expect(
+      generationService.create('u1', {
+        projectId: 'proj1',
+        mode: 'ip_change',
+        sourceImagePath: 'uploads/u1/proj1/source.png',
+        characterImagePath: 'characters/u1/character.png',
+      })
+    ).rejects.toThrow('redis unavailable');
+
+    expect(vi.mocked(prisma.generation.update)).toHaveBeenCalledWith({
+      where: { id: 'gen-enqueue-failed' },
+      data: {
+        status: 'failed',
+        errorMessage: 'redis unavailable',
+        completedAt: expect.any(Date),
+      },
     });
   });
 
@@ -406,6 +465,10 @@ describe('GenerationService - provider contract', () => {
         provider: 'openai',
         model: 'gpt-image-2',
         endpoint: 'images.edit',
+        externalRequestCount: 1,
+        outputCount: 2,
+        sdkMaxRetries: 0,
+        queueAttempts: 1,
       },
     });
 
@@ -420,6 +483,10 @@ describe('GenerationService - provider contract', () => {
           provider: 'openai',
           model: 'gpt-image-2',
           endpoint: 'images.edit',
+          externalRequestCount: 1,
+          outputCount: 2,
+          sdkMaxRetries: 0,
+          queueAttempts: 1,
         },
       },
     });
@@ -685,27 +752,287 @@ describe('GenerationService - copyStyle', () => {
     vi.clearAllMocks();
   });
 
-  it('rejects OpenAI v2 style copy before enqueueing a failing worker job', async () => {
+  it('creates OpenAI style copy for ip-change with selected image id and two candidates', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { addGenerationJob } = await import('../../lib/queue.js');
+    const { generationService } = await import('../generation.service.js');
+
+    vi.mocked(prisma.project.findFirst).mockResolvedValue({ id: 'proj1', userId: 'u1' } as any);
+    vi.mocked(prisma.generation.findFirst).mockResolvedValue({
+      id: 'gen1',
+      projectId: 'proj1',
+      project: { userId: 'u1' },
+      images: [
+        {
+          id: '00000000-0000-0000-0000-000000000111',
+          filePath: 'generations/u1/proj1/gen1/output_1.png',
+          type: 'output',
+          createdAt: new Date('2026-04-28T00:00:00.000Z'),
+        },
+      ],
+      provider: 'openai',
+      providerModel: 'gpt-image-2',
+      mode: 'ip_change',
+      ipCharacterId: 'character-old',
+      userInstructions: null,
+      promptData: {
+        sourceImagePath: 'uploads/u1/proj1/source.png',
+        characterImagePath: 'characters/u1/original-character.png',
+        userPrompt: 'copy the approved treatment',
+      },
+      options: {
+        preserveStructure: true,
+        transparentBackground: false,
+        quality: 'high',
+      },
+    } as any);
+    vi.mocked(prisma.generation.create).mockResolvedValue({
+      id: 'style1',
+      projectId: 'proj1',
+      status: 'pending',
+      mode: 'ip_change',
+      provider: 'openai',
+      providerModel: 'gpt-image-2',
+    } as any);
+
+    await generationService.copyStyle('u1', 'gen1', {
+      copyTarget: 'ip-change',
+      selectedImageId: '00000000-0000-0000-0000-000000000111',
+      characterImagePath: 'characters/u1/new-character.png',
+      userInstructions: '  make the mascot blue  ',
+    });
+
+    expect(vi.mocked(prisma.generation.create).mock.calls[0][0].data).toMatchObject({
+      provider: 'openai',
+      providerModel: 'gpt-image-2',
+      styleReferenceId: 'gen1',
+      ipCharacterId: null,
+      promptData: expect.objectContaining({
+        sourceImagePath: 'uploads/u1/proj1/source.png',
+        characterImagePath: 'characters/u1/new-character.png',
+        copyTarget: 'ip-change',
+        selectedImageId: '00000000-0000-0000-0000-000000000111',
+      }),
+      options: expect.objectContaining({
+        userInstructions: 'make the mascot blue',
+        outputCount: 2,
+      }),
+    });
+    expect(vi.mocked(addGenerationJob).mock.calls[0][0]).toMatchObject({
+      provider: 'openai',
+      providerModel: 'gpt-image-2',
+      styleReferenceId: 'gen1',
+      copyTarget: 'ip-change',
+      selectedImageId: '00000000-0000-0000-0000-000000000111',
+      sourceImagePath: 'uploads/u1/proj1/source.png',
+      characterImagePath: 'characters/u1/new-character.png',
+      options: expect.objectContaining({
+        outputCount: 2,
+        userInstructions: 'make the mascot blue',
+      }),
+    });
+  });
+
+  it('creates OpenAI style copy for new-product with selected image id and two candidates', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { addGenerationJob } = await import('../../lib/queue.js');
+    const { generationService } = await import('../generation.service.js');
+
+    vi.mocked(prisma.project.findFirst).mockResolvedValue({ id: 'proj1', userId: 'u1' } as any);
+    vi.mocked(prisma.generation.findFirst).mockResolvedValue({
+      id: 'gen1',
+      projectId: 'proj1',
+      project: { userId: 'u1' },
+      images: [
+        {
+          id: '00000000-0000-0000-0000-000000000222',
+          filePath: 'generations/u1/proj1/gen1/output_2.png',
+          type: 'output',
+          createdAt: new Date('2026-04-28T00:00:00.000Z'),
+        },
+      ],
+      provider: 'openai',
+      providerModel: 'gpt-image-2',
+      mode: 'ip_change',
+      ipCharacterId: 'character-old',
+      userInstructions: 'original instruction',
+      promptData: {
+        sourceImagePath: 'uploads/u1/proj1/original-product.png',
+        characterImagePath: 'characters/u1/original-character.png',
+        userPrompt: 'copy the approved treatment',
+      },
+      options: {
+        preserveStructure: true,
+        transparentBackground: false,
+        userInstructions: 'original option instruction',
+        quality: 'medium',
+      },
+    } as any);
+    vi.mocked(prisma.generation.create).mockResolvedValue({
+      id: 'style2',
+      projectId: 'proj1',
+      status: 'pending',
+      mode: 'ip_change',
+      provider: 'openai',
+      providerModel: 'gpt-image-2',
+    } as any);
+
+    await generationService.copyStyle('u1', 'gen1', {
+      copyTarget: 'new-product',
+      selectedImageId: '00000000-0000-0000-0000-000000000222',
+      sourceImagePath: 'uploads/u1/proj1/new-product.png',
+    });
+
+    expect(vi.mocked(prisma.generation.create).mock.calls[0][0].data).toMatchObject({
+      provider: 'openai',
+      providerModel: 'gpt-image-2',
+      styleReferenceId: 'gen1',
+      ipCharacterId: 'character-old',
+      promptData: expect.objectContaining({
+        sourceImagePath: 'uploads/u1/proj1/new-product.png',
+        characterImagePath: 'characters/u1/original-character.png',
+        copyTarget: 'new-product',
+        selectedImageId: '00000000-0000-0000-0000-000000000222',
+      }),
+      options: expect.objectContaining({
+        userInstructions: 'original option instruction',
+        outputCount: 2,
+      }),
+    });
+    expect(vi.mocked(addGenerationJob).mock.calls[0][0]).toMatchObject({
+      provider: 'openai',
+      providerModel: 'gpt-image-2',
+      styleReferenceId: 'gen1',
+      copyTarget: 'new-product',
+      selectedImageId: '00000000-0000-0000-0000-000000000222',
+      sourceImagePath: 'uploads/u1/proj1/new-product.png',
+      characterImagePath: 'characters/u1/original-character.png',
+      options: expect.objectContaining({
+        outputCount: 2,
+      }),
+    });
+  });
+
+  it('rejects OpenAI style copy when selected image does not belong to the source generation', async () => {
     const { prisma } = await import('../../lib/prisma.js');
     const { addGenerationJob } = await import('../../lib/queue.js');
     const { generationService } = await import('../generation.service.js');
 
     vi.mocked(prisma.generation.findFirst).mockResolvedValue({
       id: 'gen1',
+      projectId: 'proj1',
       project: { userId: 'u1' },
-      images: [],
+      images: [
+        {
+          id: '00000000-0000-0000-0000-000000000111',
+          filePath: 'generations/u1/proj1/gen1/output_1.png',
+          type: 'output',
+          createdAt: new Date('2026-04-28T00:00:00.000Z'),
+        },
+      ],
       provider: 'openai',
+      providerModel: 'gpt-image-2',
       mode: 'ip_change',
+      promptData: {
+        sourceImagePath: 'uploads/u1/proj1/source.png',
+        characterImagePath: 'characters/u1/original-character.png',
+      },
+      options: {},
     } as any);
 
     await expect(
       generationService.copyStyle('u1', 'gen1', {
-        characterImagePath: 'characters/u1/character.png',
+        copyTarget: 'ip-change',
+        selectedImageId: '00000000-0000-0000-0000-000000000999',
+        characterImagePath: 'characters/u1/new-character.png',
       })
-    ).rejects.toThrow('OpenAI IP 변경 v2는 스타일 복사를 지원하지 않습니다');
+    ).rejects.toThrow('선택한 스타일 기준 이미지를 찾을 수 없습니다');
 
     expect(vi.mocked(prisma.generation.create)).not.toHaveBeenCalled();
     expect(vi.mocked(addGenerationJob)).not.toHaveBeenCalled();
+  });
+
+  it('rejects Gemini source generation when selectedImageId indicates v2 style copy', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { addGenerationJob } = await import('../../lib/queue.js');
+    const { generationService } = await import('../generation.service.js');
+
+    vi.mocked(prisma.generation.findFirst).mockResolvedValue({
+      id: 'gen1',
+      projectId: 'proj1',
+      project: { userId: 'u1' },
+      images: [],
+      provider: 'gemini',
+      providerModel: 'gemini-3-pro-image-preview',
+      mode: 'ip_change',
+      promptData: {
+        sourceImagePath: 'uploads/u1/proj1/source.png',
+        characterImagePath: 'characters/u1/original-character.png',
+      },
+      options: {},
+    } as any);
+
+    await expect(
+      generationService.copyStyle('u1', 'gen1', {
+        selectedImageId: '00000000-0000-0000-0000-000000000111',
+        characterImagePath: 'characters/u1/new-character.png',
+      })
+    ).rejects.toThrow('v2 스타일 복사는 v2 기준 결과에서만 시작할 수 있습니다');
+
+    expect(vi.mocked(prisma.generation.create)).not.toHaveBeenCalled();
+    expect(vi.mocked(addGenerationJob)).not.toHaveBeenCalled();
+  });
+
+  it('mirrors OpenAI style copy copyTarget styleReferenceId and styleSourceImageId in providerTrace', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { generationService } = await import('../generation.service.js');
+
+    vi.mocked(prisma.project.findFirst).mockResolvedValue({ id: 'proj1', userId: 'u1' } as any);
+    vi.mocked(prisma.generation.findFirst).mockResolvedValue({
+      id: 'gen1',
+      projectId: 'proj1',
+      project: { userId: 'u1' },
+      images: [
+        {
+          id: '00000000-0000-0000-0000-000000000333',
+          filePath: 'generations/u1/proj1/gen1/output_1.png',
+          type: 'output',
+          createdAt: new Date('2026-04-28T00:00:00.000Z'),
+        },
+      ],
+      provider: 'openai',
+      providerModel: 'gpt-image-2',
+      mode: 'ip_change',
+      ipCharacterId: null,
+      promptData: {
+        sourceImagePath: 'uploads/u1/proj1/source.png',
+        characterImagePath: 'characters/u1/original-character.png',
+      },
+      options: {
+        transparentBackground: false,
+      },
+    } as any);
+    vi.mocked(prisma.generation.create).mockResolvedValue({
+      id: 'style3',
+      projectId: 'proj1',
+      status: 'pending',
+      mode: 'ip_change',
+      provider: 'openai',
+      providerModel: 'gpt-image-2',
+    } as any);
+
+    await generationService.copyStyle('u1', 'gen1', {
+      copyTarget: 'ip-change',
+      selectedImageId: '00000000-0000-0000-0000-000000000333',
+      characterImagePath: 'characters/u1/new-character.png',
+    });
+
+    expect(vi.mocked(prisma.generation.create).mock.calls[0][0].data.providerTrace).toEqual({
+      workflow: 'style_copy',
+      copyTarget: 'ip-change',
+      styleReferenceId: 'gen1',
+      styleSourceImageId: '00000000-0000-0000-0000-000000000333',
+    });
   });
 });
 
@@ -714,7 +1041,178 @@ describe('GenerationService - regenerate', () => {
     vi.clearAllMocks();
   });
 
-  it('rejects OpenAI v2 regeneration before enqueueing a failing worker job', async () => {
+  it('replays OpenAI regeneration with persisted provider model inputs prompt and options', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { addGenerationJob } = await import('../../lib/queue.js');
+    const { generationService } = await import('../generation.service.js');
+
+    vi.mocked(prisma.project.findFirst).mockResolvedValue({ id: 'proj1', userId: 'u1' } as any);
+    vi.mocked(prisma.generation.findFirst).mockResolvedValue({
+      id: 'gen1',
+      projectId: 'proj1',
+      project: { userId: 'u1' },
+      images: [
+        {
+          id: 'selected-img',
+          filePath: 'generations/u1/proj1/gen1/output_1.png',
+          isSelected: true,
+          createdAt: new Date('2026-04-28T00:00:00.000Z'),
+        },
+      ],
+      provider: 'openai',
+      providerModel: 'gpt-image-2',
+      mode: 'ip_change',
+      ipCharacterId: null,
+      userInstructions: null,
+      promptData: {
+        sourceImagePath: 'uploads/u1/proj1/source.png',
+        characterImagePath: 'characters/u1/character.png',
+        userPrompt: 'keep the same product treatment',
+      },
+      options: {
+        preserveStructure: true,
+        transparentBackground: false,
+        fixedBackground: true,
+        fixedViewpoint: true,
+        quality: 'high',
+        outputCount: 2,
+      },
+    } as any);
+    vi.mocked(prisma.generation.create).mockResolvedValue({
+      id: 'regen1',
+      projectId: 'proj1',
+      status: 'pending',
+      mode: 'ip_change',
+      provider: 'openai',
+      providerModel: 'gpt-image-2',
+    } as any);
+
+    await generationService.regenerate('u1', 'gen1');
+
+    const createData = vi.mocked(prisma.generation.create).mock.calls[0][0].data;
+    expect(createData.provider).toBe('openai');
+    expect(createData.providerModel).toBe('gpt-image-2');
+    expect(createData.promptData).toMatchObject({
+      sourceImagePath: 'uploads/u1/proj1/source.png',
+      characterImagePath: 'characters/u1/character.png',
+      userPrompt: 'keep the same product treatment',
+    });
+    expect(createData.promptData).not.toMatchObject({
+      sourceImagePath: 'generations/u1/proj1/gen1/output_1.png',
+    });
+    expect(createData.options).toMatchObject({
+      preserveStructure: true,
+      quality: 'high',
+      outputCount: 2,
+    });
+
+    expect(vi.mocked(addGenerationJob).mock.calls[0][0]).toMatchObject({
+      provider: 'openai',
+      providerModel: 'gpt-image-2',
+      sourceImagePath: 'uploads/u1/proj1/source.png',
+      characterImagePath: 'characters/u1/character.png',
+      prompt: 'keep the same product treatment',
+      options: expect.objectContaining({
+        outputCount: 2,
+      }),
+    });
+    expect(vi.mocked(addGenerationJob).mock.calls[0][0].sourceImagePath).not.toBe(
+      'generations/u1/proj1/gen1/output_1.png'
+    );
+  });
+
+  it.each([
+    {
+      copyTarget: 'ip-change' as const,
+      sourceImagePath: 'uploads/u1/proj1/original-product.png',
+      characterImagePath: 'characters/u1/new-character.png',
+    },
+    {
+      copyTarget: 'new-product' as const,
+      sourceImagePath: 'uploads/u1/proj1/new-product.png',
+      characterImagePath: 'characters/u1/original-character.png',
+    },
+  ])(
+    'replays OpenAI style-copy regeneration with persisted $copyTarget lineage',
+    async ({ copyTarget, sourceImagePath, characterImagePath }) => {
+      const { prisma } = await import('../../lib/prisma.js');
+      const { addGenerationJob } = await import('../../lib/queue.js');
+      const { generationService } = await import('../generation.service.js');
+
+      vi.mocked(prisma.project.findFirst).mockResolvedValue({ id: 'proj1', userId: 'u1' } as any);
+      vi.mocked(prisma.generation.findFirst).mockResolvedValue({
+        id: 'style-result-1',
+        projectId: 'proj1',
+        project: { userId: 'u1' },
+        images: [
+          {
+            id: 'generated-output-1',
+            filePath: 'generations/u1/proj1/style-result-1/output_1.png',
+            type: 'output',
+            createdAt: new Date('2026-04-28T00:00:00.000Z'),
+          },
+        ],
+        provider: 'openai',
+        providerModel: 'gpt-image-2',
+        mode: 'ip_change',
+        styleReferenceId: 'source-style-generation',
+        ipCharacterId: null,
+        userInstructions: null,
+        promptData: {
+          sourceImagePath,
+          characterImagePath,
+          copyTarget,
+          selectedImageId: 'style-source-image-2',
+          userPrompt: 'copy the approved treatment',
+        },
+        options: {
+          preserveStructure: true,
+          transparentBackground: false,
+          quality: 'medium',
+          outputCount: 2,
+          userInstructions: 'replace target only',
+        },
+      } as any);
+      vi.mocked(prisma.generation.create).mockResolvedValue({
+        id: 'style-regen-1',
+        projectId: 'proj1',
+        status: 'pending',
+        mode: 'ip_change',
+        provider: 'openai',
+        providerModel: 'gpt-image-2',
+      } as any);
+
+      await generationService.regenerate('u1', 'style-result-1');
+
+      expect(vi.mocked(prisma.generation.create).mock.calls[0][0].data).toMatchObject({
+        provider: 'openai',
+        providerModel: 'gpt-image-2',
+        styleReferenceId: 'source-style-generation',
+        promptData: expect.objectContaining({
+          sourceImagePath,
+          characterImagePath,
+          copyTarget,
+          selectedImageId: 'style-source-image-2',
+        }),
+        options: expect.objectContaining({
+          outputCount: 2,
+          userInstructions: 'replace target only',
+        }),
+      });
+      expect(vi.mocked(addGenerationJob).mock.calls[0][0]).toMatchObject({
+        provider: 'openai',
+        providerModel: 'gpt-image-2',
+        styleReferenceId: 'source-style-generation',
+        copyTarget,
+        selectedImageId: 'style-source-image-2',
+        sourceImagePath,
+        characterImagePath,
+        options: expect.objectContaining({ outputCount: 2 }),
+      });
+    }
+  );
+
+  it('fails OpenAI regeneration clearly when stored source inputs are missing', async () => {
     const { prisma } = await import('../../lib/prisma.js');
     const { addGenerationJob } = await import('../../lib/queue.js');
     const { generationService } = await import('../generation.service.js');
@@ -727,8 +1225,8 @@ describe('GenerationService - regenerate', () => {
       provider: 'openai',
       providerModel: 'gpt-image-2',
       mode: 'ip_change',
+      ipCharacterId: null,
       promptData: {
-        sourceImagePath: 'uploads/u1/proj1/source.png',
         characterImagePath: 'characters/u1/character.png',
       },
       options: {
@@ -737,7 +1235,7 @@ describe('GenerationService - regenerate', () => {
     } as any);
 
     await expect(generationService.regenerate('u1', 'gen1')).rejects.toThrow(
-      'OpenAI IP 변경 v2는 동일 조건 재생성을 지원하지 않습니다'
+      '재생성 입력값이 불완전합니다'
     );
 
     expect(vi.mocked(prisma.generation.create)).not.toHaveBeenCalled();

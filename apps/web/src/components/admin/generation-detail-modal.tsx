@@ -28,6 +28,10 @@ function getProviderLabel(provider: AdminGeneration['provider']): string {
   return provider === 'openai' ? 'OpenAI' : 'Gemini';
 }
 
+function hasSupportValue(value: unknown): boolean {
+  return value !== null && value !== undefined && value !== '';
+}
+
 export default function GenerationDetailModal({
   generation,
   onClose,
@@ -59,8 +63,12 @@ export default function GenerationDetailModal({
     { label: 'OpenAI Request ID', value: generation.openaiRequestId },
     { label: 'OpenAI Response ID', value: generation.openaiResponseId },
     { label: 'OpenAI Image Call ID', value: generation.openaiImageCallId },
+    { label: 'OpenAI External Requests', value: generation.openaiExternalRequestCount },
+    { label: 'OpenAI Output Candidates', value: generation.openaiOutputCount },
+    { label: 'OpenAI SDK Max Retries', value: generation.openaiSdkMaxRetries },
+    { label: 'OpenAI Queue Attempts', value: generation.openaiQueueAttempts },
     { label: 'OpenAI Revised Prompt', value: generation.openaiRevisedPrompt },
-  ].filter((field) => Boolean(field.value));
+  ].filter((field) => hasSupportValue(field.value));
 
   const copySupportValue = async (label: string, value: string) => {
     await navigator.clipboard?.writeText(value);

@@ -16,6 +16,13 @@ import {
 } from '@/lib/api';
 
 const V2_CANDIDATE_LABELS = ['후보 1', '후보 2'];
+const PARTIAL_EDIT_EMPTY_PROMPT_ERROR = '수정할 내용을 입력해주세요.';
+const PARTIAL_EDIT_SUBMIT_ERROR =
+  '부분 수정 요청에 실패했습니다. 선택 이미지와 요청 내용을 확인한 뒤 다시 시도해주세요.';
+const REGENERATE_MISSING_INPUT_ERROR =
+  '원본 입력을 확인할 수 없어 동일 조건 재생성을 시작하지 못했습니다. 조건 수정을 열어 새로 생성해주세요.';
+const FOLLOWUP_START_ERROR =
+  '후속 작업을 시작하지 못했습니다. 저장된 입력과 선택 이미지를 확인한 뒤 다시 시도해주세요.';
 
 const V2_WORKFLOW_COPY: Record<
   GenerationMode,
@@ -87,17 +94,14 @@ export default function GenerationResultPage() {
   const [isPolling, setIsPolling] = useState(true);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editPrompt, setEditPrompt] = useState('');
+  const [editError, setEditError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isStartingStyleCopy, setIsStartingStyleCopy] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const isV2 = generation?.provider === 'openai';
-  const isV2SketchToReal = Boolean(isV2 && generation?.mode === 'sketch_to_real');
   const v2WorkflowCopy = isV2 && generation ? getV2WorkflowCopy(generation.mode) : null;
-  const styleCopyIpChangeLabel = isV2SketchToReal
-    ? '🎨 스타일 복사'
-    : '🎨 스타일 복사 (IP 변경)';
-  const disabledFollowupId = 'v2-disabled-followups';
 
   // Interval 관리를 위한 ref
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -262,16 +266,32 @@ export default function GenerationResultPage() {
     URL.revokeObjectURL(url);
   };
 
+  const handleOpenEditModal = () => {
+    setEditPrompt('');
+    setEditError(null);
+    setShowEditModal(true);
+  };
+
   /**
    * 부분 수정 요청
    */
   const handleEdit = async () => {
-    if (isV2) return;
-    if (!accessToken || !selectedImageId || !editPrompt.trim()) return;
+    const trimmedPrompt = editPrompt.trim();
+    const canStartEdit = !isEditing;
+
+    if (!canStartEdit) return;
+    if (!trimmedPrompt) {
+      setEditError(PARTIAL_EDIT_EMPTY_PROMPT_ERROR);
+      return;
+    }
+    if (!accessToken || !selectedImageId) {
+      setEditError(PARTIAL_EDIT_SUBMIT_ERROR);
+      return;
+    }
 
     setIsEditing(true);
+    setEditError(null);
     try {
-      // 올바른 경로: /api/generations/:id/edit
       const response = await apiFetch(`/api/generations/${genId}/edit`, {
         method: 'POST',
         token: accessToken,
@@ -279,24 +299,22 @@ export default function GenerationResultPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          prompt: editPrompt,
+          prompt: trimmedPrompt,
+          selectedImageId,
         }),
       });
 
       const data = await response.json();
-      if (data.success) {
-        // 새 생성 결과 페이지로 이동
+      if (response.ok && data.success) {
         router.push(`/projects/${projectId}/generations/${data.data.generationId}`);
       } else {
-        alert(data.error?.message || '편집 요청에 실패했습니다');
+        setEditError(PARTIAL_EDIT_SUBMIT_ERROR);
       }
     } catch (error) {
       console.error('편집 요청 실패:', error);
-      alert('편집 요청에 실패했습니다');
+      setEditError(PARTIAL_EDIT_SUBMIT_ERROR);
     } finally {
       setIsEditing(false);
-      setShowEditModal(false);
-      setEditPrompt('');
     }
   };
 
@@ -333,10 +351,10 @@ export default function GenerationResultPage() {
    * 동일 조건 재생성
    */
   const handleRegenerateWithSameInputs = async () => {
-    if (isV2) return;
-    if (!accessToken) return;
+    if (!accessToken || isRegenerating) return;
 
     setIsRegenerating(true);
+    setSaveMessage(null);
     try {
       const response = await apiFetch(`/api/generations/${genId}/regenerate`, {
         method: 'POST',
@@ -344,15 +362,15 @@ export default function GenerationResultPage() {
       });
 
       const data = await response.json();
-      if (data.success) {
+      if (response.ok && data.success) {
         router.push(`/projects/${projectId}/generations/${data.data.id}`);
         return;
       }
 
-      alert(data.error?.message || '동일 조건 재생성에 실패했습니다');
+      setSaveMessage(REGENERATE_MISSING_INPUT_ERROR);
     } catch (error) {
       console.error('동일 조건 재생성 실패:', error);
-      alert('동일 조건 재생성에 실패했습니다');
+      setSaveMessage(REGENERATE_MISSING_INPUT_ERROR);
     } finally {
       setIsRegenerating(false);
     }
@@ -378,8 +396,21 @@ export default function GenerationResultPage() {
    * 스타일 복사
    */
   const handleStyleCopy = (copyTarget: 'ip-change' | 'new-product') => {
-    if (isV2) return;
+    if (!generation) return;
+
     const styleRef = generation?.id ?? genId;
+    if (generation.provider === 'openai') {
+      if (!selectedImageId || isStartingStyleCopy) {
+        setSaveMessage(FOLLOWUP_START_ERROR);
+        return;
+      }
+
+      setIsStartingStyleCopy(true);
+      const query = new URLSearchParams({ styleRef, copyTarget, imageId: selectedImageId });
+      router.push(`/projects/${projectId}/style-copy/openai?${query.toString()}`);
+      return;
+    }
+
     const query = new URLSearchParams({ styleRef, copyTarget });
     router.push(`/projects/${projectId}/ip-change?${query.toString()}`);
   };
@@ -446,7 +477,12 @@ export default function GenerationResultPage() {
 
   const orderedImages = getImagesInOutputOrder(generation.images);
 
-  if (isV2SketchToReal && orderedImages.length !== 2) {
+  if (
+    generation.provider === 'openai' &&
+    generation.mode === 'sketch_to_real' &&
+    orderedImages.length !== 2 &&
+    orderedImages.length !== 1
+  ) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-[var(--bg-primary)] px-4 text-center">
         <div className="mb-4 text-5xl">❌</div>
@@ -468,6 +504,8 @@ export default function GenerationResultPage() {
   }
 
   const selectedImage = orderedImages.find((img) => img.id === selectedImageId);
+  const isOneResultEdit = generation.provider === 'openai' && orderedImages.length === 1;
+  const canRegenerate = !isOneResultEdit;
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)]">
@@ -509,7 +547,11 @@ export default function GenerationResultPage() {
             {selectedImage && (
               <img
                 src={`${API_URL}/uploads/${selectedImage.filePath}`}
-                alt={v2WorkflowCopy?.selectedAlt ?? '생성된 목업 결과'}
+                alt={
+                  isOneResultEdit
+                    ? '선택된 v2 부분 수정 결과'
+                    : v2WorkflowCopy?.selectedAlt ?? '생성된 목업 결과'
+                }
                 className="max-h-[600px] rounded-lg object-contain"
               />
             )}
@@ -518,14 +560,24 @@ export default function GenerationResultPage() {
           {/* 이미지 목록 */}
           <div className="space-y-4">
             <h3 className="font-medium text-[var(--text-primary)]">
-              {isV2 ? '생성된 이미지 (2개)' : `생성된 이미지 (${orderedImages.length}개)`}
+              {isOneResultEdit
+                ? '수정 결과'
+                : isV2
+                  ? '생성된 이미지 (2개)'
+                  : `생성된 이미지 (${orderedImages.length}개)`}
             </h3>
             <div className="grid grid-cols-2 gap-3">
               {orderedImages.map((image, index) => (
                 <button
                   key={image.id}
                   onClick={() => handleSelectImage(image.id)}
-                  aria-label={isV2 ? `후보 ${index + 1} 선택` : `이미지 ${index + 1} 선택`}
+                  aria-label={
+                    isOneResultEdit
+                      ? '수정 결과 선택'
+                      : isV2
+                        ? `후보 ${index + 1} 선택`
+                        : `이미지 ${index + 1} 선택`
+                  }
                   aria-pressed={selectedImageId === image.id}
                   className={`relative overflow-hidden rounded-lg border-2 transition-all ${
                     selectedImageId === image.id
@@ -536,13 +588,15 @@ export default function GenerationResultPage() {
                   <img
                     src={`${API_URL}/uploads/${image.thumbnailPath || image.filePath}`}
                     alt={
-                      v2WorkflowCopy
+                      isOneResultEdit
+                        ? '선택된 v2 부분 수정 결과'
+                        : v2WorkflowCopy
                         ? `${v2WorkflowCopy.candidateAltPrefix} ${index + 1}`
                         : `생성 후보 ${index + 1}`
                     }
                     className="aspect-square w-full object-cover"
                   />
-                  {isV2 && (
+                  {isV2 && !isOneResultEdit && (
                     <span className="absolute left-2 top-2 rounded bg-black/70 px-2 py-1 text-xs text-white">
                       {V2_CANDIDATE_LABELS[index] ?? `후보 ${index + 1}`}
                     </span>
@@ -560,48 +614,44 @@ export default function GenerationResultPage() {
 
             {/* 추가 액션 */}
             <div className="space-y-2 pt-4">
-              {isV2 && (
-                <p id={disabledFollowupId} className="text-center text-xs text-[var(--text-tertiary)]">
-                  v2 후속 편집은 다음 업데이트에서 지원됩니다
-                </p>
-              )}
               <Button
                 variant="secondary"
                 className="w-full"
-                onClick={() => setShowEditModal(true)}
-                disabled={isV2}
-                aria-disabled={isV2}
-                aria-describedby={isV2 ? disabledFollowupId : undefined}
+                onClick={handleOpenEditModal}
+                disabled={!selectedImageId}
               >
-                ✏️ 부분 수정
+                부분 수정
               </Button>
               <Button
                 variant="secondary"
                 className="w-full"
                 onClick={handleSaveToHistory}
                 isLoading={isSaving}
+                disabled={!selectedImageId}
               >
-                📚 히스토리에 저장
+                히스토리에 저장
               </Button>
               <Button
                 variant="secondary"
                 className="w-full"
                 onClick={() => handleStyleCopy('ip-change')}
-                disabled={isV2}
-                aria-disabled={isV2}
-                aria-describedby={isV2 ? disabledFollowupId : undefined}
+                isLoading={isStartingStyleCopy}
+                disabled={
+                  isStartingStyleCopy || (generation.provider === 'openai' && !selectedImageId)
+                }
               >
-                {styleCopyIpChangeLabel}
+                스타일 복사 (IP 변경)
               </Button>
               <Button
                 variant="secondary"
                 className="w-full"
                 onClick={() => handleStyleCopy('new-product')}
-                disabled={isV2}
-                aria-disabled={isV2}
-                aria-describedby={isV2 ? disabledFollowupId : undefined}
+                isLoading={isStartingStyleCopy}
+                disabled={
+                  isStartingStyleCopy || (generation.provider === 'openai' && !selectedImageId)
+                }
               >
-                🧩 스타일 복사 (새 제품 적용)
+                스타일 복사 (새 제품 적용)
               </Button>
               {saveMessage && (
                 <p className="text-center text-sm text-[var(--text-secondary)]">{saveMessage}</p>
@@ -611,14 +661,12 @@ export default function GenerationResultPage() {
                 className="w-full"
                 onClick={handleRegenerateWithSameInputs}
                 isLoading={isRegenerating}
-                disabled={isV2}
-                aria-disabled={isV2}
-                aria-describedby={isV2 ? disabledFollowupId : undefined}
+                disabled={isRegenerating || !canRegenerate}
               >
-                🔁 동일 조건 재생성
+                동일 조건 재생성
               </Button>
               <Button variant="ghost" className="w-full" onClick={handleModifyConditions}>
-                🛠️ 조건 수정
+                조건 수정
               </Button>
             </div>
           </div>
@@ -629,29 +677,39 @@ export default function GenerationResultPage() {
       {showEditModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <div className="w-full max-w-md rounded-xl bg-[var(--bg-secondary)] p-6">
-            <h2 className="mb-4 text-xl font-semibold text-[var(--text-primary)]">✏️ 부분 수정</h2>
+            <h2 className="mb-4 text-xl font-semibold text-[var(--text-primary)]">부분 수정</h2>
             <p className="mb-4 text-sm text-[var(--text-secondary)]">
-              수정하고 싶은 부분을 자세히 설명해주세요. 요청한 부분만 변경되고 나머지는 유지됩니다.
+              선택한 결과에서 요청한 부분만 수정합니다. 제품 구조, 시점, 배경, 부자재, 라벨은
+              유지됩니다.
             </p>
             <Input
               label="수정 요청"
-              placeholder="예: 캐릭터 색상을 파란색으로 변경해주세요"
+              placeholder="예: 캐릭터 색상만 파란색으로 변경해주세요"
               value={editPrompt}
-              onChange={(e) => setEditPrompt(e.target.value)}
+              onChange={(e) => {
+                setEditPrompt(e.target.value);
+                if (editError) setEditError(null);
+              }}
               onKeyDown={(e) => e.key === 'Enter' && handleEdit()}
             />
+            {editError && <p className="mt-2 text-sm text-red-400">{editError}</p>}
             <div className="mt-6 flex justify-end gap-3">
               <Button
                 variant="secondary"
                 onClick={() => {
                   setShowEditModal(false);
                   setEditPrompt('');
+                  setEditError(null);
                 }}
               >
-                취소
+                수정 취소
               </Button>
-              <Button onClick={handleEdit} isLoading={isEditing} disabled={!editPrompt.trim()}>
-                수정 요청
+              <Button
+                onClick={handleEdit}
+                isLoading={isEditing}
+                disabled={!selectedImageId || isEditing}
+              >
+                {isEditing ? '수정 결과 생성 중...' : '수정 요청'}
               </Button>
             </div>
           </div>

@@ -175,6 +175,7 @@ export default function HistoryPage() {
                         <button
                           onClick={(e) => handleDeleteGeneration(e, item.id)}
                           disabled={deletingId === item.id}
+                          aria-label="히스토리 삭제"
                           className="rounded-full p-1.5 text-[var(--text-tertiary)] transition-colors hover:bg-red-500/10 hover:text-red-500 disabled:opacity-50"
                           title="히스토리 삭제"
                         >
@@ -231,7 +232,7 @@ export default function HistoryPage() {
               아직 저장된 목업이 없습니다
             </h3>
             <p className="mb-4 text-[var(--text-secondary)]">
-              스케치 실사화 결과를 저장하면 여기에서 다시 열 수 있습니다.
+              목업 결과를 저장하면 여기에서 다시 열고 후속 작업을 이어갈 수 있습니다.
             </p>
             <Button onClick={() => router.push(`/projects/${projectId}`)}>목업 생성하기</Button>
           </div>
