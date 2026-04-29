@@ -205,6 +205,24 @@ beforeEach(() => {
 });
 
 describe('processGenerationJob provider continuation', () => {
+  it('accepts a complete admin-retried OpenAI style-copy payload before dispatch', async () => {
+    const jobData = baseOpenAIJob({
+      provider: 'openai',
+      providerModel: 'gpt-image-2',
+      styleReferenceId: 'style-ref-1',
+      copyTarget: 'ip-change',
+      selectedImageId: 'style-img-2',
+    });
+    mockGenerationLookup(generationRecord(), openAIReference());
+
+    const result = await processGenerationJob({ data: jobData });
+
+    expect(result).toEqual({ success: true, imageCount: 2 });
+    expect(openaiImageService.generateStyleCopyWithLinkage).toHaveBeenCalled();
+    expect(openaiImageService.generateStyleCopyFromImage).not.toHaveBeenCalled();
+    expect(geminiService.generateWithStyleCopy).not.toHaveBeenCalled();
+  });
+
   it('uses OpenAI linkage before selected-image fallback for style copy', async () => {
     const jobData = baseOpenAIJob();
     mockGenerationLookup(generationRecord(), openAIReference());
