@@ -787,6 +787,25 @@ describe('AdminService - retryGeneration', () => {
     );
   });
 
+  it('rolls status back to failed when queue enqueue fails', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { addGenerationJob } = await import('../../lib/queue.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.generation.findUnique).mockResolvedValue(mockGeneration as any);
+    vi.mocked(prisma.generation.update)
+      .mockResolvedValueOnce({ ...mockGeneration, status: 'pending', errorMessage: null } as any)
+      .mockResolvedValueOnce({ ...mockGeneration, status: 'failed', errorMessage: 'queue down' } as any);
+    vi.mocked(addGenerationJob).mockRejectedValue(new Error('queue down'));
+
+    await expect(adminService.retryGeneration('gen1')).rejects.toThrow('queue down');
+
+    expect(vi.mocked(prisma.generation.update)).toHaveBeenLastCalledWith({
+      where: { id: 'gen1' },
+      data: { status: 'failed', errorMessage: 'queue down' },
+    });
+  });
+
   it('should throw error if generation not found', async () => {
     const { prisma } = await import('../../lib/prisma.js');
     const { adminService } = await import('../admin.service.js');

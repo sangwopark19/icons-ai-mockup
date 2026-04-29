@@ -551,15 +551,6 @@ export class AdminService {
       throw new Error('Only failed generations can be retried');
     }
 
-    const updated = await prisma.generation.update({
-      where: { id },
-      data: {
-        status: 'pending',
-        errorMessage: null,
-        retryCount: { increment: 1 },
-      },
-    });
-
     const promptData = (generation.promptData as StoredGenerationPromptData) ?? {};
     const options = (generation.options as StoredGenerationOptions) ?? {};
     const projectUploadPrefix = `uploads/${generation.project.userId}/${generation.projectId}`;
@@ -571,12 +562,11 @@ export class AdminService {
     ]);
     const copyTarget = copyTargetValue(promptData.copyTarget);
     const selectedImageId = stringValue(promptData.selectedImageId);
-
-    await addGenerationJob({
+    const jobData: GenerationJobData = {
       generationId: generation.id,
       userId: generation.project.userId,
       projectId: generation.projectId,
-      mode: generation.mode as 'ip_change' | 'sketch_to_real',
+      mode: generation.mode as GenerationJobData['mode'],
       provider: generation.provider,
       providerModel: generation.providerModel,
       styleReferenceId: generation.styleReferenceId ?? undefined,
@@ -585,9 +575,28 @@ export class AdminService {
       sourceImagePath,
       characterImagePath,
       textureImagePath,
-      prompt: promptData.userPrompt as string | undefined,
+      prompt: stringValue(promptData.userPrompt),
       options: buildRetryGenerationOptions(options, promptData),
+    };
+
+    const updated = await prisma.generation.update({
+      where: { id },
+      data: {
+        status: 'pending',
+        errorMessage: null,
+        retryCount: { increment: 1 },
+      },
     });
+
+    try {
+      await addGenerationJob(jobData);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '작업 큐 등록에 실패했습니다';
+      await prisma.generation
+        .update({ where: { id }, data: { status: 'failed', errorMessage: message } })
+        .catch(() => undefined);
+      throw error;
+    }
 
     return updated;
   }
