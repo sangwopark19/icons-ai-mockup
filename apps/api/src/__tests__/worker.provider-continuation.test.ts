@@ -4,8 +4,8 @@ import type { GenerationJobData } from '../lib/queue.js';
 vi.mock('bullmq', () => ({
   Worker: vi.fn(function WorkerMock() {
     return {
-    close: vi.fn().mockResolvedValue(undefined),
-    on: vi.fn(),
+      close: vi.fn().mockResolvedValue(undefined),
+      on: vi.fn(),
     };
   }),
 }));
@@ -158,6 +158,7 @@ beforeEach(() => {
 
   vi.mocked(adminService.getActiveApiKey).mockResolvedValue({
     id: 'api-key-1',
+    provider: 'openai',
     key: 'openai-key',
   });
   vi.mocked(adminService.incrementCallCount).mockResolvedValue(undefined);
@@ -168,13 +169,13 @@ beforeEach(() => {
     async (_userId, _projectId, generationId, buffer, index) => ({
       filePath: `generations/user-1/project-1/${generationId}/output_${index + 1}.png`,
       thumbnailPath: null,
-      metadata: { width: 1, height: 1, size: buffer.length },
+      metadata: { width: 1, height: 1, format: 'png', size: buffer.length },
     })
   );
   vi.mocked(generationService.updateStatus).mockResolvedValue(undefined);
   vi.mocked(generationService.updateOpenAIMetadata).mockResolvedValue(undefined);
   vi.mocked(generationService.deleteGeneratedOutputImages).mockResolvedValue(undefined);
-  vi.mocked(generationService.saveGeneratedImage).mockResolvedValue(undefined);
+  vi.mocked(generationService.saveGeneratedImage).mockResolvedValue({} as never);
   vi.mocked(generationService.updateThoughtSignatures).mockResolvedValue(undefined);
   vi.mocked(openaiImageService.generateIPChange).mockResolvedValue(twoImageResult('ip-change'));
   vi.mocked(openaiImageService.generateSketchToReal).mockResolvedValue(
@@ -229,9 +230,7 @@ describe('processGenerationJob provider continuation', () => {
     expect(openaiImageService.generateStyleCopyWithLinkage).not.toHaveBeenCalled();
     expect(openaiImageService.generateStyleCopyFromImage).toHaveBeenCalledWith(
       'openai-key',
-      Buffer.from('file:generations/user-1/project-1/style-ref-1/output_2.png').toString(
-        'base64'
-      ),
+      Buffer.from('file:generations/user-1/project-1/style-ref-1/output_2.png').toString('base64'),
       Buffer.from(`file:${jobData.characterImagePath}`).toString('base64'),
       expect.objectContaining({ copyTarget: 'ip-change', quality: 'high' })
     );

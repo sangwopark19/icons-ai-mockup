@@ -88,73 +88,293 @@ const parseThoughtSignatures = (value: unknown): ThoughtSignatureData[] => {
   return parsed;
 };
 
+const getErrorRecord = (error: unknown): Record<string, unknown> =>
+  error && typeof error === 'object' ? (error as Record<string, unknown>) : {};
+
+const getOpenAIErrorStatus = (error: unknown): number | undefined => {
+  const record = getErrorRecord(error);
+  const status = record.status ?? record.statusCode;
+  return typeof status === 'number' && Number.isFinite(status) ? status : undefined;
+};
+
+const getOpenAIErrorCode = (error: unknown): string | undefined => {
+  const code = getErrorRecord(error).code;
+  return typeof code === 'string' ? code : undefined;
+};
+
+const getOpenAIErrorMessage = (error: unknown): string | undefined => {
+  if (error instanceof Error) return error.message;
+  const message = getErrorRecord(error).message;
+  return typeof message === 'string' ? message : undefined;
+};
+
+export function isRecoverableOpenAILinkageError(error: unknown): boolean {
+  const status = getOpenAIErrorStatus(error);
+  const code = getOpenAIErrorCode(error)?.toLowerCase() ?? '';
+  const message = getOpenAIErrorMessage(error)?.toLowerCase() ?? '';
+  const searchable = `${code} ${message}`;
+
+  if (
+    status === 401 ||
+    status === 403 ||
+    status === 429 ||
+    /authentication|unauthorized|permission|forbidden|organization verification|api key|insufficient_quota|rate[-_ ]?limit/.test(
+      searchable
+    )
+  ) {
+    return false;
+  }
+
+  if (status === 404 || status === 410 || (typeof status === 'number' && status >= 500)) {
+    return true;
+  }
+
+  return (
+    code === 'invalid_response' ||
+    code === 'response_not_found' ||
+    code === 'response_expired' ||
+    /invalid_response|expired response|response expired|response not found|missing response/.test(
+      searchable
+    )
+  );
+}
+
+const summarizeOpenAILinkageError = (error: unknown): string => {
+  const status = getOpenAIErrorStatus(error);
+  const code = getOpenAIErrorCode(error);
+  const message = getOpenAIErrorMessage(error);
+  const parts = [
+    status !== undefined ? `status=${status}` : null,
+    code ? `code=${code}` : null,
+    message ? `message=${message}` : null,
+  ].filter(Boolean);
+
+  return parts.length > 0 ? parts.join('; ') : 'unknown OpenAI linkage error';
+};
+
+const selectStyleReferenceImage = (
+  images: GeneratedImageReference[],
+  selectedImageId?: string
+): GeneratedImageReference => {
+  const image =
+    (selectedImageId ? images.find((item) => item.id === selectedImageId) : undefined) ??
+    images.find((item) => item.isSelected) ??
+    images[0];
+
+  if (!image) {
+    throw new Error('스타일 기준 이미지가 없습니다');
+  }
+
+  return image;
+};
+
+const resolveOpenAIStyleCopyTargetBase64 = (
+  copyTarget: OpenAIStyleCopyTarget,
+  sourceImageBase64: string | undefined,
+  characterImageBase64: string | undefined
+): string => {
+  if (copyTarget === 'ip-change') {
+    if (!characterImageBase64) {
+      throw new Error('IP 변경 스타일 복사에는 새 캐릭터 이미지가 필요합니다');
+    }
+    return characterImageBase64;
+  }
+
+  if (!sourceImageBase64) {
+    throw new Error('새 제품 스타일 복사에는 새 제품 이미지가 필요합니다');
+  }
+  return sourceImageBase64;
+};
+
+const requireTwoOpenAIStyleCopyImages = (result: OpenAIImageGenerationResult): void => {
+  if (result.images.length !== 2) {
+    throw new Error('OpenAI 스타일 복사 결과 이미지가 부족합니다');
+  }
+};
+
+const readStyleReferenceImageBase64 = async (
+  referenceImage: GeneratedImageReference
+): Promise<string> => {
+  const referenceBuffer = await uploadService.readFile(referenceImage.filePath);
+  return referenceBuffer.toString('base64');
+};
+
+const generateOpenAIStyleCopy = async (params: {
+  activeApiKey: string;
+  userId: string;
+  jobData: GenerationJobData;
+  sourceImageBase64?: string;
+  characterImageBase64?: string;
+}): Promise<OpenAIImageGenerationResult> => {
+  const { activeApiKey, userId, jobData, sourceImageBase64, characterImageBase64 } = params;
+  const { copyTarget, styleReferenceId, selectedImageId, options } = jobData;
+
+  if (!styleReferenceId) {
+    throw new Error('OpenAI 스타일 복사에는 스타일 기준 결과가 필요합니다');
+  }
+
+  if (!copyTarget) {
+    throw new Error('OpenAI 스타일 복사에는 복사 대상이 필요합니다');
+  }
+
+  const reference = await generationService.getById(userId, styleReferenceId);
+  if (!reference) {
+    throw new Error('스타일 참조 생성 기록을 찾을 수 없습니다');
+  }
+
+  if (reference.provider !== 'openai') {
+    throw new Error('OpenAI 스타일 복사는 OpenAI 기준 결과만 사용할 수 있습니다');
+  }
+
+  const referenceImage = selectStyleReferenceImage(
+    (reference.images || []) as GeneratedImageReference[],
+    selectedImageId
+  );
+  const targetImageBase64 = resolveOpenAIStyleCopyTargetBase64(
+    copyTarget,
+    sourceImageBase64,
+    characterImageBase64
+  );
+  const styleOptions = {
+    copyTarget,
+    quality: options.quality,
+    userInstructions: options.userInstructions,
+  };
+  const linkage: OpenAIStyleCopyLinkage & { providerTrace?: unknown } = {
+    openaiResponseId: reference.openaiResponseId,
+    openaiImageCallId: reference.openaiImageCallId,
+    providerTrace: reference.providerTrace,
+  };
+  let result: OpenAIImageGenerationResult;
+  let linkageFallbackUsed = false;
+  let linkageFallbackReason: string | undefined;
+
+  const generateFromSelectedImage = async () => {
+    const styleImageBase64 = await readStyleReferenceImageBase64(referenceImage);
+    return openaiImageService.generateStyleCopyFromImage(
+      activeApiKey,
+      styleImageBase64,
+      targetImageBase64,
+      styleOptions
+    );
+  };
+
+  if (linkage.openaiResponseId || linkage.openaiImageCallId) {
+    try {
+      result = await openaiImageService.generateStyleCopyWithLinkage(
+        activeApiKey,
+        targetImageBase64,
+        linkage,
+        styleOptions
+      );
+    } catch (error) {
+      if (!isRecoverableOpenAILinkageError(error)) {
+        throw error;
+      }
+
+      linkageFallbackUsed = true;
+      linkageFallbackReason = summarizeOpenAILinkageError(error);
+      result = await generateFromSelectedImage();
+    }
+  } else {
+    result = await generateFromSelectedImage();
+  }
+
+  requireTwoOpenAIStyleCopyImages(result);
+
+  return {
+    ...result,
+    providerTrace: {
+      ...result.providerTrace,
+      copyTarget,
+      styleReferenceId,
+      styleSourceImageId: referenceImage.id,
+      linkageFallbackUsed,
+      ...(linkageFallbackReason ? { linkageFallbackReason } : {}),
+    },
+  };
+};
+
 /**
  * 생성 작업 처리 워커
  */
 export async function processGenerationJob(
   job: Pick<Job<GenerationJobData>, 'data'>
 ): Promise<{ success: true; imageCount: number }> {
-    const { generationId, userId, projectId, options } = job.data;
-    let openAIMetadata: OpenAIImageGenerationResult | undefined;
-    let openAIMetadataSaved = false;
-    console.log(`🚀 생성 작업 시작: ${generationId}`);
+  const { generationId, userId, projectId, options } = job.data;
+  let openAIMetadata: OpenAIImageGenerationResult | undefined;
+  let openAIMetadataSaved = false;
+  console.log(`🚀 생성 작업 시작: ${generationId}`);
 
-    try {
-      const generation = await generationService.getById(userId, generationId);
-      if (!generation) {
-        throw new Error('생성 기록을 찾을 수 없습니다');
+  try {
+    const generation = await generationService.getById(userId, generationId);
+    if (!generation) {
+      throw new Error('생성 기록을 찾을 수 없습니다');
+    }
+
+    if (job.data.provider !== generation.provider) {
+      throw new Error('저장된 provider와 큐 provider가 일치하지 않아 작업을 실행할 수 없습니다.');
+    }
+
+    if (job.data.providerModel !== generation.providerModel) {
+      throw new Error('저장된 providerModel과 큐 providerModel이 일치하지 않습니다.');
+    }
+
+    const provider = generation.provider;
+    const mode = generation.mode;
+
+    // DB에서 활성 API 키 조회 (작업별 1회, 캐싱 없음 — CONTEXT.md 정책)
+    const { id: activeKeyId, key: activeApiKey } = await adminService.getActiveApiKey(provider);
+
+    // 상태를 processing으로 업데이트
+    await generationService.updateStatus(generationId, 'processing');
+
+    // 이미지 파일 로드
+    let sourceImageBase64: string | undefined;
+    let characterImageBase64: string | undefined;
+    let textureImageBase64: string | undefined;
+
+    if (job.data.sourceImagePath) {
+      const buffer = await uploadService.readFile(job.data.sourceImagePath);
+      sourceImageBase64 = buffer.toString('base64');
+    }
+
+    if (job.data.characterImagePath) {
+      const buffer = await uploadService.readFile(job.data.characterImagePath);
+      characterImageBase64 = buffer.toString('base64');
+    }
+
+    if (job.data.textureImagePath) {
+      const buffer = await uploadService.readFile(job.data.textureImagePath);
+      textureImageBase64 = buffer.toString('base64');
+    }
+
+    let generatedImages: Buffer[];
+    let thoughtSignatures: ThoughtSignatureData[] = [];
+
+    if (mode === 'ip_change') {
+      if (!sourceImageBase64 || !characterImageBase64) {
+        throw new Error('IP 변경에는 원본 이미지와 캐릭터 이미지가 필요합니다');
       }
 
-      if (job.data.provider !== generation.provider) {
-        throw new Error('저장된 provider와 큐 provider가 일치하지 않아 작업을 실행할 수 없습니다.');
-      }
-
-      if (job.data.providerModel !== generation.providerModel) {
-        throw new Error('저장된 providerModel과 큐 providerModel이 일치하지 않습니다.');
-      }
-
-      const provider = generation.provider;
-      const mode = generation.mode;
-
-      // DB에서 활성 API 키 조회 (작업별 1회, 캐싱 없음 — CONTEXT.md 정책)
-      const { id: activeKeyId, key: activeApiKey } = await adminService.getActiveApiKey(provider);
-
-      // 상태를 processing으로 업데이트
-      await generationService.updateStatus(generationId, 'processing');
-
-      // 이미지 파일 로드
-      let sourceImageBase64: string | undefined;
-      let characterImageBase64: string | undefined;
-      let textureImageBase64: string | undefined;
-
-      if (job.data.sourceImagePath) {
-        const buffer = await uploadService.readFile(job.data.sourceImagePath);
-        sourceImageBase64 = buffer.toString('base64');
-      }
-
-      if (job.data.characterImagePath) {
-        const buffer = await uploadService.readFile(job.data.characterImagePath);
-        characterImageBase64 = buffer.toString('base64');
-      }
-
-      if (job.data.textureImagePath) {
-        const buffer = await uploadService.readFile(job.data.textureImagePath);
-        textureImageBase64 = buffer.toString('base64');
-      }
-
-      let generatedImages: Buffer[];
-      let thoughtSignatures: ThoughtSignatureData[] = [];
-
-      if (mode === 'ip_change') {
-        if (!sourceImageBase64 || !characterImageBase64) {
-          throw new Error('IP 변경에는 원본 이미지와 캐릭터 이미지가 필요합니다');
-        }
-
-        if (provider === 'openai') {
-          if (job.data.styleReferenceId) {
-            throw new Error('OpenAI IP 변경 v2는 스타일 참조를 지원하지 않습니다');
-          }
-
+      if (provider === 'openai') {
+        if (job.data.styleReferenceId) {
+          const result = await generateOpenAIStyleCopy({
+            activeApiKey,
+            userId,
+            jobData: job.data,
+            sourceImageBase64,
+            characterImageBase64,
+          });
+          const tracedResult = attachOpenAIWorkerTrace(result, job);
+          openAIMetadata = tracedResult;
+          await adminService.incrementCallCount(
+            provider,
+            activeKeyId,
+            getPositiveNumber(tracedResult.providerTrace.externalRequestCount, 1)
+          );
+          generatedImages = tracedResult.images;
+        } else {
           const result = await openaiImageService.generateIPChange(
             activeApiKey,
             sourceImageBase64,
@@ -181,94 +401,107 @@ export async function processGenerationJob(
             getPositiveNumber(tracedResult.providerTrace.externalRequestCount, 1)
           );
           generatedImages = tracedResult.images;
-        } else if (job.data.styleReferenceId) {
-          const reference = await generationService.getById(userId, job.data.styleReferenceId);
-          if (!reference) {
-            throw new Error('스타일 참조 생성 기록을 찾을 수 없습니다');
-          }
+        }
+      } else if (job.data.styleReferenceId) {
+        const reference = await generationService.getById(userId, job.data.styleReferenceId);
+        if (!reference) {
+          throw new Error('스타일 참조 생성 기록을 찾을 수 없습니다');
+        }
 
-          const referenceImages = reference.images || [];
-          if (referenceImages.length === 0) {
-            throw new Error('스타일 참조 이미지가 없습니다');
-          }
+        const referenceImages = reference.images || [];
+        if (referenceImages.length === 0) {
+          throw new Error('스타일 참조 이미지가 없습니다');
+        }
 
-          const selectedIndex = referenceImages.findIndex((img) => img.isSelected);
-          const referenceImage = referenceImages[selectedIndex >= 0 ? selectedIndex : 0];
-          const referenceBuffer = await uploadService.readFile(referenceImage.filePath);
-          const referenceBase64 = referenceBuffer.toString('base64');
-          const signatureData = parseThoughtSignatures(reference.thoughtSignatures);
-          const signature =
-            signatureData[selectedIndex >= 0 ? selectedIndex : 0] || signatureData[0];
+        const selectedIndex = referenceImages.findIndex((img) => img.isSelected);
+        const referenceImage = referenceImages[selectedIndex >= 0 ? selectedIndex : 0];
+        const referenceBuffer = await uploadService.readFile(referenceImage.filePath);
+        const referenceBase64 = referenceBuffer.toString('base64');
+        const signatureData = parseThoughtSignatures(reference.thoughtSignatures);
+        const signature = signatureData[selectedIndex >= 0 ? selectedIndex : 0] || signatureData[0];
 
-          if (!signature) {
-            throw new Error('스타일 참조 thoughtSignature가 없습니다');
-          }
+        if (!signature) {
+          throw new Error('스타일 참조 thoughtSignature가 없습니다');
+        }
 
-          const newParts = [
-            { text: '캐릭터를 변경하되 동일한 스타일(배치, 각도, 효과) 유지' },
-            {
-              inlineData: {
-                mimeType: 'image/png',
-                data: characterImageBase64,
-              },
+        const newParts = [
+          { text: '캐릭터를 변경하되 동일한 스타일(배치, 각도, 효과) 유지' },
+          {
+            inlineData: {
+              mimeType: 'image/png',
+              data: characterImageBase64,
             },
-          ];
+          },
+        ];
 
-          await adminService.incrementCallCount(provider, activeKeyId);
-          const result = await geminiService.generateWithStyleCopy(
-            activeApiKey,
-            (reference.promptData as any)?.userPrompt || '원본 스타일 생성 요청',
-            referenceBase64,
-            signature,
-            newParts,
-            {
-              preserveStructure: options.preserveStructure,
-              transparentBackground: options.transparentBackground,
-              preserveHardware: options.preserveHardware,
-              fixedBackground: options.fixedBackground,
-              fixedViewpoint: options.fixedViewpoint,
-              removeShadows: options.removeShadows,
-              userInstructions: options.userInstructions,
-              hardwareSpecInput: options.hardwareSpecInput,
-              hardwareSpecs: options.hardwareSpecs,
-              prompt: job.data.prompt,
-            }
-          );
+        await adminService.incrementCallCount(provider, activeKeyId);
+        const result = await geminiService.generateWithStyleCopy(
+          activeApiKey,
+          (reference.promptData as any)?.userPrompt || '원본 스타일 생성 요청',
+          referenceBase64,
+          signature,
+          newParts,
+          {
+            preserveStructure: options.preserveStructure,
+            transparentBackground: options.transparentBackground,
+            preserveHardware: options.preserveHardware,
+            fixedBackground: options.fixedBackground,
+            fixedViewpoint: options.fixedViewpoint,
+            removeShadows: options.removeShadows,
+            userInstructions: options.userInstructions,
+            hardwareSpecInput: options.hardwareSpecInput,
+            hardwareSpecs: options.hardwareSpecs,
+            prompt: job.data.prompt,
+          }
+        );
 
-          generatedImages = result.images;
-          thoughtSignatures = result.signatures;
-        } else {
-          await adminService.incrementCallCount(provider, activeKeyId);
-          const result = await geminiService.generateIPChange(
+        generatedImages = result.images;
+        thoughtSignatures = result.signatures;
+      } else {
+        await adminService.incrementCallCount(provider, activeKeyId);
+        const result = await geminiService.generateIPChange(
+          activeApiKey,
+          sourceImageBase64,
+          characterImageBase64,
+          {
+            preserveStructure: options.preserveStructure,
+            transparentBackground: options.transparentBackground,
+            preserveHardware: options.preserveHardware,
+            fixedBackground: options.fixedBackground,
+            fixedViewpoint: options.fixedViewpoint,
+            removeShadows: options.removeShadows,
+            userInstructions: options.userInstructions,
+            hardwareSpecInput: options.hardwareSpecInput,
+            hardwareSpecs: options.hardwareSpecs,
+            prompt: job.data.prompt,
+          }
+        );
+        generatedImages = result.images;
+        thoughtSignatures = result.signatures;
+      }
+    } else if (mode === 'sketch_to_real') {
+      if (!sourceImageBase64) {
+        throw new Error('스케치 이미지가 필요합니다');
+      }
+
+      if (provider === 'openai') {
+        if (job.data.styleReferenceId) {
+          const result = await generateOpenAIStyleCopy({
             activeApiKey,
+            userId,
+            jobData: job.data,
             sourceImageBase64,
             characterImageBase64,
-            {
-              preserveStructure: options.preserveStructure,
-              transparentBackground: options.transparentBackground,
-              preserveHardware: options.preserveHardware,
-              fixedBackground: options.fixedBackground,
-              fixedViewpoint: options.fixedViewpoint,
-              removeShadows: options.removeShadows,
-              userInstructions: options.userInstructions,
-              hardwareSpecInput: options.hardwareSpecInput,
-              hardwareSpecs: options.hardwareSpecs,
-              prompt: job.data.prompt,
-            }
+          });
+          const tracedResult = attachOpenAIWorkerTrace(result, job);
+          openAIMetadata = tracedResult;
+          await adminService.incrementCallCount(
+            provider,
+            activeKeyId,
+            getPositiveNumber(tracedResult.providerTrace.externalRequestCount, 1)
           );
-          generatedImages = result.images;
-          thoughtSignatures = result.signatures;
-        }
-      } else if (mode === 'sketch_to_real') {
-        if (!sourceImageBase64) {
-          throw new Error('스케치 이미지가 필요합니다');
-        }
-
-        if (provider === 'openai') {
-          if (job.data.styleReferenceId) {
-            throw new Error('OpenAI 스케치 실사화 v2는 스타일 참조를 지원하지 않습니다');
-          }
-
+          generatedImages = tracedResult.images;
+        } else {
           const result = await openaiImageService.generateSketchToReal(
             activeApiKey,
             sourceImageBase64,
@@ -295,113 +528,110 @@ export async function processGenerationJob(
             getPositiveNumber(tracedResult.providerTrace.externalRequestCount, 1)
           );
           generatedImages = tracedResult.images;
-        } else {
-          await adminService.incrementCallCount(provider, activeKeyId);
-          const result = await geminiService.generateSketchToReal(
-            activeApiKey,
-            sourceImageBase64,
-            textureImageBase64 || null,
-            {
-              preserveStructure: options.preserveStructure,
-              transparentBackground: options.transparentBackground,
-              preserveHardware: options.preserveHardware,
-              fixedBackground: options.fixedBackground,
-              fixedViewpoint: options.fixedViewpoint,
-              removeShadows: options.removeShadows,
-              userInstructions: options.userInstructions,
-              hardwareSpecInput: options.hardwareSpecInput,
-              hardwareSpecs: options.hardwareSpecs,
-              prompt: job.data.prompt,
-            }
-          );
-          generatedImages = result.images;
-          thoughtSignatures = result.signatures;
         }
       } else {
-        throw new Error(`알 수 없는 생성 모드: ${mode}`);
-      }
-
-      if (openAIMetadata) {
-        await generationService.updateOpenAIMetadata(
-          generationId,
-          toOpenAIMetadataPayload(openAIMetadata)
-        );
-        openAIMetadataSaved = true;
-      }
-
-      const processedImages: ProcessedGeneratedImage[] = [];
-      for (const image of generatedImages) {
-        if (provider === 'openai' && mode === 'sketch_to_real' && options.transparentBackground) {
-          try {
-            const processed = await removeUniformLightBackground(image);
-            processedImages.push({
-              buffer: processed.buffer,
-              hasTransparency: processed.hasTransparency,
-            });
-          } catch {
-            throw new Error('배경 제거에 실패했습니다. 원본 결과를 저장하거나 다시 생성해주세요.');
+        await adminService.incrementCallCount(provider, activeKeyId);
+        const result = await geminiService.generateSketchToReal(
+          activeApiKey,
+          sourceImageBase64,
+          textureImageBase64 || null,
+          {
+            preserveStructure: options.preserveStructure,
+            transparentBackground: options.transparentBackground,
+            preserveHardware: options.preserveHardware,
+            fixedBackground: options.fixedBackground,
+            fixedViewpoint: options.fixedViewpoint,
+            removeShadows: options.removeShadows,
+            userInstructions: options.userInstructions,
+            hardwareSpecInput: options.hardwareSpecInput,
+            hardwareSpecs: options.hardwareSpecs,
+            prompt: job.data.prompt,
           }
-        } else {
-          processedImages.push({ buffer: image, hasTransparency: false });
-        }
-      }
-
-      await generationService.deleteGeneratedOutputImages(generationId);
-
-      // 생성된 이미지 저장
-      for (let i = 0; i < processedImages.length; i++) {
-        const image = processedImages[i];
-        const result = await uploadService.saveGeneratedImage(
-          userId,
-          projectId,
-          generationId,
-          image.buffer,
-          i
         );
-
-        await generationService.saveGeneratedImage(
-          generationId,
-          result.filePath,
-          result.thumbnailPath,
-          result.metadata,
-          { hasTransparency: image.hasTransparency, isSelected: i === 0 }
-        );
+        generatedImages = result.images;
+        thoughtSignatures = result.signatures;
       }
-
-      if (thoughtSignatures.length > 0) {
-        await generationService.updateThoughtSignatures(generationId, thoughtSignatures);
-      }
-
-      // 완료 상태로 업데이트
-      await generationService.updateStatus(generationId, 'completed');
-      console.log(`✅ 생성 작업 완료: ${generationId}`);
-
-      return { success: true, imageCount: generatedImages.length };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : '알 수 없는 오류';
-      console.error(`❌ 생성 작업 실패: ${generationId}`, error);
-
-      if (openAIMetadata && !openAIMetadataSaved) {
-        await generationService
-          .updateOpenAIMetadata(generationId, toOpenAIMetadataPayload(openAIMetadata))
-          .catch((metadataError) => {
-            console.error(`❌ OpenAI 메타데이터 저장 실패: ${generationId}`, metadataError);
-          });
-      }
-
-      await generationService.updateStatus(generationId, 'failed', message);
-      throw error;
+    } else {
+      throw new Error(`알 수 없는 생성 모드: ${mode}`);
     }
+
+    if (openAIMetadata) {
+      await generationService.updateOpenAIMetadata(
+        generationId,
+        toOpenAIMetadataPayload(openAIMetadata)
+      );
+      openAIMetadataSaved = true;
+    }
+
+    const processedImages: ProcessedGeneratedImage[] = [];
+    for (const image of generatedImages) {
+      if (provider === 'openai' && mode === 'sketch_to_real' && options.transparentBackground) {
+        try {
+          const processed = await removeUniformLightBackground(image);
+          processedImages.push({
+            buffer: processed.buffer,
+            hasTransparency: processed.hasTransparency,
+          });
+        } catch {
+          throw new Error('배경 제거에 실패했습니다. 원본 결과를 저장하거나 다시 생성해주세요.');
+        }
+      } else {
+        processedImages.push({ buffer: image, hasTransparency: false });
+      }
+    }
+
+    await generationService.deleteGeneratedOutputImages(generationId);
+
+    // 생성된 이미지 저장
+    for (let i = 0; i < processedImages.length; i++) {
+      const image = processedImages[i];
+      const result = await uploadService.saveGeneratedImage(
+        userId,
+        projectId,
+        generationId,
+        image.buffer,
+        i
+      );
+
+      await generationService.saveGeneratedImage(
+        generationId,
+        result.filePath,
+        result.thumbnailPath,
+        result.metadata,
+        { hasTransparency: image.hasTransparency, isSelected: i === 0 }
+      );
+    }
+
+    if (thoughtSignatures.length > 0) {
+      await generationService.updateThoughtSignatures(generationId, thoughtSignatures);
+    }
+
+    // 완료 상태로 업데이트
+    await generationService.updateStatus(generationId, 'completed');
+    console.log(`✅ 생성 작업 완료: ${generationId}`);
+
+    return { success: true, imageCount: generatedImages.length };
+  } catch (error) {
+    const message = getOpenAIErrorMessage(error) ?? '알 수 없는 오류';
+    console.error(`❌ 생성 작업 실패: ${generationId}`, error);
+
+    if (openAIMetadata && !openAIMetadataSaved) {
+      await generationService
+        .updateOpenAIMetadata(generationId, toOpenAIMetadataPayload(openAIMetadata))
+        .catch((metadataError) => {
+          console.error(`❌ OpenAI 메타데이터 저장 실패: ${generationId}`, metadataError);
+        });
+    }
+
+    await generationService.updateStatus(generationId, 'failed', message);
+    throw error;
+  }
 }
 
-const generationWorker = new Worker<GenerationJobData>(
-  'generation',
-  processGenerationJob,
-  {
-    connection: redis,
-    concurrency: 2, // 동시에 2개 작업 처리
-  }
-);
+const generationWorker = new Worker<GenerationJobData>('generation', processGenerationJob, {
+  connection: redis,
+  concurrency: 2, // 동시에 2개 작업 처리
+});
 
 // 이벤트 핸들러
 generationWorker.on('completed', (job) => {
