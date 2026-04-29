@@ -5,12 +5,34 @@ import { geminiService } from '../services/gemini.service.js';
 import { uploadService } from '../services/upload.service.js';
 import { generationService } from '../services/generation.service.js';
 import { adminService } from '../services/admin.service.js';
+import { openaiImageService } from '../services/openai-image.service.js';
+
+const OPENAI_KEY_MISSING_MESSAGE =
+  'OpenAI v2 API 키가 설정되어 있지 않습니다. 관리자에게 문의해주세요.';
+
+function isOpenAIKeyMissingError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return [
+    'OpenAI API 키',
+    'openai API 키',
+    '활성화된 API 키',
+    '활성화된 openai',
+  ].some((keyMissingText) => message.includes(keyMissingText));
+}
+
+function jsonObject(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+  return value as Record<string, unknown>;
+}
 
 /**
  * 부분 수정 요청 스키마
  */
 const EditRequestSchema = z.object({
   prompt: z.string().min(1, '수정 내용을 입력해주세요').max(500),
+  selectedImageId: z.string().uuid().optional(),
 });
 
 /**
@@ -38,8 +60,10 @@ const editRoutes: FastifyPluginAsync = async (fastify) => {
       });
     }
 
-    // 선택된 이미지 찾기
-    const selectedImage = generation.images.find((img) => img.isSelected);
+    // 선택된 이미지 찾기. selectedImageId는 조회된 generation.images 내부에서만 해석한다.
+    const selectedImage = body.selectedImageId
+      ? generation.images.find((img) => img.id === body.selectedImageId)
+      : generation.images.find((img) => img.isSelected);
     if (!selectedImage) {
       return reply.code(400).send({
         success: false,
@@ -47,35 +71,126 @@ const editRoutes: FastifyPluginAsync = async (fastify) => {
       });
     }
 
-    if (generation.provider !== 'gemini') {
+    if (generation.provider !== 'gemini' && generation.provider !== 'openai') {
       return reply.code(400).send({
         success: false,
         error: {
           code: 'UNSUPPORTED_PROVIDER_EDIT',
-          message: `${generation.provider} provider는 현재 부분 수정을 지원하지 않습니다.`,
+          message: '지원하지 않는 provider입니다.',
         },
       });
     }
 
     try {
-      // 원본 이미지 로드
+      if (generation.provider === 'gemini') {
+        // 원본 이미지 로드
+        const originalBuffer = await uploadService.readFile(selectedImage.filePath);
+        const originalBase64 = originalBuffer.toString('base64');
+
+        // DB에서 활성 API 키 조회
+        const { id: activeKeyId, key: activeApiKey } = await adminService.getActiveApiKey(
+          generation.provider
+        );
+
+        // Gemini API로 부분 수정
+        await adminService.incrementCallCount(generation.provider, activeKeyId);
+        const editResult = await geminiService.generateEdit(
+          activeApiKey,
+          originalBase64,
+          body.prompt
+        );
+
+        // 새 생성 기록 저장
+        const newGeneration = await prisma.generation.create({
+          data: {
+            projectId: generation.projectId,
+            ipCharacterId: generation.ipCharacterId,
+            sourceImageId: selectedImage.id,
+            mode: generation.mode,
+            status: 'completed',
+            provider: generation.provider,
+            providerModel: generation.providerModel,
+            promptData: {
+              ...jsonObject(generation.promptData),
+              editPrompt: body.prompt,
+              parentGenerationId: generationId,
+            },
+            options: generation.options as object,
+            completedAt: new Date(),
+          },
+        });
+
+        // 수정된 이미지 저장 (첫 번째 이미지를 선택 상태로 설정)
+        for (let i = 0; i < editResult.images.length; i++) {
+          const result = await uploadService.saveGeneratedImage(
+            user.id,
+            generation.projectId,
+            newGeneration.id,
+            editResult.images[i],
+            i
+          );
+
+          const savedImage = await generationService.saveGeneratedImage(
+            newGeneration.id,
+            result.filePath,
+            result.thumbnailPath,
+            result.metadata
+          );
+
+          // 첫 번째 이미지를 선택 상태로 설정 (히스토리 썸네일 표시용)
+          if (i === 0) {
+            await prisma.generatedImage.update({
+              where: { id: savedImage.id },
+              data: { isSelected: true },
+            });
+          }
+        }
+
+        // 히스토리 저장
+        await prisma.imageHistory.create({
+          data: {
+            imageId: selectedImage.id,
+            action: 'edit',
+            changes: { prompt: body.prompt },
+            filePath: selectedImage.filePath,
+          },
+        });
+
+        return reply.code(201).send({
+          success: true,
+          data: {
+            generationId: newGeneration.id,
+            message: '수정이 완료되었습니다',
+          },
+        });
+      }
+
+      const { id: activeKeyId, key: activeApiKey } = await adminService.getActiveApiKey('openai');
+      await adminService.incrementCallCount('openai', activeKeyId);
+
       const originalBuffer = await uploadService.readFile(selectedImage.filePath);
       const originalBase64 = originalBuffer.toString('base64');
+      const options = jsonObject(generation.options);
+      const quality = (options.quality as 'low' | 'medium' | 'high' | undefined) ?? 'medium';
 
-      // DB에서 활성 API 키 조회
-      const { id: activeKeyId, key: activeApiKey } = await adminService.getActiveApiKey(
-        generation.provider
-      );
-
-      // Gemini API로 부분 수정
-      await adminService.incrementCallCount(generation.provider, activeKeyId);
-      const editResult = await geminiService.generateEdit(
+      if (typeof reply.raw.setTimeout === 'function') {
+        try {
+          reply.raw.setTimeout(120_000);
+        } catch (timeoutError) {
+          const message = timeoutError instanceof Error ? timeoutError.message : '';
+          if (!message.includes('listener')) {
+            throw timeoutError;
+          }
+          reply.raw.setTimeout(120_000, () => undefined);
+        }
+      }
+      const editResult = await openaiImageService.generatePartialEdit(
         activeApiKey,
         originalBase64,
-        body.prompt
+        body.prompt,
+        { quality }
       );
 
-      // 새 생성 기록 저장
       const newGeneration = await prisma.generation.create({
         data: {
           projectId: generation.projectId,
@@ -83,45 +198,47 @@ const editRoutes: FastifyPluginAsync = async (fastify) => {
           sourceImageId: selectedImage.id,
           mode: generation.mode,
           status: 'completed',
-          provider: generation.provider,
+          provider: 'openai',
           providerModel: generation.providerModel,
           promptData: {
-            ...(generation.promptData as object),
+            ...jsonObject(generation.promptData),
             editPrompt: body.prompt,
             parentGenerationId: generationId,
+            selectedImageId: selectedImage.id,
           },
-          options: generation.options as object,
+          options: {
+            ...options,
+            outputCount: 1,
+          },
           completedAt: new Date(),
         },
       });
 
-      // 수정된 이미지 저장 (첫 번째 이미지를 선택 상태로 설정)
-      for (let i = 0; i < editResult.images.length; i++) {
-        const result = await uploadService.saveGeneratedImage(
-          user.id,
-          generation.projectId,
-          newGeneration.id,
-          editResult.images[i],
-          i
-        );
+      const outputImage = editResult.images[0];
+      const result = await uploadService.saveGeneratedImage(
+        user.id,
+        generation.projectId,
+        newGeneration.id,
+        outputImage,
+        0
+      );
 
-        const savedImage = await generationService.saveGeneratedImage(
-          newGeneration.id,
-          result.filePath,
-          result.thumbnailPath,
-          result.metadata
-        );
+      await generationService.saveGeneratedImage(
+        newGeneration.id,
+        result.filePath,
+        result.thumbnailPath,
+        result.metadata,
+        { isSelected: true }
+      );
 
-        // 첫 번째 이미지를 선택 상태로 설정 (히스토리 썸네일 표시용)
-        if (i === 0) {
-          await prisma.generatedImage.update({
-            where: { id: savedImage.id },
-            data: { isSelected: true },
-          });
-        }
-      }
+      await generationService.updateOpenAIMetadata(newGeneration.id, {
+        requestIds: editResult.requestIds,
+        responseId: editResult.responseId,
+        imageCallIds: editResult.imageCallIds,
+        revisedPrompt: editResult.revisedPrompt,
+        providerTrace: editResult.providerTrace,
+      });
 
-      // 히스토리 저장
       await prisma.imageHistory.create({
         data: {
           imageId: selectedImage.id,
@@ -139,6 +256,16 @@ const editRoutes: FastifyPluginAsync = async (fastify) => {
         },
       });
     } catch (error) {
+      if (generation.provider === 'openai' && isOpenAIKeyMissingError(error)) {
+        return reply.code(503).send({
+          success: false,
+          error: {
+            code: 'OPENAI_KEY_MISSING',
+            message: OPENAI_KEY_MISSING_MESSAGE,
+          },
+        });
+      }
+
       const message = error instanceof Error ? error.message : '수정에 실패했습니다';
       return reply.code(500).send({
         success: false,
