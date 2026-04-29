@@ -419,7 +419,7 @@ export class OpenAIImageService {
     };
     const baseRequest = {
       model: responsesModel,
-      tools: [{ type: 'image_generation', action: 'edit', quality }],
+      tools: [{ type: 'image_generation', model: this.model, action: 'edit', quality }],
     };
 
     let request: Record<string, unknown>;

@@ -439,7 +439,9 @@ describe('OpenAIImageService', () => {
     expect(firstCall.input).toHaveLength(1);
     expect(JSON.stringify(firstCall.input)).not.toContain('image_generation_call');
     expect(JSON.stringify(firstCall.input)).toContain('data:image/png;base64,');
-    expect(firstCall.tools).toEqual([{ type: 'image_generation', action: 'edit', quality: 'high' }]);
+    expect(firstCall.tools).toEqual([
+      { type: 'image_generation', model: 'gpt-image-2', action: 'edit', quality: 'high' },
+    ]);
     expect(firstCall.background).toBeUndefined();
     expect(firstCall.input_fidelity).toBeUndefined();
   });
