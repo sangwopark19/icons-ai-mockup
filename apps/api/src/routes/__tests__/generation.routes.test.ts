@@ -246,6 +246,38 @@ describe('generation routes', () => {
     await app.close();
   });
 
+  it('passes copyTarget selectedImageId and userInstructions through the copy-style route', async () => {
+    const app = await buildTestApp();
+    const { generationService } = await import('../../services/generation.service.js');
+    vi.mocked(generationService.copyStyle).mockResolvedValue({
+      id: 'gen-copy',
+      status: 'pending',
+      provider: 'openai',
+      providerModel: 'gpt-image-2',
+    } as any);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/00000000-0000-0000-0000-000000000001/copy-style',
+      payload: {
+        characterImagePath: 'characters/user1/new-character.png',
+        copyTarget: 'ip-change',
+        selectedImageId: '00000000-0000-0000-0000-000000000111',
+        userInstructions: 'keep the polished lighting',
+      },
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(vi.mocked(generationService.copyStyle)).toHaveBeenCalledWith('user1', expect.any(String), {
+      characterImagePath: 'characters/user1/new-character.png',
+      copyTarget: 'ip-change',
+      selectedImageId: '00000000-0000-0000-0000-000000000111',
+      userInstructions: 'keep the polished lighting',
+    });
+
+    await app.close();
+  });
+
   it('returns a structured 400 for invalid history query params', async () => {
     const app = await buildTestApp();
     const { generationService } = await import('../../services/generation.service.js');
