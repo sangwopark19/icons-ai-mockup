@@ -1060,6 +1060,97 @@ describe('GenerationService - regenerate', () => {
     );
   });
 
+  it.each([
+    {
+      copyTarget: 'ip-change' as const,
+      sourceImagePath: 'uploads/u1/proj1/original-product.png',
+      characterImagePath: 'characters/u1/new-character.png',
+    },
+    {
+      copyTarget: 'new-product' as const,
+      sourceImagePath: 'uploads/u1/proj1/new-product.png',
+      characterImagePath: 'characters/u1/original-character.png',
+    },
+  ])(
+    'replays OpenAI style-copy regeneration with persisted $copyTarget lineage',
+    async ({ copyTarget, sourceImagePath, characterImagePath }) => {
+      const { prisma } = await import('../../lib/prisma.js');
+      const { addGenerationJob } = await import('../../lib/queue.js');
+      const { generationService } = await import('../generation.service.js');
+
+      vi.mocked(prisma.project.findFirst).mockResolvedValue({ id: 'proj1', userId: 'u1' } as any);
+      vi.mocked(prisma.generation.findFirst).mockResolvedValue({
+        id: 'style-result-1',
+        projectId: 'proj1',
+        project: { userId: 'u1' },
+        images: [
+          {
+            id: 'generated-output-1',
+            filePath: 'generations/u1/proj1/style-result-1/output_1.png',
+            type: 'output',
+            createdAt: new Date('2026-04-28T00:00:00.000Z'),
+          },
+        ],
+        provider: 'openai',
+        providerModel: 'gpt-image-2',
+        mode: 'ip_change',
+        styleReferenceId: 'source-style-generation',
+        ipCharacterId: null,
+        userInstructions: null,
+        promptData: {
+          sourceImagePath,
+          characterImagePath,
+          copyTarget,
+          selectedImageId: 'style-source-image-2',
+          userPrompt: 'copy the approved treatment',
+        },
+        options: {
+          preserveStructure: true,
+          transparentBackground: false,
+          quality: 'medium',
+          outputCount: 2,
+          userInstructions: 'replace target only',
+        },
+      } as any);
+      vi.mocked(prisma.generation.create).mockResolvedValue({
+        id: 'style-regen-1',
+        projectId: 'proj1',
+        status: 'pending',
+        mode: 'ip_change',
+        provider: 'openai',
+        providerModel: 'gpt-image-2',
+      } as any);
+
+      await generationService.regenerate('u1', 'style-result-1');
+
+      expect(vi.mocked(prisma.generation.create).mock.calls[0][0].data).toMatchObject({
+        provider: 'openai',
+        providerModel: 'gpt-image-2',
+        styleReferenceId: 'source-style-generation',
+        promptData: expect.objectContaining({
+          sourceImagePath,
+          characterImagePath,
+          copyTarget,
+          selectedImageId: 'style-source-image-2',
+        }),
+        options: expect.objectContaining({
+          outputCount: 2,
+          userInstructions: 'replace target only',
+        }),
+      });
+      expect(vi.mocked(addGenerationJob).mock.calls[0][0]).toMatchObject({
+        provider: 'openai',
+        providerModel: 'gpt-image-2',
+        styleReferenceId: 'source-style-generation',
+        copyTarget,
+        selectedImageId: 'style-source-image-2',
+        sourceImagePath,
+        characterImagePath,
+        options: expect.objectContaining({ outputCount: 2 }),
+      });
+    }
+  );
+
   it('fails OpenAI regeneration clearly when stored source inputs are missing', async () => {
     const { prisma } = await import('../../lib/prisma.js');
     const { addGenerationJob } = await import('../../lib/queue.js');

@@ -474,11 +474,14 @@ export class GenerationService {
     const promptData = (original.promptData as Record<string, unknown>) || {};
     const options = (original.options as Record<string, unknown>) || {};
 
-    const regenerationInput = {
+    const regenerationInput: CreateGenerationInput = {
       projectId: original.projectId,
       mode: original.mode,
       provider: original.provider,
       providerModel: original.providerModel,
+      styleReferenceId: original.styleReferenceId ?? undefined,
+      copyTarget: promptData.copyTarget as GenerationCopyTarget | undefined,
+      selectedImageId: promptData.selectedImageId as string | undefined,
       sourceImagePath: promptData.sourceImagePath as string | undefined,
       characterId: original.ipCharacterId || undefined,
       characterImagePath: promptData.characterImagePath as string | undefined,
@@ -576,7 +579,13 @@ export class GenerationService {
       sourceImageId?: unknown;
     };
 
-    if (replayInput.selectedImageId || replayInput.sourceImageId) {
+    const isStyleCopyRegeneration = Boolean(
+      regenerationInput.styleReferenceId &&
+        regenerationInput.copyTarget &&
+        regenerationInput.selectedImageId
+    );
+
+    if ((replayInput.selectedImageId || replayInput.sourceImageId) && !isStyleCopyRegeneration) {
       throw new Error('OpenAI 재생성은 저장된 결과 이미지를 입력으로 사용할 수 없습니다');
     }
 
