@@ -505,6 +505,7 @@ export default function GenerationResultPage() {
 
   const selectedImage = orderedImages.find((img) => img.id === selectedImageId);
   const isOneResultEdit = generation.provider === 'openai' && orderedImages.length === 1;
+  const canRegenerate = !isOneResultEdit;
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)]">
@@ -660,7 +661,7 @@ export default function GenerationResultPage() {
                 className="w-full"
                 onClick={handleRegenerateWithSameInputs}
                 isLoading={isRegenerating}
-                disabled={isRegenerating}
+                disabled={isRegenerating || !canRegenerate}
               >
                 동일 조건 재생성
               </Button>

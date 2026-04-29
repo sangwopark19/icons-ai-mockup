@@ -116,7 +116,7 @@ export default function OpenAIStyleCopyPage() {
 
   const fetchStyleReference = useCallback(async () => {
     if (!accessToken || !styleRef || !imageId || !copyTarget) {
-      if (!styleRef || !copyTarget) {
+      if (!styleRef || !imageId || !copyTarget) {
         setStyleFetchError(GENERIC_START_ERROR);
       }
       return;
