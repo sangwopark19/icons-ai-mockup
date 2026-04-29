@@ -302,6 +302,16 @@ function buildImageWhere(params: Omit<ListImagesParams, 'page' | 'limit'>) {
   return where;
 }
 
+function hasDeleteScope(params: Omit<ListImagesParams, 'page' | 'limit'>): boolean {
+  return Boolean(
+    params.email ||
+      params.projectId ||
+      params.startDate ||
+      params.endDate ||
+      (params.ids && params.ids.length > 0)
+  );
+}
+
 export class AdminService {
   async getDashboardStats(): Promise<DashboardStats> {
     const now = new Date();
@@ -704,6 +714,10 @@ export class AdminService {
   async bulkDeleteImages(
     params: Omit<ListImagesParams, 'page' | 'limit'>
   ): Promise<{ deletedCount: number }> {
+    if (!hasDeleteScope(params)) {
+      throw new Error('벌크 삭제에는 최소 하나 이상의 필터가 필요합니다');
+    }
+
     const where = buildImageWhere(params);
 
     const images = await prisma.generatedImage.findMany({

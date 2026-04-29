@@ -1042,6 +1042,18 @@ describe('AdminService - bulkDeleteImages', () => {
     );
     expect(vi.mocked(uploadService.deleteFile)).toHaveBeenCalledWith('thumb2.jpg');
   });
+
+  it('should reject bulk delete without any scope filter', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { adminService } = await import('../admin.service.js');
+
+    await expect(adminService.bulkDeleteImages({})).rejects.toThrow(
+      '벌크 삭제에는 최소 하나 이상의 필터가 필요합니다'
+    );
+
+    expect(vi.mocked(prisma.generatedImage.findMany)).not.toHaveBeenCalled();
+    expect(vi.mocked(prisma.generatedImage.deleteMany)).not.toHaveBeenCalled();
+  });
 });
 
 // ─── Phase 4: API Key Management Tests ──────────────────────────────────────
