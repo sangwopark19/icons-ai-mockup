@@ -12,12 +12,9 @@ const OPENAI_KEY_MISSING_MESSAGE =
 
 function isOpenAIKeyMissingError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
-  return [
-    'OpenAI API 키',
-    'openai API 키',
-    '활성화된 API 키',
-    '활성화된 openai',
-  ].some((keyMissingText) => message.includes(keyMissingText));
+  return ['OpenAI API 키', 'openai API 키', '활성화된 API 키', '활성화된 openai'].some(
+    (keyMissingText) => message.includes(keyMissingText)
+  );
 }
 
 function jsonObject(value: unknown): Record<string, unknown> {
@@ -35,6 +32,36 @@ const EditRequestSchema = z.object({
   selectedImageId: z.string().uuid().optional(),
 });
 
+async function markChildGenerationCompleted(generationId: string): Promise<void> {
+  await prisma.generation.update({
+    where: { id: generationId },
+    data: {
+      status: 'completed',
+      errorMessage: null,
+      completedAt: new Date(),
+    },
+  });
+}
+
+async function markChildGenerationFailed(
+  generationId: string,
+  message: string,
+  logError: (error: unknown, message?: string) => void
+): Promise<void> {
+  await prisma.generation
+    .update({
+      where: { id: generationId },
+      data: {
+        status: 'failed',
+        errorMessage: message,
+        completedAt: new Date(),
+      },
+    })
+    .catch((statusError) => {
+      logError(statusError, '부분 수정 실패 상태 저장에 실패했습니다');
+    });
+}
+
 /**
  * 부분 수정 라우트
  */
@@ -49,7 +76,17 @@ const editRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post('/:id/edit', async (request, reply) => {
     const user = (request as any).user;
     const { id: generationId } = request.params as { id: string };
-    const body = EditRequestSchema.parse(request.body);
+    const parsedBody = EditRequestSchema.safeParse(request.body);
+    if (!parsedBody.success) {
+      return reply.code(400).send({
+        success: false,
+        error: {
+          code: 'INVALID_REQUEST',
+          message: parsedBody.error.issues[0]?.message ?? '잘못된 요청입니다',
+        },
+      });
+    }
+    const body = parsedBody.data;
 
     // 기존 생성 기록 조회
     const generation = await generationService.getById(user.id, generationId);
@@ -81,6 +118,8 @@ const editRoutes: FastifyPluginAsync = async (fastify) => {
       });
     }
 
+    let childGenerationId: string | null = null;
+
     try {
       if (generation.provider === 'gemini') {
         // 원본 이미지 로드
@@ -107,7 +146,7 @@ const editRoutes: FastifyPluginAsync = async (fastify) => {
             ipCharacterId: generation.ipCharacterId,
             sourceImageId: selectedImage.id,
             mode: generation.mode,
-            status: 'completed',
+            status: 'processing',
             provider: generation.provider,
             providerModel: generation.providerModel,
             promptData: {
@@ -116,9 +155,9 @@ const editRoutes: FastifyPluginAsync = async (fastify) => {
               parentGenerationId: generationId,
             },
             options: generation.options as object,
-            completedAt: new Date(),
           },
         });
+        childGenerationId = newGeneration.id;
 
         // 수정된 이미지 저장 (첫 번째 이미지를 선택 상태로 설정)
         for (let i = 0; i < editResult.images.length; i++) {
@@ -155,6 +194,8 @@ const editRoutes: FastifyPluginAsync = async (fastify) => {
             filePath: selectedImage.filePath,
           },
         });
+
+        await markChildGenerationCompleted(newGeneration.id);
 
         return reply.code(201).send({
           success: true,
@@ -197,7 +238,7 @@ const editRoutes: FastifyPluginAsync = async (fastify) => {
           ipCharacterId: generation.ipCharacterId,
           sourceImageId: selectedImage.id,
           mode: generation.mode,
-          status: 'completed',
+          status: 'processing',
           provider: 'openai',
           providerModel: generation.providerModel,
           promptData: {
@@ -210,9 +251,9 @@ const editRoutes: FastifyPluginAsync = async (fastify) => {
             ...options,
             outputCount: 1,
           },
-          completedAt: new Date(),
         },
       });
+      childGenerationId = newGeneration.id;
 
       const outputImage = editResult.images[0];
       const result = await uploadService.saveGeneratedImage(
@@ -248,6 +289,8 @@ const editRoutes: FastifyPluginAsync = async (fastify) => {
         },
       });
 
+      await markChildGenerationCompleted(newGeneration.id);
+
       return reply.code(201).send({
         success: true,
         data: {
@@ -256,6 +299,15 @@ const editRoutes: FastifyPluginAsync = async (fastify) => {
         },
       });
     } catch (error) {
+      const message = error instanceof Error ? error.message : '수정에 실패했습니다';
+      if (childGenerationId) {
+        await markChildGenerationFailed(
+          childGenerationId,
+          message,
+          fastify.log.error.bind(fastify.log)
+        );
+      }
+
       if (generation.provider === 'openai' && isOpenAIKeyMissingError(error)) {
         return reply.code(503).send({
           success: false,
@@ -266,7 +318,6 @@ const editRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      const message = error instanceof Error ? error.message : '수정에 실패했습니다';
       return reply.code(500).send({
         success: false,
         error: { code: 'EDIT_FAILED', message },

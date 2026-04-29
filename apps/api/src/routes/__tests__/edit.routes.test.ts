@@ -33,6 +33,7 @@ const mocks = vi.hoisted(() => ({
   prisma: {
     generation: {
       create: vi.fn(),
+      update: vi.fn(),
     },
     generatedImage: {
       update: vi.fn(),
@@ -162,8 +163,30 @@ describe('edit routes', () => {
       provider: 'openai',
       providerModel: 'gpt-image-2',
     });
+    mocks.prisma.generation.update.mockResolvedValue({});
     mocks.prisma.generatedImage.update.mockResolvedValue({});
     mocks.prisma.imageHistory.create.mockResolvedValue({});
+  });
+
+  it('returns INVALID_REQUEST for malformed edit payloads before loading generation', async () => {
+    const app = await buildTestApp();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/${ids.generation}/edit`,
+      payload: { prompt: '' },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(JSON.parse(response.body)).toEqual({
+      success: false,
+      error: { code: 'INVALID_REQUEST', message: '수정 내용을 입력해주세요' },
+    });
+    expect(mocks.generationService.getById).not.toHaveBeenCalled();
+    expect(mocks.geminiService.generateEdit).not.toHaveBeenCalled();
+    expect(mocks.openaiImageService.generatePartialEdit).not.toHaveBeenCalled();
+
+    await app.close();
   });
 
   it('keeps Gemini partial edit on geminiService.generateEdit', async () => {
@@ -184,6 +207,15 @@ describe('edit routes', () => {
       'change only the logo color to red'
     );
     expect(mocks.openaiImageService.generatePartialEdit).not.toHaveBeenCalled();
+    expect(mocks.prisma.generation.create.mock.calls[0][0].data.status).toBe('processing');
+    expect(mocks.prisma.generation.update).toHaveBeenCalledWith({
+      where: { id: ids.newGeneration },
+      data: {
+        status: 'completed',
+        errorMessage: null,
+        completedAt: expect.any(Date),
+      },
+    });
 
     await app.close();
   });
@@ -218,6 +250,15 @@ describe('edit routes', () => {
       { quality: 'high' }
     );
     expect(mocks.geminiService.generateEdit).not.toHaveBeenCalled();
+    expect(mocks.prisma.generation.create.mock.calls[0][0].data.status).toBe('processing');
+    expect(mocks.prisma.generation.update).toHaveBeenCalledWith({
+      where: { id: ids.newGeneration },
+      data: {
+        status: 'completed',
+        errorMessage: null,
+        completedAt: expect.any(Date),
+      },
+    });
 
     await app.close();
   });
@@ -257,22 +298,19 @@ describe('edit routes', () => {
     });
 
     expect(response.statusCode).toBe(201);
-    expect(mocks.generationService.updateOpenAIMetadata).toHaveBeenCalledWith(
-      ids.newGeneration,
-      {
-        requestIds: ['req_openai_1'],
-        responseId: 'resp_openai_1',
-        imageCallIds: ['img_openai_1'],
-        revisedPrompt: 'revised prompt',
-        providerTrace: {
-          provider: 'openai',
-          model: 'gpt-image-2',
-          endpoint: 'images.edit',
-          workflow: 'partial_edit',
-          outputCount: 1,
-        },
-      }
-    );
+    expect(mocks.generationService.updateOpenAIMetadata).toHaveBeenCalledWith(ids.newGeneration, {
+      requestIds: ['req_openai_1'],
+      responseId: 'resp_openai_1',
+      imageCallIds: ['img_openai_1'],
+      revisedPrompt: 'revised prompt',
+      providerTrace: {
+        provider: 'openai',
+        model: 'gpt-image-2',
+        endpoint: 'images.edit',
+        workflow: 'partial_edit',
+        outputCount: 1,
+      },
+    });
     expect(JSON.parse(response.body).data.providerTrace).toBeUndefined();
 
     await app.close();
@@ -349,6 +387,38 @@ describe('edit routes', () => {
     expect(response.statusCode).toBe(201);
     expect(mocks.openaiImageService.generatePartialEdit).toHaveBeenCalledTimes(1);
     expect(mocks.geminiService.generateEdit).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
+  it('marks OpenAI partial edit child generation failed when output persistence fails', async () => {
+    mocks.generationService.getById.mockResolvedValue(openAIGenerationFixture());
+    mocks.uploadService.saveGeneratedImage.mockRejectedValueOnce(new Error('disk full'));
+    const app = await buildTestApp();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/${ids.generation}/edit`,
+      payload: {
+        prompt: 'change only the logo color',
+        selectedImageId: ids.selectedImage,
+      },
+    });
+
+    expect(response.statusCode).toBe(500);
+    expect(JSON.parse(response.body)).toEqual({
+      success: false,
+      error: { code: 'EDIT_FAILED', message: 'disk full' },
+    });
+    expect(mocks.prisma.generation.create.mock.calls[0][0].data.status).toBe('processing');
+    expect(mocks.prisma.generation.update).toHaveBeenCalledWith({
+      where: { id: ids.newGeneration },
+      data: {
+        status: 'failed',
+        errorMessage: 'disk full',
+        completedAt: expect.any(Date),
+      },
+    });
 
     await app.close();
   });
