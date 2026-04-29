@@ -407,9 +407,11 @@ export class OpenAIImageService {
     const quality = options.quality ?? 'medium';
     const responsesModel = process.env.OPENAI_RESPONSES_IMAGE_MODEL ?? 'gpt-5.5';
     const prompt = this.buildStyleCopyPrompt(options);
+    const targetBuffer = this.decodeBase64Image(targetImageBase64);
+    const targetMimeType = this.detectMimeType(targetBuffer);
     const targetImageInput = {
       type: 'input_image',
-      image_url: `data:image/png;base64,${targetImageBase64}`,
+      image_url: `data:${targetMimeType};base64,${targetBuffer.toString('base64')}`,
     };
     const userInput = {
       role: 'user',

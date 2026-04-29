@@ -31,6 +31,10 @@ const testDir = dirname(fileURLToPath(import.meta.url));
 const pngBase64 = Buffer.from([
   0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00,
 ]).toString('base64');
+const jpegBase64 = Buffer.from([0xff, 0xd8, 0xff, 0xdb, 0x00]).toString('base64');
+const webpBase64 = Buffer.from([
+  0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50,
+]).toString('base64');
 
 describe('OpenAIImageService', () => {
   beforeEach(() => {
@@ -466,6 +470,27 @@ describe('OpenAIImageService', () => {
         }),
       ])
     );
+  });
+
+  it.each([
+    ['JPEG', jpegBase64, 'image/jpeg'],
+    ['WEBP', webpBase64, 'image/webp'],
+  ])('labels %s targets with the detected MIME type for Responses linkage', async (
+    _label,
+    base64,
+    mimeType
+  ) => {
+    const { openaiImageService } = await import('../openai-image.service.js');
+
+    await openaiImageService.generateStyleCopyWithLinkage(
+      'sk-test',
+      base64,
+      { openaiResponseId: 'resp_previous_1' },
+      { copyTarget: 'ip-change' }
+    );
+
+    const firstCall = mocks.responsesCreate.mock.calls[0][0];
+    expect(JSON.stringify(firstCall.input)).toContain(`data:${mimeType};base64,${base64}`);
   });
 
   it('throws when style copy linkage is missing', async () => {
