@@ -32,6 +32,21 @@ const API_KEY_PUBLIC_SELECT = {
   createdAt: true,
 } as const;
 
+function normalizePagination(
+  pageValue?: number,
+  limitValue?: number
+): { page: number; limit: number; skip: number } {
+  const page =
+    typeof pageValue === 'number' && Number.isInteger(pageValue) && pageValue > 0
+      ? pageValue
+      : 1;
+  const limit =
+    typeof limitValue === 'number' && Number.isInteger(limitValue) && limitValue > 0
+      ? Math.min(limitValue, 100)
+      : 20;
+  return { page, limit, skip: (page - 1) * limit };
+}
+
 function stringValue(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value : undefined;
 }
@@ -400,9 +415,7 @@ export class AdminService {
   }
 
   async listUsers(params: ListUsersParams): Promise<ListUsersResult> {
-    const page = params.page ?? 1;
-    const limit = params.limit ?? 20;
-    const skip = (page - 1) * limit;
+    const { page, limit, skip } = normalizePagination(params.page, params.limit);
 
     const where: Record<string, unknown> = {};
 
@@ -474,9 +487,7 @@ export class AdminService {
   }
 
   async listGenerations(params: ListGenerationsParams): Promise<ListGenerationsResult> {
-    const page = params.page ?? 1;
-    const limit = params.limit ?? 20;
-    const skip = (page - 1) * limit;
+    const { page, limit, skip } = normalizePagination(params.page, params.limit);
 
     const where: Record<string, unknown> = {};
 
@@ -623,9 +634,7 @@ export class AdminService {
   }
 
   async listGeneratedImages(params: ListImagesParams): Promise<ListImagesResult> {
-    const page = params.page ?? 1;
-    const limit = params.limit ?? 20;
-    const skip = (page - 1) * limit;
+    const { page, limit, skip } = normalizePagination(params.page, params.limit);
 
     const where = buildImageWhere(params);
 

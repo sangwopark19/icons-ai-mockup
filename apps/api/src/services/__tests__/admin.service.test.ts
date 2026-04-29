@@ -284,6 +284,22 @@ describe('AdminService - listUsers', () => {
     expect(result.pagination.limit).toBe(20);
   });
 
+  it('should normalize invalid pagination input', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.user.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.user.count).mockResolvedValue(0);
+
+    const result = await adminService.listUsers({ page: 0, limit: 0 });
+
+    expect(vi.mocked(prisma.user.findMany).mock.calls[0][0]).toMatchObject({
+      skip: 0,
+      take: 20,
+    });
+    expect(result.pagination).toMatchObject({ page: 1, limit: 20 });
+  });
+
   it('should apply case-insensitive email filter', async () => {
     const { prisma } = await import('../../lib/prisma.js');
     const { adminService } = await import('../admin.service.js');
@@ -575,6 +591,23 @@ describe('AdminService - listGenerations', () => {
     expect(result.pagination.limit).toBe(20);
   });
 
+  it('should clamp invalid generation pagination input', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.generation.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.generation.count).mockResolvedValue(0);
+    vi.mocked(prisma.generation.groupBy).mockResolvedValue([] as any);
+
+    const result = await adminService.listGenerations({ page: -2, limit: 500 });
+
+    expect(vi.mocked(prisma.generation.findMany).mock.calls[0][0]).toMatchObject({
+      skip: 0,
+      take: 100,
+    });
+    expect(result.pagination).toMatchObject({ page: 1, limit: 100 });
+  });
+
   it('maps safe OpenAI request-accounting fields from providerTrace', async () => {
     const { prisma } = await import('../../lib/prisma.js');
     const { adminService } = await import('../admin.service.js');
@@ -864,6 +897,22 @@ describe('AdminService - listGeneratedImages', () => {
 
     expect(result.images).toHaveLength(1);
     expect(result.pagination).toMatchObject({ page: 1, limit: 20, total: 1 });
+  });
+
+  it('should normalize invalid generated image pagination input', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.generatedImage.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.generatedImage.count).mockResolvedValue(0);
+
+    const result = await adminService.listGeneratedImages({ page: 0, limit: 0 });
+
+    expect(vi.mocked(prisma.generatedImage.findMany).mock.calls[0][0]).toMatchObject({
+      skip: 0,
+      take: 20,
+    });
+    expect(result.pagination).toMatchObject({ page: 1, limit: 20 });
   });
 
   it('should apply email filter through nested project.user relation', async () => {
