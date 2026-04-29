@@ -71,6 +71,10 @@ function qualityValue(value: unknown): GenerationJobData['options']['quality'] {
   return value === 'low' || value === 'medium' || value === 'high' ? value : undefined;
 }
 
+function copyTargetValue(value: unknown): GenerationJobData['copyTarget'] | undefined {
+  return value === 'ip-change' || value === 'new-product' ? value : undefined;
+}
+
 function retryStringOption(
   options: StoredGenerationOptions,
   promptData: StoredGenerationPromptData,
@@ -565,6 +569,8 @@ export class AdminService {
       validateRetryStoragePath(promptData.characterImagePath, [characterUploadPrefix], '캐릭터'),
       validateRetryStoragePath(promptData.textureImagePath, [projectUploadPrefix], '텍스처'),
     ]);
+    const copyTarget = copyTargetValue(promptData.copyTarget);
+    const selectedImageId = stringValue(promptData.selectedImageId);
 
     await addGenerationJob({
       generationId: generation.id,
@@ -574,6 +580,8 @@ export class AdminService {
       provider: generation.provider,
       providerModel: generation.providerModel,
       styleReferenceId: generation.styleReferenceId ?? undefined,
+      ...(copyTarget ? { copyTarget } : {}),
+      ...(selectedImageId ? { selectedImageId } : {}),
       sourceImagePath,
       characterImagePath,
       textureImagePath,
