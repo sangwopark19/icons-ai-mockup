@@ -459,10 +459,6 @@ export class GenerationService {
       throw new Error('생성 기록을 찾을 수 없습니다');
     }
 
-    if (original.provider === 'openai') {
-      throw new Error('OpenAI IP 변경 v2는 동일 조건 재생성을 지원하지 않습니다');
-    }
-
     const promptData = (original.promptData as Record<string, unknown>) || {};
     const options = (original.options as Record<string, unknown>) || {};
 
@@ -503,13 +499,13 @@ export class GenerationService {
     };
 
     // 재생성 입력값이 원본과 일치하는지 검증
-    this.validateRegenerationInputs(original.mode, promptData, options, regenerationInput);
+    this.validateRegenerationInputs(original, promptData, options, regenerationInput);
 
     return this.create(userId, regenerationInput);
   }
 
   private validateRegenerationInputs(
-    mode: Generation['mode'],
+    original: Generation & { images?: GeneratedImage[] },
     promptData: Record<string, unknown>,
     options: Record<string, unknown>,
     regenerationInput: CreateGenerationInput
@@ -527,13 +523,13 @@ export class GenerationService {
       throw new Error('재생성 옵션 값이 유효하지 않습니다');
     }
 
-    if (mode === 'ip_change') {
+    if (original.mode === 'ip_change') {
       if (!promptData.sourceImagePath || !promptData.characterImagePath) {
         throw new Error('재생성 입력값이 불완전합니다');
       }
     }
 
-    if (mode === 'sketch_to_real') {
+    if (original.mode === 'sketch_to_real') {
       if (!promptData.sourceImagePath) {
         throw new Error('재생성 입력값이 불완전합니다');
       }
@@ -552,6 +548,38 @@ export class GenerationService {
 
     if (normalizedOriginal !== normalizedNew) {
       throw new Error('재생성 입력값이 원본과 일치하지 않습니다');
+    }
+
+    if (original.provider === 'openai') {
+      this.validateOpenAIRegenerationSource(original, regenerationInput);
+    }
+  }
+
+  private validateOpenAIRegenerationSource(
+    original: Generation & { images?: GeneratedImage[] },
+    regenerationInput: CreateGenerationInput
+  ): void {
+    const replayInput = regenerationInput as CreateGenerationInput & {
+      selectedImageId?: unknown;
+      sourceImageId?: unknown;
+    };
+
+    if (replayInput.selectedImageId || replayInput.sourceImageId) {
+      throw new Error('OpenAI 재생성은 저장된 결과 이미지를 입력으로 사용할 수 없습니다');
+    }
+
+    const sourceImagePath = regenerationInput.sourceImagePath;
+    const generatedOutputPaths = new Set(
+      (original.images || [])
+        .filter((image) => image.type === 'output')
+        .map((image) => image.filePath)
+    );
+
+    if (
+      sourceImagePath &&
+      (sourceImagePath.startsWith('generations/') || generatedOutputPaths.has(sourceImagePath))
+    ) {
+      throw new Error('OpenAI 재생성은 저장된 결과 이미지를 입력으로 사용할 수 없습니다');
     }
   }
 
