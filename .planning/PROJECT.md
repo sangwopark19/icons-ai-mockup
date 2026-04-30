@@ -42,6 +42,7 @@
 - ✓ Provider-aware result/history labels, same-provider regeneration, OpenAI partial edit, and OpenAI style-copy continuation — Phase 10
 - ✓ OpenAI style-copy admin retry continuation metadata recovery — Phase 11
 - ✓ OpenAI Sketch to Real Phase 9 verification coverage and audit orphan closure — Phase 12
+- ✓ OpenAI IP Change v2 OIP-02 traceability aligned to supported structure/viewpoint/background/hardware options — Phase 13
 
 ### Active
 
@@ -98,6 +99,7 @@
 | OpenAI style copy는 Responses linkage 사용 | Gemini `thoughtSignature`를 그대로 재사용할 수 없음 | Complete in Phase 10; live smoke pending |
 | Admin retry reconstructs OpenAI style-copy continuation metadata from persisted `promptData` | Failed style-copy retries must preserve `copyTarget` and `selectedImageId` so worker guard checks pass without Gemini fallback | Complete in Phase 11 |
 | OSR-03 remains exception-scoped until final transparent PNG evidence exists | Phase 12 closed the missing verification/audit orphan gap, but final alpha/composite PNG evidence is still required before treating transparent Sketch output as fully live-passed | Complete in Phase 12 as `PARTIAL_WITH_MILESTONE_EXCEPTION` / `human_needed` |
+| OpenAI IP Change v2 does not expose transparent-background output | Current GPT Image 2 IP Change path supports structure/viewpoint/background/hardware preservation options, while direct `transparentBackground=true` submissions are rejected by route/service guards | Complete in Phase 13; Phase 8 live/browser evidence remains `human_needed` |
 
 ## Evolution
 
@@ -117,4 +119,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-30 after Phase 12 OpenAI Sketch verification closure*
+*Last updated: 2026-04-30 after Phase 13 IP Change verification note cleanup*
