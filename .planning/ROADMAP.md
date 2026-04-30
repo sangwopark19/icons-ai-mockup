@@ -91,7 +91,7 @@
     2. Transparent-background requests are proven through background-removal post-processing evidence or an explicit milestone exception
     3. Opaque and transparent Sketch to Real smoke/UAT evidence is sufficient for a follow-up milestone audit
 
-- [ ] **Phase 13: IP Change Verification Note Cleanup**
+- [x] **Phase 13: IP Change Verification Note Cleanup** — completed 2026-04-30
   - Goal: remove stale transparent-background references from Phase 8 verification and align OIP-02 traceability with the current runtime
   - Requirements: `OIP-02`
   - Gap Closure: closes v1.1 audit warning connecting the Phase 8 verification artifact to the current IP Change v2 runtime
@@ -198,10 +198,10 @@ Plans:
 **Required Skills**: `mockup-openai-dual-provider`, `mockup-openai-workflows`, `mockup-openai-image-runtime`, `mockup-ip-change`, `mockup-openai-cli-smoke`
 **Required Prompt Refs**: `.codex/skills/mockup-openai-workflows/references/workflow-matrix.md`, `.codex/skills/mockup-openai-workflows/references/prompt-playbook.md`, `.codex/skills/mockup-ip-change/references/gpt-image-2-notes.md`
 **Gap Closure**: Closes v1.1 audit warning that Phase 8 verification still mentions transparent-background option carry-through for IP Change v2.
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 Plans:
 **Wave 1**
-- [ ] 13-01-PLAN.md — Correct IP Change verification notes and close OIP-02 traceability
+- [x] 13-01-PLAN.md — Correct IP Change verification notes and close OIP-02 traceability
 **Success Criteria** (what must be TRUE):
   1. Phase 8 verification and related release notes accurately describe current IP Change v2 options
   2. OIP-02 evidence confirms structure, viewpoint, background, and hardware-preservation options without unsupported transparent-output claims
