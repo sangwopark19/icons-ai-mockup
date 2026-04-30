@@ -36,6 +36,14 @@ const webpBase64 = Buffer.from([
   0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50,
 ]).toString('base64');
 
+function restoreOpenAIImageTimeoutEnv(value: string | undefined) {
+  if (value === undefined) {
+    delete process.env.OPENAI_IMAGE_TIMEOUT_MS;
+  } else {
+    process.env.OPENAI_IMAGE_TIMEOUT_MS = value;
+  }
+}
+
 describe('OpenAIImageService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -92,36 +100,94 @@ describe('OpenAIImageService', () => {
   });
 
   it('calls images.edit with GPT Image 2 and omits forbidden parameters', async () => {
-    const { openaiImageService } = await import('../openai-image.service.js');
+    const previousTimeout = process.env.OPENAI_IMAGE_TIMEOUT_MS;
+    delete process.env.OPENAI_IMAGE_TIMEOUT_MS;
+    const { OpenAIImageService } = await import('../openai-image.service.js');
     const OpenAI = vi.mocked((await import('openai')).default);
+    const service = new OpenAIImageService();
 
-    await openaiImageService.generateIPChange('sk-test', pngBase64, pngBase64, {
-      preserveStructure: true,
-      transparentBackground: true,
-      fixedBackground: true,
-      fixedViewpoint: true,
-      quality: 'high',
-    });
+    try {
+      await service.generateIPChange('sk-test', pngBase64, pngBase64, {
+        preserveStructure: true,
+        transparentBackground: true,
+        fixedBackground: true,
+        fixedViewpoint: true,
+        quality: 'high',
+      });
 
-    expect(OpenAI).toHaveBeenCalledWith({
-      apiKey: 'sk-test',
-      maxRetries: 0,
-      timeout: 60_000,
-    });
-    expect(mocks.edit).toHaveBeenCalledTimes(1);
+      expect(OpenAI).toHaveBeenCalledWith({
+        apiKey: 'sk-test',
+        maxRetries: 0,
+        timeout: 600_000,
+      });
+      expect(mocks.edit).toHaveBeenCalledTimes(1);
 
-    const firstCall = mocks.edit.mock.calls[0][0];
-    expect(firstCall).toMatchObject({
-      model: 'gpt-image-2',
-      quality: 'high',
-      n: 2,
-      size: '1024x1024',
-      output_format: 'png',
-    });
-    expect(firstCall.image).toHaveLength(2);
-    expect(firstCall.background).toBeUndefined();
-    expect(firstCall.input_fidelity).toBeUndefined();
+      const firstCall = mocks.edit.mock.calls[0][0];
+      expect(firstCall).toMatchObject({
+        model: 'gpt-image-2',
+        quality: 'high',
+        n: 2,
+        size: '1024x1024',
+        output_format: 'png',
+      });
+      expect(firstCall.image).toHaveLength(2);
+      expect(firstCall.background).toBeUndefined();
+      expect(firstCall.input_fidelity).toBeUndefined();
+    } finally {
+      restoreOpenAIImageTimeoutEnv(previousTimeout);
+    }
   });
+
+  it('uses OPENAI_IMAGE_TIMEOUT_MS when configured with a positive integer', async () => {
+    const previousTimeout = process.env.OPENAI_IMAGE_TIMEOUT_MS;
+    process.env.OPENAI_IMAGE_TIMEOUT_MS = '900000';
+
+    try {
+      const { OpenAIImageService } = await import('../openai-image.service.js');
+      const OpenAI = vi.mocked((await import('openai')).default);
+      const service = new OpenAIImageService();
+
+      await service.generateIPChange('sk-test', pngBase64, pngBase64, {
+        preserveStructure: true,
+        transparentBackground: false,
+      });
+
+      expect(OpenAI).toHaveBeenCalledWith({
+        apiKey: 'sk-test',
+        maxRetries: 0,
+        timeout: 900_000,
+      });
+    } finally {
+      restoreOpenAIImageTimeoutEnv(previousTimeout);
+    }
+  });
+
+  it.each(['', 'not-a-number', '0', '-1'])(
+    'falls back to the default OpenAI image timeout for invalid env value %j',
+    async (invalidTimeout) => {
+      const previousTimeout = process.env.OPENAI_IMAGE_TIMEOUT_MS;
+      process.env.OPENAI_IMAGE_TIMEOUT_MS = invalidTimeout;
+
+      try {
+        const { OpenAIImageService } = await import('../openai-image.service.js');
+        const OpenAI = vi.mocked((await import('openai')).default);
+        const service = new OpenAIImageService();
+
+        await service.generateIPChange('sk-test', pngBase64, pngBase64, {
+          preserveStructure: true,
+          transparentBackground: false,
+        });
+
+        expect(OpenAI).toHaveBeenCalledWith({
+          apiKey: 'sk-test',
+          maxRetries: 0,
+          timeout: 600_000,
+        });
+      } finally {
+        restoreOpenAIImageTimeoutEnv(previousTimeout);
+      }
+    }
+  );
 
   it('records one external OpenAI request and safe candidate accounting', async () => {
     const { openaiImageService } = await import('../openai-image.service.js');
