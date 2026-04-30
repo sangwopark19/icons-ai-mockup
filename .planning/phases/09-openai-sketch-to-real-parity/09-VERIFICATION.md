@@ -76,10 +76,12 @@ human_verification:
 
 | Command | Result |
 |---|---|
-| `pnpm --filter @mockup-ai/api test` | PASS in Phase 9 release smoke: 9 test files / 100 tests; Phase 12 research later observed the expanded API suite passing. |
-| `pnpm --filter @mockup-ai/api type-check` | PASS in Phase 9 release smoke. |
-| `pnpm --filter @mockup-ai/web type-check` | PASS in Phase 9 release smoke. |
+| `pnpm --filter @mockup-ai/api test` | PASS in current workspace during Phase 12 Plan 12-02 gate on 2026-04-30T04:40:59Z: 12 test files / 167 tests. |
+| `pnpm --filter @mockup-ai/api type-check` | PASS in current workspace during Phase 12 Plan 12-02 gate on 2026-04-30T04:40:59Z: `tsc --noEmit` exited 0. |
+| `pnpm --filter @mockup-ai/web type-check` | PASS in current workspace during Phase 12 Plan 12-02 gate on 2026-04-30T04:40:59Z: `tsc --noEmit` exited 0. |
 | `rg -n "background:\\s*['\\\"]transparent|input_fidelity" apps/api/src/services/openai-image.service.ts` | PASS by absence for request parameters; tests assert both forbidden fields are undefined for Sketch calls. |
+| `rg -q "removeUniformLightBackground" apps/api/src/worker.ts`, `rg -q "hasTransparency" apps/api/src/worker.ts`, `rg -q "transparentBackground" apps/api/src/worker.ts` | PASS by source/static check: OpenAI Sketch transparent requests post-process opaque outputs and persist transparency state. |
+| Web source checks for project entry, OpenAI Sketch submit payload, result copy, and history badge | PASS by source/static check: project page exposes `스케치 실사화 v2`, form submits `provider: 'openai'`, `providerModel: 'gpt-image-2'`, and `outputCount: 2`, result page shows `v2 스케치 실사화` / `후보 2`, and history renders `스케치 실사화` with `v2`. |
 | `node -e` task assertions in Phase 12 Plan 12-01 | PASS required before this verification artifact can be accepted. |
 
 ### Requirements Coverage
