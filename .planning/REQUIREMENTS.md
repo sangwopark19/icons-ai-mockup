@@ -10,7 +10,7 @@ Requirements for milestone v1.1 OpenAI GPT Image 2 Dual Provider.
 ### Provider Selection
 
 - [x] **PROV-01**: User can open an OpenAI GPT Image 2 version of the IP Change workflow from a project without losing access to the existing Gemini version.
-- [ ] **PROV-02**: User can open an OpenAI GPT Image 2 version of the Sketch to Real workflow from a project without losing access to the existing Gemini version.
+- [x] **PROV-02**: User can open an OpenAI GPT Image 2 version of the Sketch to Real workflow from a project without losing access to the existing Gemini version.
 - [x] **PROV-03**: User can see which provider and model produced each generation in the result view and project history.
 - [x] **PROV-04**: User can regenerate a saved generation with the same provider and core options used for the original request.
 
@@ -22,9 +22,9 @@ Requirements for milestone v1.1 OpenAI GPT Image 2 Dual Provider.
 
 ### OpenAI Sketch To Real
 
-- [ ] **OSR-01**: User can generate two OpenAI GPT Image 2 Sketch to Real candidates from a sketch and an optional texture reference.
-- [ ] **OSR-02**: User can preserve sketch layout and key character/product details while applying realistic material treatment in the OpenAI Sketch to Real workflow.
-- [ ] **OSR-03**: User can request transparent-background output from the OpenAI Sketch to Real workflow and receive a background-removed final asset through the existing post-process flow.
+- [x] **OSR-01**: User can generate two OpenAI GPT Image 2 Sketch to Real candidates from a sketch and an optional texture reference.
+- [x] **OSR-02**: User can preserve sketch layout and key character/product details while applying realistic material treatment in the OpenAI Sketch to Real workflow.
+- [x] **OSR-03**: User can request transparent-background output from the OpenAI Sketch to Real workflow and receive a background-removed final asset through the existing post-process flow.
 
 ### OpenAI Editing
 
@@ -71,15 +71,15 @@ Requirements for milestone v1.1 OpenAI GPT Image 2 Dual Provider.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | PROV-01 | Phase 8 | Pending |
-| PROV-02 | Phase 12 | Pending |
+| PROV-02 | Phase 12 | Complete |
 | PROV-03 | Phase 10 | Complete |
 | PROV-04 | Phase 10 | Complete |
 | OIP-01 | Phase 8 | Pending |
 | OIP-02 | Phase 13 | Pending |
 | OIP-03 | Phase 8 | Pending |
-| OSR-01 | Phase 12 | Pending |
-| OSR-02 | Phase 12 | Pending |
-| OSR-03 | Phase 12 | Pending |
+| OSR-01 | Phase 12 | Complete |
+| OSR-02 | Phase 12 | Complete |
+| OSR-03 | Phase 12 | Complete |
 | OED-01 | Phase 10 | Complete |
 | OED-02 | Phase 11 | Complete |
 | OED-03 | Phase 11 | Complete |
@@ -90,11 +90,11 @@ Requirements for milestone v1.1 OpenAI GPT Image 2 Dual Provider.
 
 **Coverage:**
 - v1 requirements: 17 total
-- Checked complete after audit gap reset: 10
-- Pending gap closure: 7
+- Checked complete after audit gap reset: 14
+- Pending gap closure: 3
 - Mapped to phases: 17
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-04-23*
-*Last updated: 2026-04-29 after v1.1 milestone audit gap planning*
+*Last updated: 2026-04-30 after Phase 12 verification closure*

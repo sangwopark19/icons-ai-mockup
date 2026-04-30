@@ -82,7 +82,7 @@
     2. Regression coverage proves a failed OpenAI style-copy retry reaches provider dispatch with the required fields
     3. Gemini retry and non-style-copy OpenAI retry behavior remain unchanged
 
-- [ ] **Phase 12: OpenAI Sketch Verification Closure**
+- [x] **Phase 12: OpenAI Sketch Verification Closure** — completed 2026-04-30
   - Goal: produce the missing Phase 9 verification and close Sketch to Real transparent-background evidence gaps
   - Requirements: `PROV-02`, `OSR-01`, `OSR-02`, `OSR-03`
   - Gap Closure: closes v1.1 audit orphaned Phase 9 requirements and transparent-background flow evidence gap
@@ -208,10 +208,10 @@ Plans:
 | Milestone | Phases | Plans | Status | Shipped |
 |-----------|--------|-------|--------|---------|
 | v1.0 AI Mockup Admin Panel | 1-6 | 18/18 | Shipped | 2026-04-23 |
-| v1.1 OpenAI GPT Image 2 Dual Provider | 7-13 | 11/19 original; 0/3 gap closures | In Progress | — |
+| v1.1 OpenAI GPT Image 2 Dual Provider | 7-13 | 11/19 original; 2/3 gap closures | In Progress | — |
 
 ## Next
 
-**Phase 12: OpenAI Sketch Verification Closure** — close Phase 9 verification and transparent-background evidence gaps.
+**Phase 13: IP Change Verification Note Cleanup** — remove stale transparent-background references from Phase 8 verification and align OIP-02 traceability.
 
-Run `$gsd-plan-phase 12` to plan the Sketch verification closure.
+Run `$gsd-plan-phase 13` to plan the IP Change verification note cleanup.
