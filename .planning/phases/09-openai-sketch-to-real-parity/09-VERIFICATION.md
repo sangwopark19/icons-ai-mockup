@@ -91,6 +91,41 @@ human_verification:
 | OSR-02 | SATISFIED, visual quality human review pending | Prompt source/test evidence names Image 1 as locked sketch, treats optional Image 2 as material/texture reference only, preserves layout/silhouette/proportions/face/product construction/perspective, adds only manufacturing realism, and places `Hard constraints` after user instructions. |
 | OSR-03 | PARTIAL - human_needed | Source/tests prove transparent requests are opaque-first and post-processed through `removeUniformLightBackground()` with `hasTransparency` persistence and quality gates. Final live transparent PNG alpha/composite evidence is missing, so this requirement is not marked fully passed. |
 
+### OSR-03 Transparent Background Disposition
+
+**Status:** `PARTIAL_WITH_MILESTONE_EXCEPTION` and `human_needed`
+
+`OSR-03` is source/test covered but not fully live-passed. Phase 9 attempted transparent-background live evidence through generation `7418ceef-19cf-41fa-b317-cbf5cf711dfe`, but the run failed before final output creation. Observed transparent failure request IDs:
+
+- `req_5e3e30e9b855443691e4fdacc148c216`
+- `req_17c851718d45451e8279160ffdf63975`
+- `req_06becc0fe71c4ac7aa2a46e8d2803333`
+
+Source and tests prove the post-process path through `removeUniformLightBackground()` and `hasTransparency` persistence:
+
+- `apps/api/src/worker.ts` calls `removeUniformLightBackground()` for OpenAI `sketch_to_real` jobs when `options.transparentBackground` is true.
+- `apps/api/src/services/background-removal.service.ts` returns `{ buffer, hasTransparency: true, quality }` only after transparent-output quality gates pass.
+- `apps/api/src/services/generation.service.ts` persists `GeneratedImage.hasTransparency` from the worker save options.
+- `apps/api/src/services/__tests__/background-removal.service.test.ts` asserts alpha, transparent border, transparent pixel ratio, and dark-composite luma gates.
+
+Missing final live evidence before `OSR-03` can be marked fully passed:
+
+- `metadata.hasAlpha === true`
+- `transparentPixelRatio >= 0.15`
+- `transparentPixelRatio <= 0.95`
+- `transparentBorderRatio >= 0.85`
+- `darkCompositeBorderLuma <= 40`
+- dark composite output evidence
+
+Forbidden-parameter discipline:
+
+- GPT Image 2 requests do not send `background: "transparent"`; transparency is post-processed output from local background removal.
+- GPT Image 2 requests do not send `input_fidelity`; `gpt-image-2` image inputs are treated as high fidelity by the model and the project omits this unsupported parameter.
+
+### Evidence Hygiene
+
+This artifact stores request IDs, sanitized relative output paths, status, and derived metrics only. It must not store API keys, raw approved images, base64 payloads, or raw vendor response bodies.
+
 ### Human Verification Required
 
 1. **Live OpenAI Sketch transparent-background output**
