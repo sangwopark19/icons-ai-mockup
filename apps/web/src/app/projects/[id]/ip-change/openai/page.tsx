@@ -11,9 +11,9 @@ import { apiFetch } from '@/lib/api';
 type QualityValue = 'low' | 'medium' | 'high';
 
 const QUALITY_OPTIONS: Array<{ label: string; value: QualityValue; waitHint: string }> = [
-  { label: '빠른모드', value: 'low', waitHint: '공식 기준: 가장 빠름' },
-  { label: '균형모드', value: 'medium', waitHint: '공식 기준: 표준 품질' },
-  { label: '퀄리티모드', value: 'high', waitHint: '공식 기준: 최종 에셋용' },
+  { label: '빠른모드', value: 'low', waitHint: '예상 대기 30초~' },
+  { label: '균형모드', value: 'medium', waitHint: '예상 대기 1분30초~' },
+  { label: '퀄리티모드', value: 'high', waitHint: '예상 대기 4분~' },
 ];
 
 export default function OpenAIIPChangePage() {
@@ -252,8 +252,7 @@ export default function OpenAIIPChangePage() {
               ))}
             </div>
             <p className="mt-2 text-xs text-[var(--text-secondary)]">
-              OpenAI는 모드별 분 단위 대기시간을 공개하지 않습니다. 요청 내용과 이미지 수에 따라
-              달라질 수 있습니다.
+              실제 대기시간은 요청 내용과 이미지 수에 따라 달라질 수 있습니다.
             </p>
           </fieldset>
 
