@@ -187,7 +187,7 @@ Source: current code path. [VERIFIED: apps/web/src/app/projects/[id]/ip-change/o
 | `.planning/phases/08-openai-ip-change-parity/08-SMOKE.md` | Browser checklist says v2 form keeps transparent background available. [VERIFIED: .planning/phases/08-openai-ip-change-parity/08-SMOKE.md] | Active stale smoke checklist. [VERIFIED: rg command] | Remove transparent-background availability from browser checklist; add negative check that no transparent UI exists for IP Change v2. [VERIFIED: rg "transparentBackground|투명 배경|누끼" apps/web/src/app/projects/[id]/ip-change/openai/page.tsx] |
 | `.planning/phases/08-openai-ip-change-parity/08-VALIDATION.md` | Manual-only row asks to submit v2 with transparent option. [VERIFIED: .planning/phases/08-openai-ip-change-parity/08-VALIDATION.md] | Active stale validation mapping. [VERIFIED: gsd-sdk query audit-uat --raw] | Replace with route/service rejection validation and UI absence validation. [VERIFIED: apps/api/src/services/__tests__/generation.service.test.ts] |
 | `.planning/phases/08-openai-ip-change-parity/08-01-SUMMARY.md` | Key decision says transparent-background intent remains an app option. [VERIFIED: .planning/phases/08-openai-ip-change-parity/08-01-SUMMARY.md] | Release-summary style stale note. [ASSUMED] | Add a correction/supersession note referencing `08-REVIEW-FIX.md` rather than erasing runtime history. [VERIFIED: .planning/phases/08-openai-ip-change-parity/08-REVIEW-FIX.md] |
-| `.planning/phases/08-openai-ip-change-parity/08-UI-SPEC.md` | Interaction contract says keep `투명 배경 (누끼)` for parity. [VERIFIED: .planning/phases/08-openai-ip-change-parity/08-UI-SPEC.md] | Historical design contract now superseded by review fix. [VERIFIED: .planning/phases/08-openai-ip-change-parity/08-REVIEW-FIX.md] | Add a dated supersession note only if planner decides UI-SPEC is treated as current release documentation. [ASSUMED] |
+| `.planning/phases/08-openai-ip-change-parity/08-UI-SPEC.md` | Interaction contract says keep `투명 배경 (누끼)` for parity. [VERIFIED: .planning/phases/08-openai-ip-change-parity/08-UI-SPEC.md] | Historical design contract now superseded by review fix. [VERIFIED: .planning/phases/08-openai-ip-change-parity/08-REVIEW-FIX.md] | Do not edit by default; active verification/smoke/validation/release-summary artifacts plus Phase 13 audit/verification are the execution scope. [RESOLVED: planner revision 2026-04-30] |
 | `.planning/phases/08-openai-ip-change-parity/08-DISCUSSION-LOG.md` and `08-CONTEXT.md` | Historical decisions mention transparent parity/post-processing. [VERIFIED: rg command] | Historical context, not current proof. [VERIFIED: .planning/phases/08-openai-ip-change-parity/08-REVIEW-FIX.md] | Do not rewrite by default; prefer active verification/release-note correction plus `13-AUDIT-CHECK.md`. [VERIFIED: .planning/phases/12-openai-sketch-verification-closure/12-AUDIT-CHECK.md] |
 
 ## Don't Hand-Roll
@@ -298,19 +298,19 @@ Expected after Phase 13 cleanup: no matches. [VERIFIED: current matches found be
 | # | Claim | Section | Risk if Wrong |
 |---|-------|---------|---------------|
 | A1 | `08-01-SUMMARY.md` and `08-04-SUMMARY.md` are "release-note-like" artifacts for this cleanup because the roadmap says "release notes" but the repo does not expose a separate Phase 8 release-notes file. [ASSUMED] | Exact Stale Claim Inventory | Planner may update too few or too many summary files; mitigate by using `rg` and planner review. |
-| A2 | `08-UI-SPEC.md` should receive a supersession note only if the team treats Phase 8 UI-SPEC as current release documentation rather than historical design input. [ASSUMED] | Exact Stale Claim Inventory | Planner may leave a stale spec phrase searchable; mitigate by adding a dated supersession note if audit grep includes UI-SPEC. |
+| A2 | Historical Phase 8 `08-UI-SPEC.md` is superseded by `08-REVIEW-FIX.md` but is not an execution target for Phase 13 by default. [RESOLVED: planner revision 2026-04-30] | Exact Stale Claim Inventory | If future audit tooling treats UI-SPEC as active release documentation, open a separate scoped follow-up rather than expanding Phase 13 silently. |
 
-## Open Questions
+## Resolved Questions
 
-1. **Should Phase 13 update historical Phase 8 `08-CONTEXT.md` and `08-DISCUSSION-LOG.md`?**
+1. **RESOLVED: Should Phase 13 update historical Phase 8 `08-CONTEXT.md`, `08-DISCUSSION-LOG.md`, or `08-UI-SPEC.md`?**
    - What we know: those files contain historical transparent-option decisions that were superseded by `08-REVIEW-FIX.md`. [VERIFIED: rg command] [VERIFIED: .planning/phases/08-openai-ip-change-parity/08-REVIEW-FIX.md]
-   - What's unclear: whether the team's audit treats historical context as current release documentation. [ASSUMED]
-   - Recommendation: do not rewrite historical context by default; add a Phase 13 audit check and, if necessary, add supersession notes to UI-SPEC/summary files rather than erasing history. [VERIFIED: .planning/phases/12-openai-sketch-verification-closure/12-AUDIT-CHECK.md]
+   - Selected decision: do not edit historical Phase 8 `08-CONTEXT.md`, `08-DISCUSSION-LOG.md`, or `08-UI-SPEC.md` by default. Active verification/smoke/validation/release-summary artifacts plus Phase 13 audit/verification are the execution scope. [RESOLVED: planner revision 2026-04-30]
+   - Planning consequence: Task 13-01-01 must update only `08-VERIFICATION.md`, `08-SMOKE.md`, `08-VALIDATION.md`, and `08-01-SUMMARY.md`; Task 13-01-02 must create Phase 13 audit/verification evidence instead of rewriting historical context. [RESOLVED: planner revision 2026-04-30]
 
-2. **Should `.planning/REQUIREMENTS.md` traceability mark `OIP-02` complete during Phase 13 execution?**
+2. **RESOLVED: Should `.planning/REQUIREMENTS.md` traceability mark `OIP-02` complete during Phase 13 execution?**
    - What we know: `OIP-02` is currently mapped to Phase 13 with status `Pending`. [VERIFIED: .planning/REQUIREMENTS.md]
-   - What's unclear: whether execution plans should update milestone traceability after validation or leave it to verify-work. [ASSUMED]
-   - Recommendation: include a final task to update `OIP-02` traceability only after `13-VERIFICATION.md` and deterministic stale-claim checks pass. [VERIFIED: .planning/ROADMAP.md]
+   - Selected decision: update `.planning/REQUIREMENTS.md` OIP-02 traceability only after deterministic checks pass. [RESOLVED: planner revision 2026-04-30]
+   - Planning consequence: Task 13-01-03 must run only after Task 13-01-02 passes and must update the `OIP-02` row, coverage counters, and footer without changing `OIP-01` or `OIP-03`. [RESOLVED: planner revision 2026-04-30]
 
 ## Environment Availability
 
