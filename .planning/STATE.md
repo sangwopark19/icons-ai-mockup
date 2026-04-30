@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: OpenAI GPT Image 2 Dual Provider
-status: ready_to_plan
-stopped_at: Phase 11 completed; Phase 12 ready to plan
-last_updated: "2026-04-29T08:29:05Z"
-last_activity: 2026-04-29 -- Phase 11 execution complete; Phase 12 ready to plan
+status: "Phase 11 shipped — PR #6"
+stopped_at: Phase 11 shipped; Phase 12 ready to plan
+last_updated: "2026-04-30T02:32:39.604Z"
+last_activity: 2026-04-30 -- Phase 11 shipped; PR #6 created
 progress:
   total_phases: 7
   completed_phases: 5
@@ -27,8 +27,8 @@ See: .planning/PROJECT.md (updated 2026-04-29)
 
 Phase: 12
 Plan: Not started
-Status: Ready to plan
-Last activity: 2026-04-29 -- Phase 11 execution complete
+Status: Phase 11 shipped — PR #6
+Last activity: 2026-04-30 -- Phase 11 shipped; PR #6 created
 
 Progress: [███████░░░] 71%
 
