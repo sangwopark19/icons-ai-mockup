@@ -4,8 +4,8 @@ milestone: v1.1
 milestone_name: OpenAI GPT Image 2 Dual Provider
 status: "Phase 11 shipped — PR #6"
 stopped_at: Phase 11 shipped; Phase 12 ready to plan
-last_updated: "2026-04-30T02:32:39.604Z"
-last_activity: 2026-04-30 -- Phase 11 shipped; PR #6 created
+last_updated: "2026-04-30T14:40:16+0900"
+last_activity: 2026-04-30 -- Completed quick task 260430-k39: OpenAI image timeout and mode wait-time UI hotfix
 progress:
   total_phases: 7
   completed_phases: 5
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-04-29)
 Phase: 12
 Plan: Not started
 Status: Phase 11 shipped — PR #6
-Last activity: 2026-04-30 -- Phase 11 shipped; PR #6 created
+Last activity: 2026-04-30 -- Completed quick task 260430-k39: OpenAI image timeout and mode wait-time UI hotfix
 
 Progress: [███████░░░] 71%
 
@@ -144,6 +144,7 @@ Progress: [███████░░░] 71%
 | 2 | Mac 서버 ENCRYPTION_KEY 배포 누락 및 admin 대시보드 빈 상태 수정 | 2026-04-23 | 6de9087 | [260423-l20-mac-encryption-key-api-admin-dashboard](./quick/260423-l20-mac-encryption-key-api-admin-dashboard/) |
 | 3 | Mac 서버 로그인 만료 시간 1일 및 자동 refresh 처리 | 2026-04-24 | e41c6ba | [260424-eex-auth-session-refresh](./quick/260424-eex-auth-session-refresh/) |
 | 4 | GPT Image 2 요청 수/토큰 사용량 급증 원인 조사 및 request budget 수정 | 2026-04-28 | d3e3739 | [260428-p4c-gpt-image-2-0-2-requests-27-101-176-cli](./quick/260428-p4c-gpt-image-2-0-2-requests-27-101-176-cli/) |
+| 260430-k39 | OpenAI image timeout and mode wait-time UI hotfix | 2026-04-30 | 556ef12 | [260430-k39-fix-gpt-image-2-openai-image-timeout-fro](./quick/260430-k39-fix-gpt-image-2-openai-image-timeout-fro/) |
 
 ## Deferred Items
 

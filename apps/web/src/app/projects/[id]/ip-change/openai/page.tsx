@@ -10,10 +10,10 @@ import { apiFetch } from '@/lib/api';
 
 type QualityValue = 'low' | 'medium' | 'high';
 
-const QUALITY_OPTIONS: Array<{ label: string; value: QualityValue }> = [
-  { label: '빠른모드', value: 'low' },
-  { label: '균형모드', value: 'medium' },
-  { label: '퀄리티모드', value: 'high' },
+const QUALITY_OPTIONS: Array<{ label: string; value: QualityValue; estimatedWait: string }> = [
+  { label: '빠른모드', value: 'low', estimatedWait: '예상 대기 1-4분' },
+  { label: '균형모드', value: 'medium', estimatedWait: '예상 대기 4-10분' },
+  { label: '퀄리티모드', value: 'high', estimatedWait: '예상 대기 8-15분' },
 ];
 
 export default function OpenAIIPChangePage() {
@@ -236,7 +236,7 @@ export default function OpenAIIPChangePage() {
               {QUALITY_OPTIONS.map((option) => (
                 <label
                   key={option.value}
-                  className="relative flex min-h-10 cursor-pointer items-center justify-center rounded-md px-3 py-2 text-sm font-medium text-[var(--text-secondary)] transition-colors has-[:checked]:bg-brand-500 has-[:checked]:text-white"
+                  className="relative flex min-h-14 cursor-pointer flex-col items-center justify-center rounded-md px-3 py-2 text-center text-sm font-medium text-[var(--text-secondary)] transition-colors has-[:checked]:bg-brand-500 has-[:checked]:text-white"
                 >
                   <input
                     type="radio"
@@ -246,7 +246,8 @@ export default function OpenAIIPChangePage() {
                     onChange={() => setQuality(option.value)}
                     className="sr-only"
                   />
-                  {option.label}
+                  <span>{option.label}</span>
+                  <span className="mt-1 text-xs font-normal opacity-80">{option.estimatedWait}</span>
                 </label>
               ))}
             </div>
