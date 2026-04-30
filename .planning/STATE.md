@@ -145,6 +145,7 @@ Progress: [████████░░] 86%
 | 2 | Mac 서버 ENCRYPTION_KEY 배포 누락 및 admin 대시보드 빈 상태 수정 | 2026-04-23 | 6de9087 | [260423-l20-mac-encryption-key-api-admin-dashboard](./quick/260423-l20-mac-encryption-key-api-admin-dashboard/) |
 | 3 | Mac 서버 로그인 만료 시간 1일 및 자동 refresh 처리 | 2026-04-24 | e41c6ba | [260424-eex-auth-session-refresh](./quick/260424-eex-auth-session-refresh/) |
 | 4 | GPT Image 2 요청 수/토큰 사용량 급증 원인 조사 및 request budget 수정 | 2026-04-28 | d3e3739 | [260428-p4c-gpt-image-2-0-2-requests-27-101-176-cli](./quick/260428-p4c-gpt-image-2-0-2-requests-27-101-176-cli/) |
+| 260430-k39 | OpenAI image timeout and mode wait-time UI hotfix | 2026-04-30 | 204d9e1 | [260430-k39-fix-gpt-image-2-openai-image-timeout-fro](./quick/260430-k39-fix-gpt-image-2-openai-image-timeout-fro/) |
 
 ## Deferred Items
 

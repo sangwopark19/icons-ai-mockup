@@ -10,6 +10,19 @@ import type {
 
 export type OpenAIQuality = 'low' | 'medium' | 'high';
 
+const DEFAULT_OPENAI_IMAGE_TIMEOUT_MS = 600_000;
+
+function resolveOpenAIImageTimeoutMs(value = process.env.OPENAI_IMAGE_TIMEOUT_MS): number {
+  if (!value?.trim()) {
+    return DEFAULT_OPENAI_IMAGE_TIMEOUT_MS;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && Number.isInteger(parsed) && parsed > 0
+    ? parsed
+    : DEFAULT_OPENAI_IMAGE_TIMEOUT_MS;
+}
+
 export interface OpenAIIPChangeOptions {
   preserveStructure: boolean;
   transparentBackground: boolean;
@@ -91,6 +104,7 @@ interface OpenAIResponsesImageResponse {
 export class OpenAIImageService {
   private readonly model = 'gpt-image-2';
   private readonly sdkMaxRetries = 0;
+  private readonly openaiImageTimeoutMs = resolveOpenAIImageTimeoutMs();
 
   async generateIPChange(
     apiKey: string,
@@ -101,7 +115,7 @@ export class OpenAIImageService {
     const client = new OpenAI({
       apiKey,
       maxRetries: this.sdkMaxRetries,
-      timeout: 60_000,
+      timeout: this.openaiImageTimeoutMs,
     });
     const prompt = this.buildIPChangePrompt(options);
     const quality = options.quality ?? 'medium';
@@ -192,7 +206,7 @@ export class OpenAIImageService {
     const client = new OpenAI({
       apiKey,
       maxRetries: this.sdkMaxRetries,
-      timeout: 60_000,
+      timeout: this.openaiImageTimeoutMs,
     });
     const prompt = this.buildSketchToRealPrompt(options);
     const quality = options.quality ?? 'medium';
@@ -289,7 +303,7 @@ export class OpenAIImageService {
     const client = new OpenAI({
       apiKey,
       maxRetries: this.sdkMaxRetries,
-      timeout: 60_000,
+      timeout: this.openaiImageTimeoutMs,
     });
     const quality = options?.quality ?? 'medium';
     const prompt = this.buildPartialEditPrompt({ quality, userPrompt });
@@ -363,7 +377,7 @@ export class OpenAIImageService {
     const client = new OpenAI({
       apiKey,
       maxRetries: this.sdkMaxRetries,
-      timeout: 60_000,
+      timeout: this.openaiImageTimeoutMs,
     });
     const quality = options.quality ?? 'medium';
     const prompt = this.buildStyleCopyPrompt(options);
@@ -409,7 +423,7 @@ export class OpenAIImageService {
     const client = new OpenAI({
       apiKey,
       maxRetries: this.sdkMaxRetries,
-      timeout: 60_000,
+      timeout: this.openaiImageTimeoutMs,
     });
     const quality = options.quality ?? 'medium';
     const responsesModel = process.env.OPENAI_RESPONSES_IMAGE_MODEL ?? 'gpt-5.5';
