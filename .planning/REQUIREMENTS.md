@@ -75,7 +75,7 @@ Requirements for milestone v1.1 OpenAI GPT Image 2 Dual Provider.
 | PROV-03 | Phase 10 | Complete |
 | PROV-04 | Phase 10 | Complete |
 | OIP-01 | Phase 8 | Pending |
-| OIP-02 | Phase 13 | Pending |
+| OIP-02 | Phase 13 | Complete |
 | OIP-03 | Phase 8 | Pending |
 | OSR-01 | Phase 12 | Complete |
 | OSR-02 | Phase 12 | Complete |
@@ -90,11 +90,11 @@ Requirements for milestone v1.1 OpenAI GPT Image 2 Dual Provider.
 
 **Coverage:**
 - v1 requirements: 17 total
-- Checked complete after audit gap reset: 14
-- Pending gap closure: 3
+- Checked complete after audit gap reset: 15
+- Pending gap closure: 2
 - Mapped to phases: 17
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-04-23*
-*Last updated: 2026-04-30 after Phase 12 verification closure*
+*Last updated: 2026-04-30 after Phase 13 IP Change verification note cleanup*
