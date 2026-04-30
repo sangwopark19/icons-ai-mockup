@@ -181,7 +181,10 @@
 **Gap Closure**: Closes v1.1 audit orphaned requirements caused by missing `09-VERIFICATION.md` and deferred transparent-background evidence.
 **Plans:** 2 plans
 Plans:
+**Wave 1**
 - [ ] 12-01-PLAN.md — Create Phase 9 verification artifact and OSR-03 exception discipline
+
+**Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 12-02-PLAN.md — Record automated checks and deterministic audit closure evidence
 **Success Criteria** (what must be TRUE):
   1. Phase 9 verification maps PROV-02, OSR-01, OSR-02, and OSR-03 to source, test, smoke, or explicit human-evidence status
