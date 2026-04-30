@@ -341,22 +341,19 @@ These commands currently pass in this research session, with API Vitest reportin
 |---|-------|---------|---------------|
 | A1 | The planner should use local GSD audit tooling to rerun the same audit family that produced `v1.1-MILESTONE-AUDIT.md`; the exact command name is inferred from artifact provenance rather than verified by an explicit help command in this research. [ASSUMED] | Pattern 4 | Planner may choose a different but equivalent verification command, so the plan should verify the exact available command before execution. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Will Phase 12 get live OpenAI credentials and approved sample images?** [VERIFIED: shell: OPENAI_API_KEY=unset]
    - What we know: The shell does not expose `OPENAI_API_KEY`, and Phase 9 live transparent generation previously failed before output with OpenAI 403. [VERIFIED: shell: OPENAI_API_KEY=unset] [VERIFIED: .planning/phases/09-openai-sketch-to-real-parity/09-SUMMARY.md]
-   - What's unclear: Whether the operator can provide a verified OpenAI org/key and sample approval during Phase 12 execution. [VERIFIED: .planning/phases/09-openai-sketch-to-real-parity/09-SUMMARY.md]
-   - Recommendation: Plan one live-evidence task with a fallback branch to a documented milestone exception. [VERIFIED: .planning/ROADMAP.md]
+   - RESOLVED: Live OpenAI key/sample availability is not assumed for execution. Phase 12 plans use existing evidence and an explicit `human_needed` / milestone exception path unless credentials and approved sample images are supplied at execution time. [VERIFIED: user revision instruction] [VERIFIED: .planning/ROADMAP.md]
 
 2. **Should `OSR-03` end as satisfied, partial, or exception-satisfied?** [VERIFIED: .planning/ROADMAP.md]
    - What we know: Source/test coverage exists, but final alpha/composite live proof is missing. [VERIFIED: source grep] [VERIFIED: .planning/phases/09-openai-sketch-to-real-parity/09-SUMMARY.md]
-   - What's unclear: Whether milestone policy accepts source/test plus explicit exception as enough for requirement status. [VERIFIED: .planning/ROADMAP.md]
-   - Recommendation: Use `SATISFIED_WITH_EXCEPTION` only if the exception states the missing live artifact, blocker, owner, and follow-up condition. [VERIFIED: .planning/ROADMAP.md]
+   - RESOLVED: `OSR-03` final status must remain `human_needed`, `PARTIAL_WITH_MILESTONE_EXCEPTION`, or equivalent until final PNG alpha/composite metrics exist. Do not mark `OSR-03` fully passed from source/test evidence alone. [VERIFIED: user revision instruction] [VERIFIED: .planning/phases/09-openai-sketch-to-real-parity/09-SMOKE.md]
 
 3. **Should `REQUIREMENTS.md` checkboxes be updated in Phase 12?** [VERIFIED: .planning/REQUIREMENTS.md]
    - What we know: `PROV-02`, `OSR-01`, `OSR-02`, and `OSR-03` are still unchecked and mapped to Phase 12. [VERIFIED: .planning/REQUIREMENTS.md]
-   - What's unclear: Whether this project updates requirement checkboxes during gap-closure execution or only after audit passes. [VERIFIED: .planning/STATE.md]
-   - Recommendation: Planner should make checkbox updates a final task gated on `09-VERIFICATION.md` plus follow-up audit result. [VERIFIED: .planning/v1.1-MILESTONE-AUDIT.md]
+   - RESOLVED: `REQUIREMENTS.md` checkboxes must not be changed in Phase 12 planning. Any status update is gated on `09-VERIFICATION.md` plus follow-up audit/coverage evidence during execution. [VERIFIED: user revision instruction] [VERIFIED: .planning/v1.1-MILESTONE-AUDIT.md]
 
 ## Environment Availability
 
