@@ -71,28 +71,30 @@ Requirements for milestone v1.1 OpenAI GPT Image 2 Dual Provider.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | PROV-01 | Phase 8 | Pending |
-| PROV-02 | Phase 9 | Pending |
+| PROV-02 | Phase 12 | Pending |
 | PROV-03 | Phase 10 | Complete |
 | PROV-04 | Phase 10 | Complete |
 | OIP-01 | Phase 8 | Pending |
-| OIP-02 | Phase 8 | Pending |
+| OIP-02 | Phase 13 | Pending |
 | OIP-03 | Phase 8 | Pending |
-| OSR-01 | Phase 9 | Pending |
-| OSR-02 | Phase 9 | Pending |
-| OSR-03 | Phase 9 | Pending |
+| OSR-01 | Phase 12 | Pending |
+| OSR-02 | Phase 12 | Pending |
+| OSR-03 | Phase 12 | Pending |
 | OED-01 | Phase 10 | Complete |
-| OED-02 | Phase 10 | Complete |
-| OED-03 | Phase 10 | Complete |
+| OED-02 | Phase 11 | Complete |
+| OED-03 | Phase 11 | Complete |
 | OPS-01 | Phase 7 | Satisfied |
 | OPS-02 | Phase 7 | Satisfied |
-| OPS-03 | Phase 7 | Foundation Satisfied |
+| OPS-03 | Phase 11 | Complete |
 | OPS-04 | Phase 7 | Foundation Satisfied |
 
 **Coverage:**
 - v1 requirements: 17 total
+- Checked complete after audit gap reset: 10
+- Pending gap closure: 7
 - Mapped to phases: 17
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-04-23*
-*Last updated: 2026-04-23 after roadmap creation*
+*Last updated: 2026-04-29 after v1.1 milestone audit gap planning*

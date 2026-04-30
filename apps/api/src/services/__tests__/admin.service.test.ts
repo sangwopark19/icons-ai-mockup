@@ -13,6 +13,7 @@ vi.mock('../../lib/prisma.js', () => ({
       findMany: vi.fn(),
       findUnique: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
       groupBy: vi.fn(),
     },
     generatedImage: {
@@ -283,6 +284,22 @@ describe('AdminService - listUsers', () => {
     expect(result.pagination.limit).toBe(20);
   });
 
+  it('should normalize invalid pagination input', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.user.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.user.count).mockResolvedValue(0);
+
+    const result = await adminService.listUsers({ page: 0, limit: 0 });
+
+    expect(vi.mocked(prisma.user.findMany).mock.calls[0][0]).toMatchObject({
+      skip: 0,
+      take: 20,
+    });
+    expect(result.pagination).toMatchObject({ page: 1, limit: 20 });
+  });
+
   it('should apply case-insensitive email filter', async () => {
     const { prisma } = await import('../../lib/prisma.js');
     const { adminService } = await import('../admin.service.js');
@@ -550,13 +567,13 @@ describe('AdminService - listGenerations', () => {
     vi.mocked(prisma.generation.findMany).mockResolvedValue([]);
     vi.mocked(prisma.generation.count).mockResolvedValue(0);
     vi.mocked(prisma.generation.groupBy).mockResolvedValue([
-      { status: 'completed', _count: { id: 10 } },
-      { status: 'failed', _count: { id: 3 } },
+      { status: 'completed', _count: { _all: 10 } },
+      { status: 'failed', _count: { _all: 3 } },
     ] as any);
 
     const result = await adminService.listGenerations({});
 
-    expect(result.statusCounts).toBeDefined();
+    expect(result.statusCounts).toEqual({ completed: 10, failed: 3 });
     expect(vi.mocked(prisma.generation.groupBy)).toHaveBeenCalled();
   });
 
@@ -572,6 +589,23 @@ describe('AdminService - listGenerations', () => {
 
     expect(result.pagination.page).toBe(1);
     expect(result.pagination.limit).toBe(20);
+  });
+
+  it('should clamp invalid generation pagination input', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.generation.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.generation.count).mockResolvedValue(0);
+    vi.mocked(prisma.generation.groupBy).mockResolvedValue([] as any);
+
+    const result = await adminService.listGenerations({ page: -2, limit: 500 });
+
+    expect(vi.mocked(prisma.generation.findMany).mock.calls[0][0]).toMatchObject({
+      skip: 0,
+      take: 100,
+    });
+    expect(result.pagination).toMatchObject({ page: 1, limit: 100 });
   });
 
   it('maps safe OpenAI request-accounting fields from providerTrace', async () => {
@@ -613,8 +647,10 @@ describe('AdminService - listGenerations', () => {
 });
 
 describe('AdminService - retryGeneration', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    const { prisma } = await import('../../lib/prisma.js');
+    vi.mocked(prisma.generation.updateMany).mockResolvedValue({ count: 1 } as any);
   });
 
   it('should update status to pending, clear errorMessage, increment retryCount', async () => {
@@ -631,9 +667,9 @@ describe('AdminService - retryGeneration', () => {
 
     await adminService.retryGeneration('gen1');
 
-    expect(vi.mocked(prisma.generation.update)).toHaveBeenCalledWith(
+    expect(vi.mocked(prisma.generation.updateMany)).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'gen1' },
+        where: { id: 'gen1', status: 'failed' },
         data: expect.objectContaining({
           status: 'pending',
           errorMessage: null,
@@ -682,6 +718,42 @@ describe('AdminService - retryGeneration', () => {
           hardwareSpecs: mockGeneration.options.hardwareSpecs,
           outputCount: 2,
         }),
+      })
+    );
+  });
+
+  it('requeues failed OpenAI style-copy retry with persisted continuation metadata', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { addGenerationJob } = await import('../../lib/queue.js');
+    const { adminService } = await import('../admin.service.js');
+    const openAIStyleCopyGeneration = {
+      ...mockGeneration,
+      provider: 'openai',
+      providerModel: 'gpt-image-2',
+      styleReferenceId: 'source-style-generation',
+      promptData: {
+        ...mockGeneration.promptData,
+        copyTarget: 'ip-change',
+        selectedImageId: 'style-source-image-2',
+      },
+    };
+
+    vi.mocked(prisma.generation.findUnique).mockResolvedValue(openAIStyleCopyGeneration as any);
+    vi.mocked(prisma.generation.update).mockResolvedValue({
+      ...openAIStyleCopyGeneration,
+      status: 'pending',
+    } as any);
+    vi.mocked(addGenerationJob).mockResolvedValue({} as any);
+
+    await adminService.retryGeneration('gen1');
+
+    expect(vi.mocked(addGenerationJob)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: 'openai',
+        providerModel: 'gpt-image-2',
+        styleReferenceId: 'source-style-generation',
+        copyTarget: 'ip-change',
+        selectedImageId: 'style-source-image-2',
       })
     );
   });
@@ -751,6 +823,40 @@ describe('AdminService - retryGeneration', () => {
     );
   });
 
+  it('rolls status back to failed when queue enqueue fails', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { addGenerationJob } = await import('../../lib/queue.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.generation.findUnique).mockResolvedValue(mockGeneration as any);
+    vi.mocked(prisma.generation.update)
+      .mockResolvedValueOnce({ ...mockGeneration, status: 'pending', errorMessage: null } as any)
+      .mockResolvedValueOnce({ ...mockGeneration, status: 'failed', errorMessage: 'queue down' } as any);
+    vi.mocked(addGenerationJob).mockRejectedValue(new Error('queue down'));
+
+    await expect(adminService.retryGeneration('gen1')).rejects.toThrow('queue down');
+
+    expect(vi.mocked(prisma.generation.update)).toHaveBeenLastCalledWith({
+      where: { id: 'gen1' },
+      data: { status: 'failed', errorMessage: 'queue down' },
+    });
+  });
+
+  it('should not enqueue when another retry already claimed the generation', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { addGenerationJob } = await import('../../lib/queue.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.generation.findUnique).mockResolvedValue(mockGeneration as any);
+    vi.mocked(prisma.generation.updateMany).mockResolvedValue({ count: 0 } as any);
+
+    await expect(adminService.retryGeneration('gen1')).rejects.toThrow(
+      'Only failed generations can be retried'
+    );
+
+    expect(vi.mocked(addGenerationJob)).not.toHaveBeenCalled();
+  });
+
   it('should throw error if generation not found', async () => {
     const { prisma } = await import('../../lib/prisma.js');
     const { adminService } = await import('../admin.service.js');
@@ -791,6 +897,22 @@ describe('AdminService - listGeneratedImages', () => {
 
     expect(result.images).toHaveLength(1);
     expect(result.pagination).toMatchObject({ page: 1, limit: 20, total: 1 });
+  });
+
+  it('should normalize invalid generated image pagination input', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { adminService } = await import('../admin.service.js');
+
+    vi.mocked(prisma.generatedImage.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.generatedImage.count).mockResolvedValue(0);
+
+    const result = await adminService.listGeneratedImages({ page: 0, limit: 0 });
+
+    expect(vi.mocked(prisma.generatedImage.findMany).mock.calls[0][0]).toMatchObject({
+      skip: 0,
+      take: 20,
+    });
+    expect(result.pagination).toMatchObject({ page: 1, limit: 20 });
   });
 
   it('should apply email filter through nested project.user relation', async () => {
@@ -969,6 +1091,18 @@ describe('AdminService - bulkDeleteImages', () => {
     );
     expect(vi.mocked(uploadService.deleteFile)).toHaveBeenCalledWith('thumb2.jpg');
   });
+
+  it('should reject bulk delete without any scope filter', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { adminService } = await import('../admin.service.js');
+
+    await expect(adminService.bulkDeleteImages({})).rejects.toThrow(
+      '벌크 삭제에는 최소 하나 이상의 필터가 필요합니다'
+    );
+
+    expect(vi.mocked(prisma.generatedImage.findMany)).not.toHaveBeenCalled();
+    expect(vi.mocked(prisma.generatedImage.deleteMany)).not.toHaveBeenCalled();
+  });
 });
 
 // ─── Phase 4: API Key Management Tests ──────────────────────────────────────
@@ -1087,6 +1221,19 @@ describe('AdminService - createApiKey', () => {
     await adminService.createApiKey('gemini', 'Test', 'AIzaSyD-key-1234');
 
     expect(vi.mocked(encrypt)).toHaveBeenCalled();
+  });
+
+  it('should reject short API keys before encryption or storage', async () => {
+    const { prisma } = await import('../../lib/prisma.js');
+    const { encrypt } = await import('../../lib/crypto.js');
+    const { adminService } = await import('../admin.service.js');
+
+    await expect(adminService.createApiKey('openai', 'Short', 'abcd')).rejects.toThrow(
+      'API 키가 너무 짧습니다'
+    );
+
+    expect(vi.mocked(encrypt)).not.toHaveBeenCalled();
+    expect(vi.mocked(prisma.apiKey.create)).not.toHaveBeenCalled();
   });
 });
 

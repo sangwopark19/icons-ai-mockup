@@ -7,7 +7,7 @@
   - Requirements: [v1.0-REQUIREMENTS.md](./milestones/v1.0-REQUIREMENTS.md)
   - Audit: [v1.0-MILESTONE-AUDIT.md](./milestones/v1.0-MILESTONE-AUDIT.md)
   - Phase artifacts: [v1.0-phases/](./milestones/v1.0-phases/)
-- 🚧 **v1.1 OpenAI GPT Image 2 Dual Provider** — Phases 7-10 in progress, started 2026-04-24
+- 🚧 **v1.1 OpenAI GPT Image 2 Dual Provider** — Phases 7-13 in progress, started 2026-04-24
   - Goal: keep Gemini intact while adding matching OpenAI GPT Image 2 workflows beside it
   - Requirements: [.planning/REQUIREMENTS.md](./REQUIREMENTS.md)
   - Research: [.planning/research/](./research/)
@@ -28,7 +28,7 @@
 </details>
 
 <details open>
-<summary>🚧 v1.1 OpenAI GPT Image 2 Dual Provider (Phases 7-10) — IN PROGRESS</summary>
+<summary>🚧 v1.1 OpenAI GPT Image 2 Dual Provider (Phases 7-13) — IN PROGRESS</summary>
 
 - [x] **Phase 7: Provider Foundation and Key Separation** — completed 2026-04-24
   - Goal: make generation, admin key management, and queue routing provider-aware without breaking Gemini
@@ -72,6 +72,33 @@
     3. OpenAI-generated results support partial edit from the existing result page
     4. OpenAI style-copy and iterative follow-ups use OpenAI lineage rather than Gemini-only `thoughtSignature`
     5. Follow-up actions on Gemini and OpenAI results no longer drift into the wrong provider runtime
+
+- [x] **Phase 11: OpenAI Style-Copy Retry Recovery** — completed 2026-04-29
+  - Goal: reconnect admin retry recovery with OpenAI style-copy continuation metadata
+  - Requirements: `OPS-03`, `OED-02`, `OED-03`
+  - Gap Closure: closes v1.1 audit blocker where `AdminService.retryGeneration()` omits `copyTarget` and `selectedImageId`
+  - Success criteria:
+    1. Admin retry requeues OpenAI style-copy jobs with complete persisted continuation metadata
+    2. Regression coverage proves a failed OpenAI style-copy retry reaches provider dispatch with the required fields
+    3. Gemini retry and non-style-copy OpenAI retry behavior remain unchanged
+
+- [ ] **Phase 12: OpenAI Sketch Verification Closure**
+  - Goal: produce the missing Phase 9 verification and close Sketch to Real transparent-background evidence gaps
+  - Requirements: `PROV-02`, `OSR-01`, `OSR-02`, `OSR-03`
+  - Gap Closure: closes v1.1 audit orphaned Phase 9 requirements and transparent-background flow evidence gap
+  - Success criteria:
+    1. Phase 9 has a verification artifact mapping PROV-02, OSR-01, OSR-02, and OSR-03 to checked evidence
+    2. Transparent-background requests are proven through background-removal post-processing evidence or an explicit milestone exception
+    3. Opaque and transparent Sketch to Real smoke/UAT evidence is sufficient for a follow-up milestone audit
+
+- [ ] **Phase 13: IP Change Verification Note Cleanup**
+  - Goal: remove stale transparent-background references from Phase 8 verification and align OIP-02 traceability with the current runtime
+  - Requirements: `OIP-02`
+  - Gap Closure: closes v1.1 audit warning connecting the Phase 8 verification artifact to the current IP Change v2 runtime
+  - Success criteria:
+    1. Phase 8 verification and release notes no longer imply an IP Change transparent option that the current API rejects
+    2. OIP-02 evidence documents the supported structure, viewpoint, background, and hardware-preservation options
+    3. Follow-up audit no longer reports a stale transparent-background warning for IP Change v2
 
 </details>
 
@@ -135,15 +162,49 @@
   4. OpenAI style-copy and iterative follow-ups use OpenAI lineage rather than Gemini-only `thoughtSignature`
   5. Follow-up actions on Gemini and OpenAI results no longer drift into the wrong provider runtime
 
+### Phase 11: OpenAI Style-Copy Retry Recovery
+**Goal**: Reconnect admin retry recovery with OpenAI style-copy continuation metadata
+**Depends on**: Phases 7 and 10
+**Requirements**: OPS-03, OED-02, OED-03
+**Gap Closure**: Closes v1.1 audit blocker where admin retry requeues failed OpenAI style-copy jobs without `promptData.copyTarget` and `promptData.selectedImageId`.
+**Success Criteria** (what must be TRUE):
+  1. `AdminService.retryGeneration()` includes persisted style-copy continuation metadata in OpenAI retry queue payloads
+  2. Regression coverage proves failed OpenAI style-copy retry reaches provider dispatch with complete metadata
+  3. Existing Gemini and non-style-copy OpenAI retry behavior remains unchanged
+
+### Phase 12: OpenAI Sketch Verification Closure
+**Goal**: Produce the missing Phase 9 verification and close Sketch to Real transparent-background evidence gaps
+**Depends on**: Phase 9
+**Requirements**: PROV-02, OSR-01, OSR-02, OSR-03
+**Required Skills**: `mockup-openai-dual-provider`, `mockup-openai-workflows`, `mockup-openai-image-runtime`, `mockup-sketch-realization`, `mockup-openai-cli-smoke`
+**Required Prompt Refs**: `.codex/skills/mockup-openai-workflows/references/workflow-matrix.md`, `.codex/skills/mockup-openai-workflows/references/prompt-playbook.md`, `.codex/skills/mockup-sketch-realization/references/gpt-image-2-notes.md`
+**Gap Closure**: Closes v1.1 audit orphaned requirements caused by missing `09-VERIFICATION.md` and deferred transparent-background evidence.
+**Success Criteria** (what must be TRUE):
+  1. Phase 9 verification maps PROV-02, OSR-01, OSR-02, and OSR-03 to source, test, smoke, or explicit human-evidence status
+  2. Transparent-background Sketch to Real requests are verified through the post-processing path with alpha/composite evidence or a documented milestone exception
+  3. Follow-up audit no longer treats Phase 9 requirements as orphaned
+
+### Phase 13: IP Change Verification Note Cleanup
+**Goal**: Remove stale transparent-background references from Phase 8 verification and align OIP-02 traceability with the current runtime
+**Depends on**: Phase 8
+**Requirements**: OIP-02
+**Required Skills**: `mockup-openai-dual-provider`, `mockup-openai-workflows`, `mockup-openai-image-runtime`, `mockup-ip-change`, `mockup-openai-cli-smoke`
+**Required Prompt Refs**: `.codex/skills/mockup-openai-workflows/references/workflow-matrix.md`, `.codex/skills/mockup-openai-workflows/references/prompt-playbook.md`, `.codex/skills/mockup-ip-change/references/gpt-image-2-notes.md`
+**Gap Closure**: Closes v1.1 audit warning that Phase 8 verification still mentions transparent-background option carry-through for IP Change v2.
+**Success Criteria** (what must be TRUE):
+  1. Phase 8 verification and related release notes accurately describe current IP Change v2 options
+  2. OIP-02 evidence confirms structure, viewpoint, background, and hardware-preservation options without unsupported transparent-output claims
+  3. Follow-up audit no longer reports the Phase 8 stale transparent-background warning
+
 ## Progress
 
 | Milestone | Phases | Plans | Status | Shipped |
 |-----------|--------|-------|--------|---------|
 | v1.0 AI Mockup Admin Panel | 1-6 | 18/18 | Shipped | 2026-04-23 |
-| v1.1 OpenAI GPT Image 2 Dual Provider | 7-10 | 11/19 | In Progress | — |
+| v1.1 OpenAI GPT Image 2 Dual Provider | 7-13 | 11/19 original; 0/3 gap closures | In Progress | — |
 
 ## Next
 
-**Phase 8: OpenAI IP Change Parity** — planned in 4 execution plans; ready to implement the OpenAI GPT Image 2 `IP 변경` workflow while preserving the existing Gemini flow.
+**Phase 12: OpenAI Sketch Verification Closure** — close Phase 9 verification and transparent-background evidence gaps.
 
-Run `$gsd-execute-phase 8` to implement the plans.
+Run `$gsd-plan-phase 12` to plan the Sketch verification closure.

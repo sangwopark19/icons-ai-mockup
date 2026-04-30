@@ -40,6 +40,7 @@
 - ✓ Provider-scoped Gemini/OpenAI admin API key management — Phase 7
 - ✓ Admin provider/model/support metadata monitoring — Phase 7
 - ✓ Provider-aware result/history labels, same-provider regeneration, OpenAI partial edit, and OpenAI style-copy continuation — Phase 10
+- ✓ OpenAI style-copy admin retry continuation metadata recovery — Phase 11
 
 ### Active
 
@@ -94,6 +95,7 @@
 | OpenAI runtime을 별도 service로 추가 | `gemini.service.ts`를 provider 혼합 blob으로 만들지 않기 위함 | — Pending |
 | OpenAI transparent output은 후처리로 해결 | `gpt-image-2` API 제약을 제품 옵션과 양립시키기 위함 | — Pending |
 | OpenAI style copy는 Responses linkage 사용 | Gemini `thoughtSignature`를 그대로 재사용할 수 없음 | Complete in Phase 10; live smoke pending |
+| Admin retry reconstructs OpenAI style-copy continuation metadata from persisted `promptData` | Failed style-copy retries must preserve `copyTarget` and `selectedImageId` so worker guard checks pass without Gemini fallback | Complete in Phase 11 |
 
 ## Evolution
 
@@ -113,4 +115,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-29 after Phase 10 provider-aware continuation completion*
+*Last updated: 2026-04-29 after Phase 11 style-copy retry recovery completion*

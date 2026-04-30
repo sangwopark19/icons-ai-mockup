@@ -32,6 +32,21 @@ const API_KEY_PUBLIC_SELECT = {
   createdAt: true,
 } as const;
 
+function normalizePagination(
+  pageValue?: number,
+  limitValue?: number
+): { page: number; limit: number; skip: number } {
+  const page =
+    typeof pageValue === 'number' && Number.isInteger(pageValue) && pageValue > 0
+      ? pageValue
+      : 1;
+  const limit =
+    typeof limitValue === 'number' && Number.isInteger(limitValue) && limitValue > 0
+      ? Math.min(limitValue, 100)
+      : 20;
+  return { page, limit, skip: (page - 1) * limit };
+}
+
 function stringValue(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value : undefined;
 }
@@ -69,6 +84,10 @@ function getOpenAIRequestAccounting(providerTrace: unknown): OpenAIRequestAccoun
 
 function qualityValue(value: unknown): GenerationJobData['options']['quality'] {
   return value === 'low' || value === 'medium' || value === 'high' ? value : undefined;
+}
+
+function copyTargetValue(value: unknown): GenerationJobData['copyTarget'] | undefined {
+  return value === 'ip-change' || value === 'new-product' ? value : undefined;
 }
 
 function retryStringOption(
@@ -298,6 +317,16 @@ function buildImageWhere(params: Omit<ListImagesParams, 'page' | 'limit'>) {
   return where;
 }
 
+function hasDeleteScope(params: Omit<ListImagesParams, 'page' | 'limit'>): boolean {
+  return Boolean(
+    params.email ||
+      params.projectId ||
+      params.startDate ||
+      params.endDate ||
+      (params.ids && params.ids.length > 0)
+  );
+}
+
 export class AdminService {
   async getDashboardStats(): Promise<DashboardStats> {
     const now = new Date();
@@ -386,9 +415,7 @@ export class AdminService {
   }
 
   async listUsers(params: ListUsersParams): Promise<ListUsersResult> {
-    const page = params.page ?? 1;
-    const limit = params.limit ?? 20;
-    const skip = (page - 1) * limit;
+    const { page, limit, skip } = normalizePagination(params.page, params.limit);
 
     const where: Record<string, unknown> = {};
 
@@ -460,9 +487,7 @@ export class AdminService {
   }
 
   async listGenerations(params: ListGenerationsParams): Promise<ListGenerationsResult> {
-    const page = params.page ?? 1;
-    const limit = params.limit ?? 20;
-    const skip = (page - 1) * limit;
+    const { page, limit, skip } = normalizePagination(params.page, params.limit);
 
     const where: Record<string, unknown> = {};
 
@@ -547,15 +572,6 @@ export class AdminService {
       throw new Error('Only failed generations can be retried');
     }
 
-    const updated = await prisma.generation.update({
-      where: { id },
-      data: {
-        status: 'pending',
-        errorMessage: null,
-        retryCount: { increment: 1 },
-      },
-    });
-
     const promptData = (generation.promptData as StoredGenerationPromptData) ?? {};
     const options = (generation.options as StoredGenerationOptions) ?? {};
     const projectUploadPrefix = `uploads/${generation.project.userId}/${generation.projectId}`;
@@ -565,29 +581,60 @@ export class AdminService {
       validateRetryStoragePath(promptData.characterImagePath, [characterUploadPrefix], '캐릭터'),
       validateRetryStoragePath(promptData.textureImagePath, [projectUploadPrefix], '텍스처'),
     ]);
-
-    await addGenerationJob({
+    const copyTarget = copyTargetValue(promptData.copyTarget);
+    const selectedImageId = stringValue(promptData.selectedImageId);
+    const jobData: GenerationJobData = {
       generationId: generation.id,
       userId: generation.project.userId,
       projectId: generation.projectId,
-      mode: generation.mode as 'ip_change' | 'sketch_to_real',
+      mode: generation.mode as GenerationJobData['mode'],
       provider: generation.provider,
       providerModel: generation.providerModel,
       styleReferenceId: generation.styleReferenceId ?? undefined,
+      ...(copyTarget ? { copyTarget } : {}),
+      ...(selectedImageId ? { selectedImageId } : {}),
       sourceImagePath,
       characterImagePath,
       textureImagePath,
-      prompt: promptData.userPrompt as string | undefined,
+      prompt: stringValue(promptData.userPrompt),
       options: buildRetryGenerationOptions(options, promptData),
+    };
+
+    const claim = await prisma.generation.updateMany({
+      where: { id, status: 'failed' },
+      data: {
+        status: 'pending',
+        errorMessage: null,
+        retryCount: { increment: 1 },
+      },
     });
+
+    if (claim.count !== 1) {
+      throw new Error('Only failed generations can be retried');
+    }
+
+    const updated = {
+      ...generation,
+      status: 'pending',
+      errorMessage: null,
+      retryCount: generation.retryCount + 1,
+    };
+
+    try {
+      await addGenerationJob(jobData);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '작업 큐 등록에 실패했습니다';
+      await prisma.generation
+        .update({ where: { id }, data: { status: 'failed', errorMessage: message } })
+        .catch(() => undefined);
+      throw error;
+    }
 
     return updated;
   }
 
   async listGeneratedImages(params: ListImagesParams): Promise<ListImagesResult> {
-    const page = params.page ?? 1;
-    const limit = params.limit ?? 20;
-    const skip = (page - 1) * limit;
+    const { page, limit, skip } = normalizePagination(params.page, params.limit);
 
     const where = buildImageWhere(params);
 
@@ -676,6 +723,10 @@ export class AdminService {
   async bulkDeleteImages(
     params: Omit<ListImagesParams, 'page' | 'limit'>
   ): Promise<{ deletedCount: number }> {
+    if (!hasDeleteScope(params)) {
+      throw new Error('벌크 삭제에는 최소 하나 이상의 필터가 필요합니다');
+    }
+
     const where = buildImageWhere(params);
 
     const images = await prisma.generatedImage.findMany({
@@ -742,8 +793,12 @@ export class AdminService {
     const provider: ApiKeyProvider = rawKey ? (providerOrAlias as ApiKeyProvider) : 'gemini';
     const alias = rawKey ? aliasOrRawKey : providerOrAlias;
     const keyToStore = rawKey ?? aliasOrRawKey;
-    const maskedKey = keyToStore.slice(-4);
-    const encryptedKey = encrypt(keyToStore, getEncryptionKey());
+    const trimmedKey = keyToStore.trim();
+    if (trimmedKey.length < 8) {
+      throw new Error('API 키가 너무 짧습니다');
+    }
+    const maskedKey = trimmedKey.slice(-4);
+    const encryptedKey = encrypt(trimmedKey, getEncryptionKey());
 
     const created = await prisma.apiKey.create({
       data: { provider, alias, encryptedKey, maskedKey, isActive: false },
