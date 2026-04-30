@@ -10,10 +10,10 @@ import { apiFetch } from '@/lib/api';
 
 type QualityValue = 'low' | 'medium' | 'high';
 
-const QUALITY_OPTIONS: Array<{ label: string; value: QualityValue; estimatedWait: string }> = [
-  { label: '빠른모드', value: 'low', estimatedWait: '예상 대기 1-4분' },
-  { label: '균형모드', value: 'medium', estimatedWait: '예상 대기 4-10분' },
-  { label: '퀄리티모드', value: 'high', estimatedWait: '예상 대기 8-15분' },
+const QUALITY_OPTIONS: Array<{ label: string; value: QualityValue; waitHint: string }> = [
+  { label: '빠른모드', value: 'low', waitHint: '공식 기준: 가장 빠름' },
+  { label: '균형모드', value: 'medium', waitHint: '공식 기준: 표준 품질' },
+  { label: '퀄리티모드', value: 'high', waitHint: '공식 기준: 최종 에셋용' },
 ];
 
 export default function OpenAIIPChangePage() {
@@ -247,10 +247,14 @@ export default function OpenAIIPChangePage() {
                     className="sr-only"
                   />
                   <span>{option.label}</span>
-                  <span className="mt-1 text-xs font-normal opacity-80">{option.estimatedWait}</span>
+                  <span className="mt-1 text-xs font-normal opacity-80">{option.waitHint}</span>
                 </label>
               ))}
             </div>
+            <p className="mt-2 text-xs text-[var(--text-secondary)]">
+              OpenAI는 모드별 분 단위 대기시간을 공개하지 않습니다. 요청 내용과 이미지 수에 따라
+              달라질 수 있습니다.
+            </p>
           </fieldset>
 
           <div className="mt-6 space-y-3">
