@@ -110,7 +110,7 @@ No blocking implementation anti-patterns found. Static scan found expected opera
 
 - Real OpenAI behavior is still unproven without live request IDs and sample outputs.
 - Browser UX is statically verified but not runtime-authenticated.
-- The transparent-background checkbox is carried through as an option and OpenAI requests stay opaque as required; final transparent-output quality should be manually confirmed if transparency is expected as an end-user deliverable.
+- OpenAI IP Change v2 intentionally has no transparent-background UI/output option; direct `provider=openai`, `mode=ip_change`, `transparentBackground=true` requests are rejected by route/service guards until a real removal pipeline is wired. OIP-02 remains satisfied by structure, fixed viewpoint, fixed background, hardware preservation, shadow removal, user instructions, quality, and two-candidate output controls.
 
 ### Next Action
 
