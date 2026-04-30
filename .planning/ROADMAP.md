@@ -198,6 +198,10 @@ Plans:
 **Required Skills**: `mockup-openai-dual-provider`, `mockup-openai-workflows`, `mockup-openai-image-runtime`, `mockup-ip-change`, `mockup-openai-cli-smoke`
 **Required Prompt Refs**: `.codex/skills/mockup-openai-workflows/references/workflow-matrix.md`, `.codex/skills/mockup-openai-workflows/references/prompt-playbook.md`, `.codex/skills/mockup-ip-change/references/gpt-image-2-notes.md`
 **Gap Closure**: Closes v1.1 audit warning that Phase 8 verification still mentions transparent-background option carry-through for IP Change v2.
+**Plans:** 1 plan
+Plans:
+**Wave 1**
+- [ ] 13-01-PLAN.md — Correct IP Change verification notes and close OIP-02 traceability
 **Success Criteria** (what must be TRUE):
   1. Phase 8 verification and related release notes accurately describe current IP Change v2 options
   2. OIP-02 evidence confirms structure, viewpoint, background, and hardware-preservation options without unsupported transparent-output claims
