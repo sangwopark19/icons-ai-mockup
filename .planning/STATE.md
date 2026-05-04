@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: OpenAI GPT Image 2 Dual Provider
-status: milestone_complete
-stopped_at: Completed 13-01-PLAN.md
-last_updated: "2026-04-30T08:45:28.275Z"
-last_activity: 2026-04-30
+status: archived
+stopped_at: v1.1 milestone archived with accepted deferred evidence; ready for next milestone planning
+last_updated: "2026-05-04T01:15:00Z"
+last_activity: 2026-05-04
 progress:
   total_phases: 7
   completed_phases: 7
-  total_plans: 24
-  completed_plans: 24
+  total_plans: 23
+  completed_plans: 23
   percent: 100
 ---
 
@@ -18,17 +18,17 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-30)
+See: .planning/PROJECT.md (updated 2026-05-04)
 
 **Core value:** 사용자가 원하는 제품 목업을 구조와 디테일을 잃지 않고 빠르게 생성하고 비교할 수 있어야 한다.
-**Current focus:** Phase 13 — ip-change-verification-note-cleanup
+**Current focus:** Planning the next milestone from accepted v1.1 deferred evidence and future provider work.
 
 ## Current Position
 
-Phase: 13 (ip-change-verification-note-cleanup) — COMPLETE
-Plan: 1 of 1
-Status: Milestone complete
-Last activity: 2026-04-30
+Milestone: v1.1 OpenAI GPT Image 2 Dual Provider — ARCHIVED
+Phases: 7-13
+Status: Shipped with accepted deferred evidence
+Last activity: 2026-05-04
 
 Progress: [██████████] 100%
 
@@ -36,7 +36,7 @@ Progress: [██████████] 100%
 
 **Velocity:**
 
-- Total plans completed: 15
+- Total plans completed: 23
 - Average duration: —
 - Total execution time: 0 hours
 
@@ -45,6 +45,8 @@ Progress: [██████████] 100%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 07 | 4 | - | - |
+| 08 | 4 | - | - |
+| 09 | 4 | - | - |
 | 10 | 7 | - | - |
 | 11 | 1 | - | - |
 | 12 | 2 | - | - |
@@ -132,6 +134,7 @@ Progress: [██████████] 100%
 
 ### Pending Todos
 
+- [v1.1 close accepted gap]: Resolve `PROV-03` by either displaying a product-safe model label in result/history or updating the requirement to explicitly accept v1/v2 product labels plus admin/API model metadata.
 - [Phase 09 follow-up]: Retry transparent-background Sketch v2 live smoke after merge/deployment and record final PNG alpha, transparent pixel ratio, border ratio, dark-composite luma, and composite output evidence.
 - [Phase 10 human UAT]: Run live OpenAI partial edit smoke, live OpenAI style-copy smoke, and authenticated browser walkthrough from `10-HUMAN-UAT.md`.
 
@@ -162,10 +165,25 @@ Items acknowledged and deferred at milestone close on 2026-04-23:
 | verification | v1.0 generation/content monitoring: 03-VERIFICATION.md | human_needed runtime/browser checks |
 | verification | Phase 09 transparent-background live smoke evidence | deferred after PR #4 merge/deploy; record alpha/ratio/dark-composite evidence |
 
+Items acknowledged and deferred at milestone close on 2026-05-04:
+
+| Category | Item | Status |
+|----------|------|--------|
+| quick_task | 260428-p4c-gpt-image-2-0-2-requests-27-101-176-cli | missing |
+| quick_task | 260430-k39-fix-gpt-image-2-openai-image-timeout-fro | missing |
+| uat_gap | Phase 08: 08-HUMAN-UAT.md | partial; 2 pending scenarios |
+| uat_gap | Phase 10: 10-HUMAN-UAT.md | partial; 3 pending scenarios |
+| uat_gap | Phase 11: 11-UAT.md | passed; 0 pending scenarios |
+| verification_gap | Phase 08: 08-VERIFICATION.md | human_needed |
+| verification_gap | Phase 09: 09-VERIFICATION.md | human_needed |
+| verification_gap | Phase 10: 10-VERIFICATION.md | human_needed |
+| audit_gap | PROV-03 result/history provider-model display | accepted deferred blocker |
+| audit_gap | OSR-03 final transparent PNG alpha/composite evidence | accepted milestone exception |
+
 ## Session Continuity
 
-Last session: 2026-04-30T08:45:28.268Z
-Stopped at: Completed 13-01-PLAN.md
+Last session: 2026-05-04T01:15:00Z
+Stopped at: v1.1 milestone archived; next action is `$gsd-new-milestone`
 Resume file: None
 
 **Planned Phase:** 8 (OpenAI IP Change Parity) — 4 plans — 2026-04-24T07:32:48.475Z
