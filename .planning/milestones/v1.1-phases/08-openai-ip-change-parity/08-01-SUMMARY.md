@@ -30,7 +30,7 @@ key-files:
 key-decisions:
   - "OpenAI IP Change uses a separate openai-image.service.ts instead of mixing provider code into gemini.service.ts."
   - "Two v2 candidates are produced through one images.edit call with n=2."
-  - "gpt-image-2 requests omit background and input_fidelity; transparent-background intent remains an app option, not an OpenAI request parameter."
+  - "gpt-image-2 requests omit background and input_fidelity; after the Phase 8 review fix, OpenAI IP Change v2 does not expose transparent-background intent as an app option and backend guards reject direct transparentBackground requests."
 patterns-established:
   - "OpenAI support IDs are stored in existing OpenAI fields and providerTrace without raw response bodies."
   - "Worker dispatch allows provider=openai only for mode=ip_change in Phase 8."

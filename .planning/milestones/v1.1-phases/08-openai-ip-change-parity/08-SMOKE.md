@@ -22,7 +22,7 @@ Check the authenticated product workflow at desktop and mobile widths:
 
 - project page shows `IP 변경 v1` and `IP 변경 v2`
 - v2 form defaults preserve structure, fixed viewpoint, and fixed background enabled
-- v2 form keeps transparent background, hardware preservation, shadow removal, and user instructions available
+- v2 form exposes structure preservation, hardware preservation, fixed background, fixed viewpoint, shadow removal, user instructions, quality, and two-candidate generation controls; it does not expose transparent-background or 누끼 controls
 - result page shows `v2`, two candidates, save, download, and disabled follow-ups
 - history shows `v2` badge and reopens the result page
 - no product screen visibly shows `OpenAI`, `Gemini`, `GPT Image 2`, or `gpt-image-2`

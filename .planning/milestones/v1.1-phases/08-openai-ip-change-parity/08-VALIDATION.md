@@ -64,7 +64,7 @@ created: 2026-04-24
 |----------|-------------|------------|-------------------|
 | Real GPT Image 2 edit produces two usable candidates | OIP-01, OIP-02 | Requires a live OpenAI API key and representative source/character images | Run the Image API edit smoke with sample product and character images; record request IDs and output file paths. |
 | v2 visual parity and no provider/model leakage | PROV-01, OIP-03 | Visual review is required for card emphasis, badge placement, disabled follow-up affordances, and Korean copy | Open project screen, v2 form, result, and history in browser at desktop and mobile widths. Confirm only v1/v2 labels appear. |
-| Transparent-background post-process quality | OIP-02 | Background removal quality cannot be fully validated by unit tests | Submit v2 with transparent option enabled, confirm `gpt-image-2` request stays opaque and final saved/downloaded asset follows the implemented post-process behavior. |
+| Direct OpenAI IP Change transparent-background submission rejection | OIP-02 | Static/UI absence plus route/service rejection can be automated; live browser/provider evidence remains separate | Verify the v2 UI has no transparent-background option and direct `provider=openai`, `mode=ip_change`, `transparentBackground=true` submissions are rejected by route/service guards. |
 
 ---
 
