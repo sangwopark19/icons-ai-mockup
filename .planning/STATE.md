@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: OpenAI GPT Image 2 Dual Provider
-status: archived
-stopped_at: v1.1 milestone archived with accepted deferred evidence; ready for next milestone planning
-last_updated: "2026-05-04T01:15:00Z"
+status: "Phase 13 shipped - PR #10"
+stopped_at: v1.1 milestone archived; next action is `$gsd-new-milestone`
+last_updated: "2026-05-04T01:35:50.749Z"
 last_activity: 2026-05-04
 progress:
   total_phases: 7
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-05-04)
 
 Milestone: v1.1 OpenAI GPT Image 2 Dual Provider — ARCHIVED
 Phases: 7-13
-Status: Shipped with accepted deferred evidence
+Status: Phase 13 shipped - PR #10
 Last activity: 2026-05-04
 
 Progress: [██████████] 100%
