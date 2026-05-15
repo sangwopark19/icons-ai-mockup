@@ -35,6 +35,7 @@ const envSchema = z.object({
 
   // Gemini API
   GEMINI_API_KEY: z.string().optional(),
+  IMAGE_V2_ENABLED: z.string().optional(),
 
   // 파일 업로드
   MAX_FILE_SIZE: z.coerce.number().default(10 * 1024 * 1024), // 10MB
@@ -67,6 +68,11 @@ function parseCorsOrigins(value: string) {
   return Array.from(new Set([...BASE_CORS_ORIGINS, ...extraOrigins]));
 }
 
+function parseBooleanFlag(value: string | undefined, fallback = false): boolean {
+  if (value === undefined) return fallback;
+  return value.trim().toLowerCase() === 'true';
+}
+
 function parseEnv() {
   const parsed = envSchema.safeParse(process.env);
 
@@ -93,6 +99,7 @@ function parseEnv() {
         jwtRefreshExpiry: '7d',
         encryptionKey: developmentEncryptionKey,
         geminiApiKey: undefined,
+        imageV2Enabled: parseBooleanFlag(process.env.IMAGE_V2_ENABLED),
         maxFileSize: 10 * 1024 * 1024,
         uploadDir: './data',
         corsOrigins: parseCorsOrigins(''),
@@ -112,6 +119,7 @@ function parseEnv() {
     jwtRefreshExpiry: parsed.data.JWT_REFRESH_EXPIRY,
     encryptionKey: parsed.data.ENCRYPTION_KEY,
     geminiApiKey: parsed.data.GEMINI_API_KEY,
+    imageV2Enabled: parseBooleanFlag(parsed.data.IMAGE_V2_ENABLED, parsed.data.NODE_ENV === 'test'),
     maxFileSize: parsed.data.MAX_FILE_SIZE,
     uploadDir: parsed.data.UPLOAD_DIR,
     corsOrigins: parseCorsOrigins(parsed.data.CORS_ORIGIN),

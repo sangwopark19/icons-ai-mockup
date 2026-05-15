@@ -14,6 +14,7 @@ import {
   type GenerationImage,
   type GenerationMode,
 } from '@/lib/api';
+import { IMAGE_V2_ENABLED } from '@/lib/features';
 
 const V2_CANDIDATE_LABELS = ['후보 1', '후보 2'];
 const PARTIAL_EDIT_EMPTY_PROMPT_ERROR = '수정할 내용을 입력해주세요.';
@@ -267,6 +268,11 @@ export default function GenerationResultPage() {
   };
 
   const handleOpenEditModal = () => {
+    if (generation?.provider === 'openai' && !IMAGE_V2_ENABLED) {
+      setSaveMessage('이미지 v2 기능은 현재 사용할 수 없습니다.');
+      return;
+    }
+
     setEditPrompt('');
     setEditError(null);
     setShowEditModal(true);
@@ -352,6 +358,10 @@ export default function GenerationResultPage() {
    */
   const handleRegenerateWithSameInputs = async () => {
     if (!accessToken || isRegenerating) return;
+    if (generation?.provider === 'openai' && !IMAGE_V2_ENABLED) {
+      setSaveMessage('이미지 v2 기능은 현재 사용할 수 없습니다.');
+      return;
+    }
 
     setIsRegenerating(true);
     setSaveMessage(null);
@@ -381,7 +391,7 @@ export default function GenerationResultPage() {
    */
   const handleModifyConditions = () => {
     // 모드에 따라 해당 페이지로 이동
-    if (generation?.provider === 'openai') {
+    if (generation?.provider === 'openai' && IMAGE_V2_ENABLED) {
       router.push(getV2WorkflowPath(projectId, generation.mode));
     } else if (generation?.mode === 'ip_change') {
       router.push(`/projects/${projectId}/ip-change`);
@@ -397,6 +407,10 @@ export default function GenerationResultPage() {
    */
   const handleStyleCopy = (copyTarget: 'ip-change' | 'new-product') => {
     if (!generation) return;
+    if (generation.provider === 'openai' && !IMAGE_V2_ENABLED) {
+      setSaveMessage('이미지 v2 기능은 현재 사용할 수 없습니다.');
+      return;
+    }
 
     const styleRef = generation?.id ?? genId;
     if (generation.provider === 'openai') {
@@ -442,8 +456,8 @@ export default function GenerationResultPage() {
         </p>
         {!pendingCopy && (
           <p className="mt-3 max-w-md text-center text-sm text-[var(--text-secondary)]">
-            고품질 결과를 위해 고성능 AI로 처리 중이라 시간이 오래 걸릴 수 있습니다. 완료까지
-            잠시만 다른작업을 하면서 기다려주세요.
+            고품질 결과를 위해 고성능 AI로 처리 중이라 시간이 오래 걸릴 수 있습니다. 완료까지 잠시만
+            다른작업을 하면서 기다려주세요.
           </p>
         )}
       </div>
@@ -464,7 +478,7 @@ export default function GenerationResultPage() {
         <Button
           className="mt-6"
           onClick={() =>
-            v2WorkflowCopy
+            v2WorkflowCopy && IMAGE_V2_ENABLED
               ? router.push(getV2WorkflowPath(projectId, generation.mode))
               : router.back()
           }
@@ -493,10 +507,7 @@ export default function GenerationResultPage() {
           후보 2개가 필요하지만 현재 {orderedImages.length}개가 저장되어 있습니다. 스케치와 재질
           정보를 확인한 뒤 다시 생성해주세요.
         </p>
-        <Button
-          className="mt-6"
-          onClick={() => router.push(`/projects/${projectId}/sketch-to-real/openai`)}
-        >
+        <Button className="mt-6" onClick={() => router.push(`/projects/${projectId}`)}>
           다시 시도
         </Button>
       </div>
@@ -550,7 +561,7 @@ export default function GenerationResultPage() {
                 alt={
                   isOneResultEdit
                     ? '선택된 v2 부분 수정 결과'
-                    : v2WorkflowCopy?.selectedAlt ?? '생성된 목업 결과'
+                    : (v2WorkflowCopy?.selectedAlt ?? '생성된 목업 결과')
                 }
                 className="max-h-[600px] rounded-lg object-contain"
               />
@@ -591,8 +602,8 @@ export default function GenerationResultPage() {
                       isOneResultEdit
                         ? '선택된 v2 부분 수정 결과'
                         : v2WorkflowCopy
-                        ? `${v2WorkflowCopy.candidateAltPrefix} ${index + 1}`
-                        : `생성 후보 ${index + 1}`
+                          ? `${v2WorkflowCopy.candidateAltPrefix} ${index + 1}`
+                          : `생성 후보 ${index + 1}`
                     }
                     className="aspect-square w-full object-cover"
                   />
@@ -618,7 +629,7 @@ export default function GenerationResultPage() {
                 variant="secondary"
                 className="w-full"
                 onClick={handleOpenEditModal}
-                disabled={!selectedImageId}
+                disabled={!selectedImageId || (isV2 && !IMAGE_V2_ENABLED)}
               >
                 부분 수정
               </Button>
@@ -637,7 +648,8 @@ export default function GenerationResultPage() {
                 onClick={() => handleStyleCopy('ip-change')}
                 isLoading={isStartingStyleCopy}
                 disabled={
-                  isStartingStyleCopy || (generation.provider === 'openai' && !selectedImageId)
+                  isStartingStyleCopy ||
+                  (generation.provider === 'openai' && (!selectedImageId || !IMAGE_V2_ENABLED))
                 }
               >
                 스타일 복사 (IP 변경)
@@ -648,7 +660,8 @@ export default function GenerationResultPage() {
                 onClick={() => handleStyleCopy('new-product')}
                 isLoading={isStartingStyleCopy}
                 disabled={
-                  isStartingStyleCopy || (generation.provider === 'openai' && !selectedImageId)
+                  isStartingStyleCopy ||
+                  (generation.provider === 'openai' && (!selectedImageId || !IMAGE_V2_ENABLED))
                 }
               >
                 스타일 복사 (새 제품 적용)
@@ -661,7 +674,7 @@ export default function GenerationResultPage() {
                 className="w-full"
                 onClick={handleRegenerateWithSameInputs}
                 isLoading={isRegenerating}
-                disabled={isRegenerating || !canRegenerate}
+                disabled={isRegenerating || !canRegenerate || (isV2 && !IMAGE_V2_ENABLED)}
               >
                 동일 조건 재생성
               </Button>

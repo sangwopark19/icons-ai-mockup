@@ -6,9 +6,11 @@ import { uploadService } from '../services/upload.service.js';
 import { generationService } from '../services/generation.service.js';
 import { adminService } from '../services/admin.service.js';
 import { openaiImageService } from '../services/openai-image.service.js';
+import { config } from '../config/index.js';
 
 const OPENAI_KEY_MISSING_MESSAGE =
   'OpenAI v2 API 키가 설정되어 있지 않습니다. 관리자에게 문의해주세요.';
+const IMAGE_V2_DISABLED_MESSAGE = '이미지 v2 기능은 현재 사용할 수 없습니다.';
 
 function isOpenAIKeyMissingError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
@@ -114,6 +116,16 @@ const editRoutes: FastifyPluginAsync = async (fastify) => {
         error: {
           code: 'UNSUPPORTED_PROVIDER_EDIT',
           message: '지원하지 않는 provider입니다.',
+        },
+      });
+    }
+
+    if (generation.provider === 'openai' && !config.imageV2Enabled) {
+      return reply.code(403).send({
+        success: false,
+        error: {
+          code: 'IMAGE_V2_DISABLED',
+          message: IMAGE_V2_DISABLED_MESSAGE,
         },
       });
     }

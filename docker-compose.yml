@@ -65,6 +65,7 @@ services:
       - JWT_REFRESH_EXPIRY=${JWT_REFRESH_EXPIRY:-7d}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - IMAGE_V2_ENABLED=${IMAGE_V2_ENABLED:-false}
       - UPLOAD_DIR=/app/data
       # CORS 허용 origin (프론트엔드 URL) - Tailscale 사용으로 모든 origin 허용
       - CORS_ORIGIN=${CORS_ORIGIN:-*}
@@ -99,6 +100,7 @@ services:
       - JWT_REFRESH_EXPIRY=${JWT_REFRESH_EXPIRY:-7d}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - IMAGE_V2_ENABLED=${IMAGE_V2_ENABLED:-false}
       - UPLOAD_DIR=/app/data
     volumes:
       - app_data:/app/data
@@ -121,6 +123,7 @@ services:
         # 로컬 개발: http://localhost:4000
         # Tailscale 접속: http://100.69.75.47:4000
         - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://100.69.75.47:4000}
+        - NEXT_PUBLIC_IMAGE_V2_ENABLED=${NEXT_PUBLIC_IMAGE_V2_ENABLED:-false}
     container_name: mockup-web
     ports:
       - '100.69.75.47:3000:3000' # 🔒 Tailscale VPN IP로만 바인딩

@@ -1,5 +1,6 @@
 import { Worker, Job } from 'bullmq';
 import { redis } from './lib/redis.js';
+import { config } from './config/index.js';
 import { geminiService } from './services/gemini.service.js';
 import { openaiImageService } from './services/openai-image.service.js';
 import { uploadService } from './services/upload.service.js';
@@ -450,6 +451,10 @@ export async function processGenerationJob(
 
     const provider = generation.provider;
     const mode = generation.mode;
+
+    if (provider === 'openai' && !config.imageV2Enabled) {
+      throw new Error('이미지 v2 기능은 현재 사용할 수 없습니다');
+    }
 
     // DB에서 활성 API 키 조회 (작업별 1회, 캐싱 없음 — CONTEXT.md 정책)
     const { id: activeKeyId, key: activeApiKey } = await adminService.getActiveApiKey(provider);

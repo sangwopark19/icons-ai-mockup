@@ -7,6 +7,7 @@ import { useAuthStore } from '@/stores/auth.store';
 import { Button } from '@/components/ui/button';
 import { ImageUploader } from '@/components/ui/image-uploader';
 import { apiFetch } from '@/lib/api';
+import { IMAGE_V2_ENABLED } from '@/lib/features';
 
 type QualityValue = 'low' | 'medium' | 'high';
 
@@ -44,6 +45,12 @@ export default function OpenAIIPChangePage() {
       router.push('/login');
     }
   }, [authLoading, isAuthenticated, router]);
+
+  useEffect(() => {
+    if (!IMAGE_V2_ENABLED) {
+      router.replace(`/projects/${projectId}`);
+    }
+  }, [projectId, router]);
 
   const uploadImage = async (file: File, type: 'source' | 'character'): Promise<string> => {
     if (!accessToken) {
@@ -170,10 +177,10 @@ export default function OpenAIIPChangePage() {
     setHardwareSpecInput(value);
   };
 
-  if (authLoading) {
+  if (authLoading || !IMAGE_V2_ENABLED) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--bg-primary)]">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+        <div className="border-brand-500 h-8 w-8 animate-spin rounded-full border-2 border-t-transparent" />
       </div>
     );
   }
@@ -236,7 +243,7 @@ export default function OpenAIIPChangePage() {
               {QUALITY_OPTIONS.map((option) => (
                 <label
                   key={option.value}
-                  className="relative flex min-h-14 cursor-pointer flex-col items-center justify-center rounded-md px-3 py-2 text-center text-sm font-medium text-[var(--text-secondary)] transition-colors has-[:checked]:bg-brand-500 has-[:checked]:text-white"
+                  className="has-[:checked]:bg-brand-500 relative flex min-h-14 cursor-pointer flex-col items-center justify-center rounded-md px-3 py-2 text-center text-sm font-medium text-[var(--text-secondary)] transition-colors has-[:checked]:text-white"
                 >
                   <input
                     type="radio"
