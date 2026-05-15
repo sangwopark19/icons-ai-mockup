@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { ImageUploader } from '@/components/ui/image-uploader';
 import { Input } from '@/components/ui/input';
 import { apiFetch } from '@/lib/api';
+import { IMAGE_V2_ENABLED } from '@/lib/features';
 
 type QualityValue = 'low' | 'medium' | 'high';
 
@@ -107,6 +108,12 @@ export default function OpenAISketchToRealPage() {
       router.push('/login');
     }
   }, [authLoading, isAuthenticated, router]);
+
+  useEffect(() => {
+    if (!IMAGE_V2_ENABLED) {
+      router.replace(`/projects/${projectId}`);
+    }
+  }, [projectId, router]);
 
   const uploadImage = async (file: File): Promise<string> => {
     if (!accessToken) {
@@ -252,10 +259,10 @@ export default function OpenAISketchToRealPage() {
     setTexturePreview(null);
   };
 
-  if (authLoading) {
+  if (authLoading || !IMAGE_V2_ENABLED) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--bg-primary)]">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+        <div className="border-brand-500 h-8 w-8 animate-spin rounded-full border-2 border-t-transparent" />
       </div>
     );
   }
@@ -349,7 +356,9 @@ export default function OpenAISketchToRealPage() {
             </fieldset>
 
             <fieldset>
-              <legend className="text-sm font-medium text-[var(--text-primary)]">재질 가이드</legend>
+              <legend className="text-sm font-medium text-[var(--text-primary)]">
+                재질 가이드
+              </legend>
               <p className="mt-1 text-xs text-[var(--text-secondary)]">
                 재질 참조 이미지가 있으면 마감과 질감은 참조 이미지를 우선합니다.
               </p>
@@ -396,7 +405,7 @@ export default function OpenAISketchToRealPage() {
               {QUALITY_OPTIONS.map((option) => (
                 <label
                   key={option.value}
-                  className="relative flex min-h-14 cursor-pointer flex-col items-center justify-center rounded-md px-3 py-2 text-center text-sm font-medium text-[var(--text-secondary)] transition-colors has-[:checked]:bg-brand-500 has-[:checked]:text-white"
+                  className="has-[:checked]:bg-brand-500 relative flex min-h-14 cursor-pointer flex-col items-center justify-center rounded-md px-3 py-2 text-center text-sm font-medium text-[var(--text-secondary)] transition-colors has-[:checked]:text-white"
                 >
                   <input
                     type="radio"

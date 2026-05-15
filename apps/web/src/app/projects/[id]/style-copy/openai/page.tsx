@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { ImageUploader } from '@/components/ui/image-uploader';
 import { Input } from '@/components/ui/input';
 import { API_URL, apiFetch, type GenerationDetail, type GenerationImage } from '@/lib/api';
+import { IMAGE_V2_ENABLED } from '@/lib/features';
 
 type CopyTarget = 'ip-change' | 'new-product';
 
@@ -99,7 +100,8 @@ export default function OpenAIStyleCopyPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const hasBlockingError = Boolean(styleFetchError) || !styleGeneration || !styleImage || !copyTarget;
+  const hasBlockingError =
+    Boolean(styleFetchError) || !styleGeneration || !styleImage || !copyTarget;
   const isTargetDisabled = hasBlockingError || isFetchingStyle;
 
   useEffect(() => {
@@ -107,6 +109,12 @@ export default function OpenAIStyleCopyPage() {
       router.push('/login');
     }
   }, [authLoading, isAuthenticated, router]);
+
+  useEffect(() => {
+    if (!IMAGE_V2_ENABLED) {
+      router.replace(`/projects/${projectId}`);
+    }
+  }, [projectId, router]);
 
   useEffect(() => {
     if (!copyTarget) {
@@ -275,10 +283,10 @@ export default function OpenAIStyleCopyPage() {
     }
   };
 
-  if (authLoading) {
+  if (authLoading || !IMAGE_V2_ENABLED) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--bg-primary)]">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+        <div className="border-brand-500 h-8 w-8 animate-spin rounded-full border-2 border-t-transparent" />
       </div>
     );
   }
@@ -325,14 +333,14 @@ export default function OpenAIStyleCopyPage() {
                   이 결과의 구도, 시점, 조명, 배경, 제품 처리 방식을 유지합니다.
                 </p>
               </div>
-              <span className="rounded bg-brand-500/10 px-2 py-1 text-xs font-semibold text-brand-500">
+              <span className="bg-brand-500/10 text-brand-500 rounded px-2 py-1 text-xs font-semibold">
                 스타일 기준 · v2
               </span>
             </div>
 
             <div className="flex min-h-[320px] items-center justify-center rounded-lg border border-[var(--border-default)] bg-[var(--bg-tertiary)] p-4">
               {isFetchingStyle && (
-                <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+                <div className="border-brand-500 h-8 w-8 animate-spin rounded-full border-2 border-t-transparent" />
               )}
               {!isFetchingStyle && styleImage && (
                 <img

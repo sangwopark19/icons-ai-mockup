@@ -16,6 +16,7 @@ const DEFAULT_PROVIDER_MODELS: Record<GenerationProvider, string> = {
   gemini: 'gemini-3-pro-image-preview',
   openai: 'gpt-image-2',
 };
+const IMAGE_V2_DISABLED_MESSAGE = '이미지 v2 기능은 현재 사용할 수 없습니다';
 
 /**
  * 생성 요청 입력 타입
@@ -135,6 +136,10 @@ function validateCreateGenerationInput(
   provider: GenerationProvider
 ): void {
   const hasContinuationOnlyMetadata = Boolean(input.copyTarget || input.selectedImageId);
+
+  if (provider === 'openai' && !config.imageV2Enabled) {
+    throw new Error(IMAGE_V2_DISABLED_MESSAGE);
+  }
 
   if (hasContinuationOnlyMetadata && !input.styleReferenceId) {
     throw new Error('스타일 복사 continuation metadata가 불완전합니다');
